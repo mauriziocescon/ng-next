@@ -262,7 +262,7 @@ export const PriceSimulator = component({
      */
     return (
       @for (item of items(); track item.id) {
-        @derive price = simulation(item={item} qty={1});
+        @derive price = simulation(item={item}, qty={1});
 
         <h5>{item.desc}</h5>
         <div>Price: {price()}</div>
