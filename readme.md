@@ -641,9 +641,7 @@ export const UserDetail = component.withDirectiveForwarding<HTMLElement>({
 
       <button on:click={() => makeAdmin.emit()}>Make Admin</button>
 
-      @if (children) {
-        @render(children())
-      }
+      @render(children?.())
     </div>
   ),
 });
