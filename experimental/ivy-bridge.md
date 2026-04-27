@@ -82,12 +82,12 @@ Template-scoped reactive computations with native DI support.
 Allows directives to "tunnel" through hostless components without requiring global compiler knowledge.
 
 - **Change Class:** Compiler + Runtime.
-- **Analogy with Fragments:** The pattern mirrors fragments: the consuming compiler (CompB) prepares a compile-time artifact — a recipe of directive defs and binding functions — and passes it across the component boundary. The child (CompA) receives an opaque, typed blob and executes it at the `@use()` site. Just as `@render(frag(args))` executes a pre-compiled template function without the child knowing anything about its contents, `ɵɵapplyAttachments` executes a pre-compiled directive recipe without the child knowing which directives are in it.
+- **Analogy with Fragments:** The pattern mirrors fragments: the consuming compiler (CompB) prepares a compile-time artifact — a recipe of directive defs and binding functions — and passes it across the component boundary. The child (CompA) receives an opaque, typed blob and executes it at the `@use()` site. Just as `@render(frag(args))` executes a pre-compiled template function without the child knowing anything about its contents, `ɵɵapplySinkDirectives` executes a pre-compiled directive recipe without the child knowing which directives are in it.
 - **Compile-time responsibility (CompB):** When the application compiler processes `<CompA use:ripple() use:tooltip(message={msg()}) />`, it generates the full recipe: directive defs, initial binding values, and update-pass binding functions. The directive matching and validation that Ivy does today via CSS-selector scanning at the first create pass has already been done — at compile time, by CompB’s compiler.
 - **The "Sink" Contract (CompA):** The child defines sink metadata with `component.withSink<T>(...)`. This is the only interface CompA exposes: the element type `T` for compile-time validation. CompA’s own TView has no knowledge of which directives will arrive.
-- **Runtime Execution:** `ɵɵapplyAttachments` calls each directive factory in the recipe, stores the instances in a per-LView side structure at the element’s position (outside the shared TView blueprint — analogous to `LView[ON_DESTROY_HOOKS]`), and wires bindings. CD visits this side structure for host bindings; destruction scans it for cleanup.
-- **Independent Compilation:** CompA’s TView blueprint is unchanged — no slots are reserved for attached directives. CompB needs no knowledge of CompA’s internals beyond the sink element type. The compiler does the structural work; the runtime does mechanical execution.
-- **Delta from Ivy Today:** In current Ivy, directive matching runs at the first create pass via CSS-selector matching against `tView.directiveRegistry`; the child must have the directive in its compilation scope and the instances live in TView-indexed LView slots. The recipe model moves matching entirely to compile time (CompB’s compiler), removes the shared-registry requirement, and stores attached directive instances in per-LView side storage rather than in the shared TView blueprint.
+- **Runtime Execution:** `ɵɵapplySinkDirectives` calls each directive factory in the recipe, stores the instances in a per-LView side structure at the element’s position (outside the shared TView blueprint — analogous to `LView[ON_DESTROY_HOOKS]`), and wires bindings. CD visits this side structure for host bindings; destruction scans it for cleanup.
+- **Independent Compilation:** CompA’s TView blueprint is unchanged — no slots are reserved for sink-propagated directives. CompB needs no knowledge of CompA’s internals beyond the sink element type. The compiler does the structural work; the runtime does mechanical execution.
+- **Delta from Ivy Today:** In current Ivy, directive matching runs at the first create pass via CSS-selector matching against `tView.directiveRegistry`; the child must have the directive in its compilation scope and the instances live in TView-indexed LView slots. The recipe model moves matching entirely to compile time (CompB’s compiler), removes the shared-registry requirement, and stores sink-propagated directive instances in per-LView side storage rather than in the shared TView blueprint.
 
 ---
 
@@ -101,7 +101,7 @@ A compile-time macro for structurally wrapping an existing component.
   3. Binds `setup` as `setup(selectedBindings)`; forwarding remainder is compiler-derived (`Forwarded`) and marker-driven via `@forward()`.
   4. Lowers `<Target @forward() />` by unrolling only `Forwarded` keys directly to target bindings.
   5. Preserves explicit prop precedence in mixed forms such as `<Target @forward() user={x} />` and `<Target user={x} @forward() />` (explicit bindings always win).
-  6. Preserves sink metadata inheritance from target to wrapper so directive passthrough remains parent → wrapper → target element. `ɵɵapplyAttachments` is emitted only at the target `@use()` site.
+  6. Preserves sink metadata inheritance from target to wrapper so directive passthrough remains parent → wrapper → target element. `ɵɵapplySinkDirectives` is emitted only at the target `@use()` site.
   7. Emits no additional Ivy instructions compared with explicit forwarding; no runtime forwarding object is allocated.
 - **Forwarding diagnostics:**
   - token/object-style forwarding usage (for example `token.foo`) is invalid.
@@ -134,7 +134,7 @@ Without a `:host` element, CSS encapsulation relies on **compiler-driven scoping
 | **Instruction Cursor** | Sequential `ɵɵadvance` on host. | Parent `ɵɵadvance` treats component as 1 slot; Child has a fresh cursor. |
 | **Public API** | Entire class instance exposed via template ref. | Only the `expose` object is accessible; internals remain private. |
 | **Projection** | Implicitly handled by `<ng-content>`. | Passed as fragments in `children` and called as functions. |
-| **Directives** | Automatically attach to the host element. | Collected in a directive bag and propagated via sink metadata to `@use()`. |
+| **Directives** | Automatically attach to the host element. | Collected in a directive recipe and propagated via sink metadata to `@use()`. |
 | **CSS Scoping** | Tied to the physical host attribute. | Applied to all template elements via compiler-generated attributes. |
 | **Template Queries** | `@ViewChild`/`@ViewChildren` resolved by a tree-walk; refreshed via `ɵɵqueryRefresh` every CD cycle. | Signal-push via `ref`/`refMany`; `expose` written once at child creation — no periodic refresh. |
 | **Transform / Memoization** | `Pipe` instances per view slot; limited DI access and no signal reactivity. | `derivation` slots with full native DI; driven directly by the signal reactive graph. |
