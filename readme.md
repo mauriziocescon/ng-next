@@ -224,7 +224,7 @@ export const tooltip = directive({
 
 ## Template-Scoped Derivations (`@derive`)
 
-`@derive` creates a template-scoped reactive computation, establishing an injection context before calling the derivation's `setup`. It follows the lifecycle of the enclosing view:
+`@derive` creates a template-scoped reactive computation, establishing an injection context before calling the derivation's `setup`. It follows the lifecycle of the enclosing view. Bindings are passed as named pairs `key={expr}`, not as a JS object literal.
 
 ```ts
 import { component, derivation, computed, inject, input } from '@angular/core';
@@ -262,7 +262,7 @@ export const PriceSimulator = component({
      */
     return (
       @for (item of items(); track item.id) {
-        @derive price = simulation(item={item}, qty={1});
+        @derive price = simulation(item={item} qty={1});
 
         <h5>{item.desc}</h5>
         <div>Price: {price()}</div>
