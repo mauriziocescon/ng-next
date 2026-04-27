@@ -467,8 +467,10 @@ export const MenuConsumer = component({
   setup: () => {
     const items = signal<Item[]>(/** ... **/);
 
-    // Inline @fragment is auto-passed as the matching fragment input.
-    // Equivalent explicit form: declare @fragment outside, pass as menuItem={menuItem}.
+    /**
+     * Inline @fragment is auto-passed as the matching fragment input.
+     * Equivalent explicit form: declare @fragment outside, pass as menuItem={menuItem}.
+     */
     return (
       <Menu items={items()}>
         @fragment menuItem(item: Item) {
@@ -556,7 +558,6 @@ export const Button = component.withDirectiveForwarding<HTMLButtonElement>({
     /**
      * Directive forwarding: directives applied to <Button /> are propagated to
      * and instantiated on the internal <button> (HTMLButtonElement) element.
-     * This passthrough is transparent at setup level.
      */
     return (
       <button
@@ -596,7 +597,9 @@ export const UserDetailConsumer = component({
   },
 });
 
-// Wrapper: selected bindings go to setup, remainder forwarded via @forward()
+/**
+ * Wrapper: selected bindings go to setup, remainder forwarded via @forward()
+ */
 export const UserDetailWrapper = component.wrap(UserDetail, {
   bindings: {
     user: input.required<User>(),
