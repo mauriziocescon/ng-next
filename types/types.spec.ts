@@ -79,43 +79,6 @@ type OptIsReq =
 const _optIsReq: OptIsReq = 'OK';
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT DIRECTIVE FORWARDING METADATA
-// ────────────────────────────────────────────────────────────────
-
-const ForwardingDefault = component.withDirectiveForwarding({
-  setup: () => tmpl,
-});
-type _ForwardingDefaultType = Assert<
-  IsEqual<typeof ForwardingDefault, ComponentInstance<{}, void, HTMLElement>>
->;
-
-const ButtonForwarding = component.withDirectiveForwarding<HTMLButtonElement>({
-  setup: () => tmpl,
-});
-type _ButtonForwardingType = Assert<
-  IsEqual<
-    typeof ButtonForwarding,
-    ComponentInstance<{}, void, HTMLButtonElement>
-  >
->;
-
-// @ts-expect-error host must be an HTMLElement subtype
-const _NegInvalidHost = component.withDirectiveForwarding<string>({
-  setup: () => tmpl,
-});
-
-const _NegForwardingMetadataInSetup = component.withDirectiveForwarding({
-  bindings: {
-    label: input<string>(),
-  },
-  setup: (bindings) => {
-    // @ts-expect-error forwarding metadata is not visible in setup bindings
-    bindings.directiveForwarding;
-    return tmpl;
-  },
-});
-
-// ────────────────────────────────────────────────────────────────
 // COMPONENT — basics
 // ────────────────────────────────────────────────────────────────
 
@@ -306,6 +269,84 @@ const Child = component({
 // Shorthand: no expose → raw template
 const NoExpose = component({
   setup: () => tmpl,
+});
+
+// Expose with inputs: inputs surfaced through expose
+const ExposedInput = component({
+  bindings: {
+    name: input.required<string>(),
+    age: input<number>(),
+  },
+  setup: ({ name, age }) => ({
+    template: tmpl,
+    expose: { name, age },
+  }),
+});
+
+const exposedInputRef = ref(ExposedInput);
+const _exposedName: InputSignal<string> | undefined = exposedInputRef()?.name;
+const _exposedAge: InputSignal<number | undefined> | undefined =
+  exposedInputRef()?.age;
+
+// Mixed: inputs + local signals in expose
+const MixedExpose = component({
+  bindings: {
+    label: input.required<string>(),
+    count: model<number>(),
+  },
+  setup: ({ label, count }) => {
+    const doubled = computed(() => (count() ?? 0) * 2);
+
+    return {
+      template: tmpl,
+      expose: { label, doubled },
+    };
+  },
+});
+
+const mixedRef = ref(MixedExpose);
+const _mixedLabel: InputSignal<string> | undefined = mixedRef()?.label;
+const _mixedDoubled: Signal<number> | undefined = mixedRef()?.doubled;
+
+// Void expose through ref: resolves to Ref<undefined>, not Ref<void | undefined>
+const voidExposeRef = ref(NoExpose);
+const _voidExposeCheck: Ref<undefined> = voidExposeRef;
+
+// ────────────────────────────────────────────────────────────────
+// COMPONENT — withDirectiveForwarding
+// ────────────────────────────────────────────────────────────────
+
+const ForwardingDefault = component.withDirectiveForwarding({
+  setup: () => tmpl,
+});
+type _ForwardingDefaultType = Assert<
+  IsEqual<typeof ForwardingDefault, ComponentInstance<{}, void, HTMLElement>>
+>;
+
+const ButtonForwarding = component.withDirectiveForwarding<HTMLButtonElement>({
+  setup: () => tmpl,
+});
+type _ButtonForwardingType = Assert<
+  IsEqual<
+    typeof ButtonForwarding,
+    ComponentInstance<{}, void, HTMLButtonElement>
+  >
+>;
+
+// @ts-expect-error host must be an HTMLElement subtype
+const _NegInvalidHost = component.withDirectiveForwarding<string>({
+  setup: () => tmpl,
+});
+
+const _NegForwardingMetadataInSetup = component.withDirectiveForwarding({
+  bindings: {
+    label: input<string>(),
+  },
+  setup: (bindings) => {
+    // @ts-expect-error forwarding metadata is not visible in setup bindings
+    bindings.directiveForwarding;
+    return tmpl;
+  },
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -601,9 +642,38 @@ const inputOnly = directive({
   },
 });
 
-// Directive-forwarding compatibility rule:
-// a directive can attach only if forwarded element type
-// is assignable to directive host element type.
+// Directive exposing its input
+const highlight = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    color: input.required<string>(),
+  },
+  setup: ({ color }, { host }) => ({ color }),
+});
+
+const highlightRef = ref(highlight);
+const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
+
+// Directive accepts fragment bindings (TemplateRef-style use cases)
+const directiveWithFragment = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    content: fragment.required<void>(),
+  },
+  setup: ({ content }, { host }) => {
+    const _content: RequiredFragmentBinding<void> = content;
+    const _rendered = content();
+    const _host: Ref<HTMLElement | undefined> = host;
+  },
+});
+
+// ────────────────────────────────────────────────────────────────
+// DIRECTIVE-FORWARDING COMPATIBILITY
+//
+// A directive can attach to a forwarded element only if the
+// forwarded element type is assignable to the directive host type.
+// ────────────────────────────────────────────────────────────────
+
 type ForwardedElement<C extends ComponentInstance<any, any, any>> =
   C extends ComponentInstance<any, any, infer S> ? S : never;
 type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
@@ -635,19 +705,6 @@ const _negButtonForwardingRejectsInputDirective: DirectiveFitsForwardedElement<
   typeof ButtonForwarding,
   typeof inputOnly
 > = true;
-
-// Directive accepts fragment bindings (TemplateRef-style use cases)
-const directiveWithFragment = directive({
-  host: ref<HTMLElement>(),
-  bindings: {
-    content: fragment.required<void>(),
-  },
-  setup: ({ content }, { host }) => {
-    const _content: RequiredFragmentBinding<void> = content;
-    const _rendered = content();
-    const _host: Ref<HTMLElement | undefined> = host;
-  },
-});
 
 // ────────────────────────────────────────────────────────────────
 // DERIVATION — only inputs, setup returns Signal<T>
@@ -749,59 +806,6 @@ childRef.set({ text: signal('') });
 tooltipRef.set({ toggle: () => {} });
 // @ts-expect-error
 manyChildren.set([]);
-
-// Expose with inputs: inputs surfaced through expose
-const ExposedInput = component({
-  bindings: {
-    name: input.required<string>(),
-    age: input<number>(),
-  },
-  setup: ({ name, age }) => ({
-    template: tmpl,
-    expose: { name, age },
-  }),
-});
-
-const exposedInputRef = ref(ExposedInput);
-const _exposedName: InputSignal<string> | undefined = exposedInputRef()?.name;
-const _exposedAge: InputSignal<number | undefined> | undefined =
-  exposedInputRef()?.age;
-
-// Mixed: inputs + local signals in expose
-const MixedExpose = component({
-  bindings: {
-    label: input.required<string>(),
-    count: model<number>(),
-  },
-  setup: ({ label, count }) => {
-    const doubled = computed(() => (count() ?? 0) * 2);
-
-    return {
-      template: tmpl,
-      expose: { label, doubled },
-    };
-  },
-});
-
-const mixedRef = ref(MixedExpose);
-const _mixedLabel: InputSignal<string> | undefined = mixedRef()?.label;
-const _mixedDoubled: Signal<number> | undefined = mixedRef()?.doubled;
-
-// Directive exposing its input
-const highlight = directive({
-  host: ref<HTMLElement>(),
-  bindings: {
-    color: input.required<string>(),
-  },
-  setup: ({ color }, { host }) => ({ color }),
-});
-
-const highlightRef = ref(highlight);
-const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
-
-// Void expose through ref: resolves to Ref<undefined>, not Ref<void | undefined>
-const voidExposeRef = ref(NoExpose);
-const _voidExposeCheck: Ref<undefined> = voidExposeRef;
 
 // Passing a ref as an input
 const Sibling = component({
