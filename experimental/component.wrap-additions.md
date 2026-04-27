@@ -96,13 +96,13 @@ type KeysMarkedTrue<M> = {
 }[keyof M];
 
 type EffectiveBindings<
-  C extends ComponentInstance<any, any>,
+  C extends ComponentInstance<any, any, any>,
   Added extends Record<string, ComponentBindingValue>,
   OmitM extends OmitMap<TargetBindings<C>>
 > = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>> & Added;
 
 type ForwardableTargetBindings<
-  C extends ComponentInstance<any, any>,
+  C extends ComponentInstance<any, any, any>,
   OmitM extends OmitMap<TargetBindings<C>>
 > = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>>;
 ```
@@ -113,7 +113,7 @@ This is a **proposed** extension of `component.wrap`, not the current signature 
 
 ```ts
 export declare function wrap<
-  C extends ComponentInstance<any, any>,
+  C extends ComponentInstance<any, any, any>,
   Added extends Record<string, ComponentBindingValue> = {},
   OmitM extends OmitMap<TargetBindings<C>> = {},
   E = void

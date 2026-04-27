@@ -14,7 +14,7 @@ Highlights:
 3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `class:`, `style:`, `animate:`, `use:`,
 4. Hostless components + TS lexical scoping for templates,
 5. Component inputs: lifted up + immediately available in setup and providers,
-6. Composition with Fragments, Directives, and Forward syntax,
+6. Composition with Fragments, Directives, and Forward Syntax,
 7. Expose and Template Refs,
 8. Dependency Injection Enhancements,
 9. Final considerations (`!important`) + [`types`](https://github.com/mauriziocescon/ng-outlook/blob/main/types/types.ts).
@@ -30,7 +30,7 @@ Highlights:
 - [Binding syntax helpers](#binding-syntax-helpers)
 - [One-time bindings (`once:`)](#one-time-bindings-once)
 - [Input-driven providers](#input-driven-providers)
-- [Composition with Fragments, Directives, and Forward syntax](#composition-with-fragments-directives-and-forward-syntax)
+- [Composition with Fragments, Directives, and Forward Syntax](#composition-with-fragments-directives-and-forward-syntax)
 - [Expose and Template Refs](#expose-and-template-refs)
 - [Dependency Injection Enhancements](#dependency-injection-enhancements)
 - [Final considerations](#final-considerations)
@@ -385,7 +385,7 @@ export const Counter = component({
 });
 ```
 
-## Composition with Fragments, Directives, and Forward syntax
+## Composition with Fragments, Directives, and Forward Syntax
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). Directive passthrough is declared with component sink metadata (`component.withSink<T>(...)`), and `@use()` marks where directives are applied. Forward syntax can be used at the component function level, similarly to React. Note: the examples below are simplified.
 
@@ -401,7 +401,7 @@ export const MenuConsumer = component({
     const second = signal('Second');
 
     /**
-     * Markup inside comp tag => implicitly becomes a fragment called children
+     * Markup inside a component tag => implicitly becomes a fragment called children
      */
     return (
       <Menu>
@@ -421,7 +421,7 @@ export const Menu = component({
      * Provided by ng from nested content (not bindable directly)
      * Name reserved to ng
      */
-     children: fragment<void>(),
+    children: fragment<void>(),
   },
   setup: ({ children }) => {
     /** ... **/
@@ -511,7 +511,7 @@ export const Menu = component({
 });
 ```
 
-Directives attached to a component and propagated to an element:
+Directives passed through a component and applied to an element:
 
 ```ts
 import { component, signal } from '@angular/core';

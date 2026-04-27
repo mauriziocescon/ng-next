@@ -78,7 +78,7 @@ Template-scoped reactive computations with native DI support.
 
 ---
 
-### 6. Directive Attachments (Instruction-Based Late Binding)
+### 6. Directive Sink Passthrough (Instruction-Based Late Binding)
 Allows directives to "tunnel" through hostless components without requiring global compiler knowledge.
 
 - **Change Class:** Compiler + Runtime.

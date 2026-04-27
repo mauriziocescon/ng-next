@@ -92,7 +92,7 @@ export type ComponentBindingValue = AnyBindingValue;
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
 //
-// ComponentInstance has bindings + expose.
+// ComponentInstance has bindings + expose + sink metadata.
 // DirectiveInstance adds a host element type (H) — a directive
 // must be attached to a DOM element.
 //
