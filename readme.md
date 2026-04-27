@@ -389,7 +389,7 @@ export const Counter = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Directive passthrough is declared with component metadata (`component.withDirectiveForwarding<T>(...)`) and element-level `@forward()` marks where directives are applied. The conformance of elements with `@forward()` to the type parameter `T` is enforced through the `IntrinsicElements` interface.
+Directive passthrough is declared with component metadata (`component.withDirectiveForwarding<T>(...)`) and element-level `@forward()` marks where directives are applied.
 
 Implicit children fragment — placement, lifecycle, and binding context:
 
