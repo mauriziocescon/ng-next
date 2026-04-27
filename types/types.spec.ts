@@ -79,38 +79,38 @@ type OptIsReq =
 const _optIsReq: OptIsReq = 'OK';
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT SINK METADATA
+// COMPONENT DIRECTIVE FORWARDING METADATA
 // ────────────────────────────────────────────────────────────────
 
-const SinkDefault = component.withSink({
+const ForwardingDefault = component.withDirectiveForwarding({
   setup: () => tmpl,
 });
-type _SinkDefaultType = Assert<
-  IsEqual<typeof SinkDefault, ComponentInstance<{}, void, HTMLElement>>
+type _ForwardingDefaultType = Assert<
+  IsEqual<typeof ForwardingDefault, ComponentInstance<{}, void, HTMLElement>>
 >;
 
-const ButtonSink = component.withSink<HTMLButtonElement>({
+const ButtonForwarding = component.withDirectiveForwarding<HTMLButtonElement>({
   setup: () => tmpl,
 });
-type _ButtonSinkType = Assert<
+type _ButtonForwardingType = Assert<
   IsEqual<
-    typeof ButtonSink,
+    typeof ButtonForwarding,
     ComponentInstance<{}, void, HTMLButtonElement>
   >
 >;
 
-// @ts-expect-error sink must be an HTMLElement subtype
-const _NegInvalidSink = component.withSink<string>({
+// @ts-expect-error host must be an HTMLElement subtype
+const _NegInvalidHost = component.withDirectiveForwarding<string>({
   setup: () => tmpl,
 });
 
-const _NegSinkInSetup = component.withSink({
+const _NegForwardingMetadataInSetup = component.withDirectiveForwarding({
   bindings: {
     label: input<string>(),
   },
   setup: (bindings) => {
-    // @ts-expect-error sink metadata is not visible in setup bindings
-    bindings.sink;
+    // @ts-expect-error forwarding metadata is not visible in setup bindings
+    bindings.directiveForwarding;
     return tmpl;
   },
 });
@@ -158,7 +158,7 @@ const MinimalFullProviders = component({
 // OutputEmitterRef, FragmentBinding.
 // ────────────────────────────────────────────────────────────────
 
-const UserDetail = component.withSink({
+const UserDetail = component.withDirectiveForwarding({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -317,7 +317,9 @@ const NoExpose = component({
 // @forward() is a compile-time forwarding marker used in
 // wrapper templates.
 //
-// @forward() is valid on components only.
+// @forward() has dual meaning:
+// - component elements: binding and directives forwarding (wrapper remainder)
+// - native elements: directive forwarding
 // ────────────────────────────────────────────────────────────────
 
 const UserDetailWrapper = component.wrap(UserDetail, {
@@ -414,7 +416,7 @@ const Base = component({
   setup: ({ item, selected, click }) => tmpl,
 });
 
-const PassThrough = component.wrap(Base, {
+const ForwardAll = component.wrap(Base, {
   bindings: {},
   setup: (bindings) => {
     // @ts-expect-error empty selection should expose no setup keys
@@ -460,26 +462,26 @@ const WrapperProvidersSelectedKinds = component.wrap(Base, {
   },
 });
 
-const SinkedWrapper = component.wrap(ButtonSink, {
+const ForwardingWrapper = component.wrap(ButtonForwarding, {
   bindings: {},
   setup: () => tmpl,
 });
-type _SinkedWrapperPreservesSink = Assert<
+type _ForwardingWrapperPreservesHost = Assert<
   IsEqual<
-    typeof SinkedWrapper,
+    typeof ForwardingWrapper,
     ComponentInstance<{}, void, HTMLButtonElement>
   >
 >;
 
-const NoSinkTarget = component({
+const NoForwardingTarget = component({
   setup: () => tmpl,
 });
-const NoSinkWrapper = component.wrap(NoSinkTarget, {
+const NoForwardingWrapper = component.wrap(NoForwardingTarget, {
   bindings: {},
   setup: () => tmpl,
 });
-type _NoSinkWrapperKeepsNever = Assert<
-  IsEqual<typeof NoSinkWrapper, ComponentInstance<{}, void, never>>
+type _NoForwardingWrapperKeepsNever = Assert<
+  IsEqual<typeof NoForwardingWrapper, ComponentInstance<{}, void, never>>
 >;
 
 // ────────────────────────────────────────────────────────────────
@@ -599,35 +601,38 @@ const inputOnly = directive({
   },
 });
 
-// Sink compatibility rule:
-// a directive can attach to a component sink only if sink element type
+// Directive-forwarding compatibility rule:
+// a directive can attach only if forwarded element type
 // is assignable to directive host element type.
-type SinkElement<C extends ComponentInstance<any, any, any>> =
+type ForwardedElement<C extends ComponentInstance<any, any, any>> =
   C extends ComponentInstance<any, any, infer S> ? S : never;
 type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
   D extends DirectiveInstance<infer H, any, any> ? H : never;
-type DirectiveFitsSink<
+type DirectiveFitsForwardedElement<
   C extends ComponentInstance<any, any, any>,
   D extends DirectiveInstance<any, any, any>,
-> = SinkElement<C> extends never
-  ? true
-  : SinkElement<C> extends DirectiveHost<D> ? true : false;
+> =
+  ForwardedElement<C> extends never
+    ? true
+    : ForwardedElement<C> extends DirectiveHost<D>
+      ? true
+      : false;
 
-type _ButtonSinkAcceptsButtonDirective = Assert<
+type _ButtonForwardingAcceptsButtonDirective = Assert<
   IsEqual<
-    DirectiveFitsSink<typeof ButtonSink, typeof buttonOnly>,
+    DirectiveFitsForwardedElement<typeof ButtonForwarding, typeof buttonOnly>,
     true
   >
 >;
-type _ButtonSinkAcceptsGenericDirective = Assert<
+type _ButtonForwardingAcceptsGenericDirective = Assert<
   IsEqual<
-    DirectiveFitsSink<typeof ButtonSink, typeof tooltip>,
+    DirectiveFitsForwardedElement<typeof ButtonForwarding, typeof tooltip>,
     true
   >
 >;
-// @ts-expect-error HTMLInputElement host directive is incompatible with HTMLButtonElement sink
-const _negButtonSinkRejectsInputDirective: DirectiveFitsSink<
-  typeof ButtonSink,
+// @ts-expect-error HTMLInputElement host directive is incompatible with HTMLButtonElement forwarded element
+const _negButtonForwardingRejectsInputDirective: DirectiveFitsForwardedElement<
+  typeof ButtonForwarding,
   typeof inputOnly
 > = true;
 

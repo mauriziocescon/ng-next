@@ -31,10 +31,7 @@ declare const FRAGMENT: unique symbol;
 declare const FRAGMENT_OPTIONAL: unique symbol;
 declare const FRAGMENT_REQUIRED: unique symbol;
 
-type FragmentArgs<T> =
-  [T] extends [void] ? []
-    : T extends any[] ? T
-    : [T];
+type FragmentArgs<T> = [T] extends [void] ? [] : T extends any[] ? T : [T];
 
 export type OptionalFragmentBinding<T> = {
   (...args: FragmentArgs<T>): TemplateMarkup;
@@ -46,7 +43,9 @@ export type RequiredFragmentBinding<T> = {
   readonly [FRAGMENT]: T;
   readonly [FRAGMENT_REQUIRED]: true;
 };
-export type FragmentBinding<T> = OptionalFragmentBinding<T> | RequiredFragmentBinding<T>;
+export type FragmentBinding<T> =
+  | OptionalFragmentBinding<T>
+  | RequiredFragmentBinding<T>;
 
 export declare function fragment<T>(): OptionalFragmentBinding<T>;
 export declare namespace fragment {
@@ -92,7 +91,7 @@ export type ComponentBindingValue = AnyBindingValue;
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
 //
-// ComponentInstance has bindings + expose + sink metadata.
+// ComponentInstance has bindings + expose + directive-forwarding metadata.
 // DirectiveInstance adds a host element type (H) — a directive
 // must be attached to a DOM element.
 //
@@ -106,12 +105,12 @@ export type ComponentBindingValue = AnyBindingValue;
 declare const BINDINGS: unique symbol;
 declare const EXPOSE: unique symbol;
 declare const HOST: unique symbol;
-declare const SINK: unique symbol;
+declare const DIRECTIVE_FORWARDING: unique symbol;
 
 export type ComponentInstance<B, E = void, S extends HTMLElement = never> = {
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
-  readonly [SINK]: S;
+  readonly [DIRECTIVE_FORWARDING]: S;
 };
 
 export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
@@ -120,102 +119,142 @@ export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
   readonly [EXPOSE]: E;
 };
 
-type ExposeOf<T> =
-  T extends { readonly [EXPOSE]: infer E } ? E : never;
+type ExposeOf<T> = T extends { readonly [EXPOSE]: infer E } ? E : never;
 
 type TargetBindings<C extends ComponentInstance<unknown, unknown, any>> =
   C extends { readonly [BINDINGS]: infer B } ? B : never;
 
-type SinkOf<C extends ComponentInstance<any, any, any>> =
-  C extends { readonly [SINK]: infer S } ? S : never;
+type DirectiveForwardingHostOf<C extends ComponentInstance<any, any, any>> =
+  C extends { readonly [DIRECTIVE_FORWARDING]: infer S } ? S : never;
 
 type InputKeys<B> = {
-  [K in keyof B]: B[K] extends ModelSignal<any> ? never
-    : B[K] extends InputSignal<any> ? K
-    : never;
+  [K in keyof B]: B[K] extends ModelSignal<any>
+    ? never
+    : B[K] extends InputSignal<any>
+      ? K
+      : never;
 }[keyof B];
 
 type InputsOnly<B> = Pick<B, InputKeys<B>>;
 
-type IsExact<A, B> =
-  [A] extends [B]
-    ? [B] extends [A]
-      ? true
-      : false
-    : false;
+type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
 type HasOwnKeys<T extends object> = keyof T extends never ? false : true;
 
 type BindingKind<V> =
-  V extends ModelSignal<any> ? 'model'
-    : V extends InputSignal<any> ? 'input'
-    : V extends OutputEmitterRef<any> ? 'output'
-    : V extends FragmentBinding<any> ? 'fragment'
-    : 'unknown';
+  V extends ModelSignal<any>
+    ? 'model'
+    : V extends InputSignal<any>
+      ? 'input'
+      : V extends OutputEmitterRef<any>
+        ? 'output'
+        : V extends FragmentBinding<any>
+          ? 'fragment'
+          : 'unknown';
 
-type ExtraKeys<Sel extends Record<string, unknown>, All extends Record<string, unknown>> =
-  Exclude<keyof Sel, keyof All>;
+type ExtraKeys<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> = Exclude<keyof Sel, keyof All>;
 
-type KindMismatchKeys<Sel extends Record<string, unknown>, All extends Record<string, unknown>> = {
-  [K in Extract<keyof Sel, keyof All>]:
-    IsExact<BindingKind<Sel[K]>, BindingKind<All[K]>> extends true ? never : K;
+type KindMismatchKeys<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> = {
+  [K in Extract<keyof Sel, keyof All>]: IsExact<
+    BindingKind<Sel[K]>,
+    BindingKind<All[K]>
+  > extends true
+    ? never
+    : K;
 }[Extract<keyof Sel, keyof All>];
 
-type TypeMismatchKeys<Sel extends Record<string, unknown>, All extends Record<string, unknown>> = {
-  [K in Extract<keyof Sel, keyof All>]:
-    IsExact<BindingKind<Sel[K]>, BindingKind<All[K]>> extends true
-      ? IsExact<Sel[K], All[K]> extends true ? never : K
-      : never;
+type TypeMismatchKeys<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> = {
+  [K in Extract<keyof Sel, keyof All>]: IsExact<
+    BindingKind<Sel[K]>,
+    BindingKind<All[K]>
+  > extends true
+    ? IsExact<Sel[K], All[K]> extends true
+      ? never
+      : K
+    : never;
 }[Extract<keyof Sel, keyof All>];
 
-type WrapUnknownKeysError<Sel extends Record<string, unknown>, All extends Record<string, unknown>> =
-  ExtraKeys<Sel, All> extends never ? {} : {
-    __wrap_unknown_keys__: {
-      message: 'wrapper bindings contain keys not present in target bindings';
-      keys: ExtraKeys<Sel, All>;
-    };
-  };
+type WrapUnknownKeysError<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> =
+  ExtraKeys<Sel, All> extends never
+    ? {}
+    : {
+        __wrap_unknown_keys__: {
+          message: 'wrapper bindings contain keys not present in target bindings';
+          keys: ExtraKeys<Sel, All>;
+        };
+      };
 
-type WrapKindMismatchError<Sel extends Record<string, unknown>, All extends Record<string, unknown>> =
-  KindMismatchKeys<Sel, All> extends never ? {} : {
-    __wrap_kind_mismatch__: {
-      message: 'wrapper binding kind must match target binding kind';
-      keys: KindMismatchKeys<Sel, All>;
-    };
-  };
+type WrapKindMismatchError<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> =
+  KindMismatchKeys<Sel, All> extends never
+    ? {}
+    : {
+        __wrap_kind_mismatch__: {
+          message: 'wrapper binding kind must match target binding kind';
+          keys: KindMismatchKeys<Sel, All>;
+        };
+      };
 
-type WrapTypeMismatchError<Sel extends Record<string, unknown>, All extends Record<string, unknown>> =
-  TypeMismatchKeys<Sel, All> extends never ? {} : {
-    __wrap_type_mismatch__: {
-      message: 'wrapper binding type must exactly match target binding type';
-      keys: TypeMismatchKeys<Sel, All>;
-    };
-  };
+type WrapTypeMismatchError<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> =
+  TypeMismatchKeys<Sel, All> extends never
+    ? {}
+    : {
+        __wrap_type_mismatch__: {
+          message: 'wrapper binding type must exactly match target binding type';
+          keys: TypeMismatchKeys<Sel, All>;
+        };
+      };
 
-type WrapSelectionDiagnostics<Sel extends Record<string, unknown>, All extends Record<string, unknown>> =
-  WrapUnknownKeysError<Sel, All> &
+type WrapSelectionDiagnostics<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> = WrapUnknownKeysError<Sel, All> &
   WrapKindMismatchError<Sel, All> &
   WrapTypeMismatchError<Sel, All>;
 
-type ValidateWrapSelection<Sel extends Record<string, unknown>, All extends Record<string, unknown>> =
+type ValidateWrapSelection<
+  Sel extends Record<string, unknown>,
+  All extends Record<string, unknown>,
+> =
   HasOwnKeys<WrapSelectionDiagnostics<Sel, All>> extends true
     ? Sel & WrapSelectionDiagnostics<Sel, All>
     : Sel;
 
 type SetupBindingValue<V> =
-  V extends OptionalFragmentBinding<infer T> ? OptionalFragmentBinding<T> | undefined
+  V extends OptionalFragmentBinding<infer T>
+    ? OptionalFragmentBinding<T> | undefined
     : V;
 
 type SetupBindings<B> = {
   [K in keyof B]: SetupBindingValue<B[K]>;
 };
 
-type ReservedBindingsConstraint<B extends Record<string, ComponentBindingValue>> =
-  ('children' extends keyof B
-    ? B['children'] extends FragmentBinding<unknown> ? {} : {
-      __reserved_children_error__: 'children binding must use fragment(...) or fragment.required(...)';
-    }
-    : unknown);
+type ReservedBindingsConstraint<
+  B extends Record<string, ComponentBindingValue>,
+> = 'children' extends keyof B
+  ? B['children'] extends FragmentBinding<unknown>
+    ? {}
+    : {
+        __reserved_children_error__: 'children binding must use fragment(...) or fragment.required(...)';
+      }
+  : unknown;
 
 // Test-only exports for diagnostic contract checks in types.spec.ts
 export type __WrapSelectionDiagnostics<
@@ -263,18 +302,21 @@ type SetupReturn<E> =
 //   element always override remainder bindings for the same key,
 //   regardless of source order. Lowering model: apply remainder first, explicit last.
 //   This applies uniformly to all binding kinds (input/model/output/fragment).
-//   Wrapper components inherit sink metadata from their target.
-//   @forward() can be used only on component elements.
 // ────────────────────────────────────────────────────────────────
 
 // With bindings
-export function component<B extends Record<string, ComponentBindingValue>, E = void>(config: {
-  bindings: B;
-  setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
-  providers?: (inputs: InputsOnly<B>) => Provider[];
-  style?: string;
-  styleUrl?: string;
-} & ReservedBindingsConstraint<B>): ComponentInstance<B, E>;
+export function component<
+  B extends Record<string, ComponentBindingValue>,
+  E = void,
+>(
+  config: {
+    bindings: B;
+    setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+    providers?: (inputs: InputsOnly<B>) => Provider[];
+    style?: string;
+    styleUrl?: string;
+  } & ReservedBindingsConstraint<B>,
+): ComponentInstance<B, E>;
 
 // No bindings
 export function component<E = void>(config: {
@@ -290,30 +332,37 @@ export function component(config: any): any {
 
 // Wrapper namespace helper (target as first arg, C inferred from value)
 export namespace component {
-  export declare function withSink<
+  export declare function withDirectiveForwarding<
     B extends Record<string, ComponentBindingValue>,
-    E = void
-  >(config: {
-    bindings: B;
-    setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
-    providers?: (inputs: InputsOnly<B>) => Provider[];
-    style?: string;
-    styleUrl?: string;
-  } & ReservedBindingsConstraint<B>): ComponentInstance<B, E, HTMLElement>;
+    E = void,
+  >(
+    config: {
+      bindings: B;
+      setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+      providers?: (inputs: InputsOnly<B>) => Provider[];
+      style?: string;
+      styleUrl?: string;
+    } & ReservedBindingsConstraint<B>,
+  ): ComponentInstance<B, E, HTMLElement>;
 
-  export declare function withSink<
+  export declare function withDirectiveForwarding<
     S extends HTMLElement,
     B extends Record<string, ComponentBindingValue>,
-    E = void
-  >(config: {
-    bindings: B;
-    setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
-    providers?: (inputs: InputsOnly<B>) => Provider[];
-    style?: string;
-    styleUrl?: string;
-  } & ReservedBindingsConstraint<B>): ComponentInstance<B, E, S>;
+    E = void,
+  >(
+    config: {
+      bindings: B;
+      setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+      providers?: (inputs: InputsOnly<B>) => Provider[];
+      style?: string;
+      styleUrl?: string;
+    } & ReservedBindingsConstraint<B>,
+  ): ComponentInstance<B, E, S>;
 
-  export declare function withSink<S extends HTMLElement = HTMLElement, E = void>(config: {
+  export declare function withDirectiveForwarding<
+    S extends HTMLElement = HTMLElement,
+    E = void,
+  >(config: {
     setup: () => SetupReturn<E>;
     providers?: () => Provider[];
     style?: string;
@@ -323,21 +372,23 @@ export namespace component {
   export declare function wrap<
     C extends ComponentInstance<unknown, unknown, any>,
     Sel extends Record<string, ComponentBindingValue>,
-    E = void
+    E = void,
   >(
     target: C,
-    config: TargetBindings<C> extends Record<string, ComponentBindingValue> ? {
-      bindings: ValidateWrapSelection<Sel, TargetBindings<C>>;
-      setup: (bindings: SetupBindings<Sel>) => SetupReturn<E>;
-      providers?: (inputs: InputsOnly<Sel>) => Provider[];
-      style?: string;
-      styleUrl?: string;
-    } : never
-  ): ComponentInstance<TargetBindings<C>, E, SinkOf<C>>;
+    config: TargetBindings<C> extends Record<string, ComponentBindingValue>
+      ? {
+          bindings: ValidateWrapSelection<Sel, TargetBindings<C>>;
+          setup: (bindings: SetupBindings<Sel>) => SetupReturn<E>;
+          providers?: (inputs: InputsOnly<Sel>) => Provider[];
+          style?: string;
+          styleUrl?: string;
+        }
+      : never,
+  ): ComponentInstance<TargetBindings<C>, E, DirectiveForwardingHostOf<C>>;
 }
 
 (component as any).wrap = (_target: any, config: any) => config;
-(component as any).withSink = (config: any) => config;
+(component as any).withDirectiveForwarding = (config: any) => config;
 
 // ────────────────────────────────────────────────────────────────
 // 7. DIRECTIVE
@@ -359,7 +410,10 @@ export function directive<
 >(config: {
   host: Ref<H | undefined>;
   bindings: B;
-  setup: (bindings: SetupBindings<B>, context: { host: Ref<H | undefined> }) => E;
+  setup: (
+    bindings: SetupBindings<B>,
+    context: { host: Ref<H | undefined> },
+  ) => E;
 }): DirectiveInstance<H, B, E>;
 
 // No bindings
@@ -387,12 +441,17 @@ export type DerivationInstance<B, T> = {
   readonly [RESULT]: T;
 };
 
-type DerivationBindingsConstraint<B extends Record<string, DerivationBindingValue>> = {
+type DerivationBindingsConstraint<
+  B extends Record<string, DerivationBindingValue>,
+> = {
   [K in keyof B]: B[K] extends ModelSignal<any> ? never : B[K];
 };
 
 // With bindings (input-only; excludes ModelSignal explicitly)
-export function derivation<B extends Record<string, DerivationBindingValue>, T>(config: {
+export function derivation<
+  B extends Record<string, DerivationBindingValue>,
+  T,
+>(config: {
   bindings: B & DerivationBindingsConstraint<B>;
   setup: (bindings: B) => Signal<T>;
 }): DerivationInstance<B, T>;
@@ -419,18 +478,22 @@ export function derivation(config: any): any {
 // Native element
 export function ref<H extends HTMLElement>(): Ref<H | undefined>;
 // Component or Directive (expose inferred)
-export function ref<T extends ComponentInstance<unknown, unknown, any> | DirectiveInstance<HTMLElement, unknown, unknown>>(
-  type: T
-): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
+export function ref<
+  T extends
+    | ComponentInstance<unknown, unknown, any>
+    | DirectiveInstance<HTMLElement, unknown, unknown>,
+>(type: T): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
 
 export function ref(_type?: any): any {
   return {} as any;
 }
 
 // Component or Directive (expose inferred)
-export function refMany<T extends ComponentInstance<unknown, unknown, any> | DirectiveInstance<HTMLElement, unknown, unknown>>(
-  type: T
-): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
+export function refMany<
+  T extends
+    | ComponentInstance<unknown, unknown, any>
+    | DirectiveInstance<HTMLElement, unknown, unknown>,
+>(type: T): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
 
 export function refMany(_type?: any): any {
   return {} as any;
@@ -454,21 +517,30 @@ export interface InjectionToken<T> {
 }
 
 // Component-level
-export function injectionToken<T>(desc: string, config: {
-  factory: () => T;
-}): InjectionToken<T>;
+export function injectionToken<T>(
+  desc: string,
+  config: {
+    factory: () => T;
+  },
+): InjectionToken<T>;
 
 // Root-level
-export function injectionToken<T>(desc: string, config: {
-  level: 'root';
-  factory: () => T;
-}): InjectionToken<T>;
+export function injectionToken<T>(
+  desc: string,
+  config: {
+    level: 'root';
+    factory: () => T;
+  },
+): InjectionToken<T>;
 
 // Multi
-export function injectionToken<T>(desc: string, config: {
-  multi: true;
-  factory: () => T;
-}): InjectionToken<T[]>;
+export function injectionToken<T>(
+  desc: string,
+  config: {
+    multi: true;
+    factory: () => T;
+  },
+): InjectionToken<T[]>;
 
 export function injectionToken(_desc: string, _config: any): any {
   return {} as any;
@@ -483,8 +555,12 @@ export function injectionToken(_desc: string, _config: any): any {
 // inject(Class)      → instance
 // ────────────────────────────────────────────────────────────────
 
-export function inject<B, E, S extends HTMLElement>(token: ComponentInstance<B, E, S>): ExposeOf<ComponentInstance<B, E, S>>;
-export function inject<H extends HTMLElement, B, E>(token: DirectiveInstance<H, B, E>): ExposeOf<DirectiveInstance<H, B, E>>;
+export function inject<B, E, S extends HTMLElement>(
+  token: ComponentInstance<B, E, S>,
+): ExposeOf<ComponentInstance<B, E, S>>;
+export function inject<H extends HTMLElement, B, E>(
+  token: DirectiveInstance<H, B, E>,
+): ExposeOf<DirectiveInstance<H, B, E>>;
 export function inject<T>(token: InjectionToken<T>): T;
 export function inject<T>(token: new (...args: any[]) => T): T;
 
@@ -505,7 +581,7 @@ export function inject(_token: any): any {
 export function provide<T>(token: InjectionToken<T>): Provider;
 export function provide<T>(config: {
   token: InjectionToken<T> | (new (...args: any[]) => T);
-  useFactory: () => (T extends (infer U)[] ? U : T);
+  useFactory: () => T extends (infer U)[] ? U : T;
 }): Provider;
 
 export function provide(_config: any): any {

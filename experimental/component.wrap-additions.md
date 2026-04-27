@@ -160,9 +160,9 @@ Compiler contract:
 2. The compiler `MUST` lower `@forward()` by unrolling only that key set.
 3. The compiler `MUST NOT` include `addBindings` keys in target forwarding.
 4. The compiler `MUST` keep existing explicit-binding precedence (React-style last wins).
-5. The compiler `SHOULD` preserve sink metadata passthrough by inheriting target sink type in wrappers.
+5. The compiler `SHOULD` preserve directive forwarding metadata inheritance by inheriting target forwarded element type in wrappers.
 6. The compiler `MUST` treat `@forward()` as marker-only: no forwarding object, property reads, or enumeration.
-7. The compiler `MUST` reject `@forward()` on non-component elements.
+7. In wrapper binding-forwarding context, the compiler `MUST` reject `@forward()` on non-component elements.
 
 No runtime forwarding object is required; the same strategy as current `component.wrap` is retained.
 
@@ -272,7 +272,7 @@ export const UserCard = component.wrap(UserDetail, {
 | Omitted required target input is not set internally | `WRAP007` — required target input missing |
 | token-style forwarding inspection is attempted (`token.foo`, `Object.keys(token)`, etc.) | `WRAP008` — forwarding is marker-only via `@forward()` |
 | JS destructuring with spread used to derive forwarding (`...rest` / `...token`) | `WRAP009` — spread-based forwarding is unsupported; use `@forward()` |
-| `@forward()` used on non-component elements | `WRAP010` — forwarding marker can only target component elements |
+| `@forward()` used on non-component elements in wrapper binding-forwarding context | `WRAP010` — wrapper binding-forwarding marker can only target component elements (element `@forward()` remains valid for directive forwarding) |
 
 ---
 
@@ -292,7 +292,7 @@ This can be introduced as a backward-compatible extension:
 `addBindings` / `omitBindings` is primarily a **compiler + type-system** evolution.
 
 - **Type system** computes effective wrapper API.
-- **Compiler** adjusts key expansion set for `@forward()`, enforces non-forwarding of wrapper-local keys, and rejects `@forward()` on non-component elements.
+- **Compiler** adjusts key expansion set for `@forward()`, enforces non-forwarding of wrapper-local keys, and rejects non-component usage only for wrapper binding-forwarding `@forward()`.
 - **Runtime** remains unchanged in principle; generated instructions stay in the same class as those emitted today.
 
 **Change Class:** Compiler + Type-level (no new runtime primitive).

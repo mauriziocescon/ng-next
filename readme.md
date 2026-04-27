@@ -387,7 +387,7 @@ export const Counter = component({
 
 ## Composition with Fragments, Directives, and Forward Syntax
 
-Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). Directive passthrough is declared with component sink metadata (`component.withSink<T>(...)`), and `@use()` marks where directives are applied. Forward syntax can be used at the component function level, similarly to React. Note: the examples below are simplified.
+Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). Directive passthrough is declared with component metadata (`component.withDirectiveForwarding<T>(...)`), and element-level `@forward()` marks where directives are applied. Note: the examples below are simplified.
 
 Implicit children fragment (placement and lifecycle) and binding context:
 
@@ -548,7 +548,7 @@ export const ButtonConsumer = component({
 // -- button in @mylib/button --------------------
 import { component, input, output, computed, fragment } from '@angular/core';
 
-export const Button = component.withSink<HTMLButtonElement>({
+export const Button = component.withDirectiveForwarding<HTMLButtonElement>({
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -561,13 +561,13 @@ export const Button = component.withSink<HTMLButtonElement>({
     const innerStyle = computed(() => `${style()}; color: red;`);
 
     /**
-     * Directive sink: directives applied to <Button /> are propagated
-     * and instantiated on the internal <button> element.
-     * setup does not receive sink metadata.
+     * Directive forwarding: directives applied to <Button /> are propagated
+     * and instantiated on the internal <button> (HTMLButtonElement) element.
+     * Such passthrough is transparent at setup level.
      */
     return (
       <button
-        @use()
+        @forward()
         type={type()}
         class={className()}
         style={innerStyle()}
@@ -615,11 +615,10 @@ export const UserDetailConsumer = component({
  * bindings are compiler-selected as the forwarding remainder.
  * The compiler statically unrolls <Target @forward() /> into
  * individual remainder bindings.
- * @forward() can be applied only to components.
- *
- * sink metadata acts as a behavior passthrough — forwarding directives
- * from the caller through to the innermost element where
- * @use() is declared.
+ * 
+ * @forward() has two contexts:
+ * - on components: forward remaining bindings and directives
+ * - on elements: forward directives to that element
  */
 export const UserDetailWrapper = component.wrap(UserDetail, {
   bindings: {
@@ -645,7 +644,7 @@ export interface User {
   role: string;
 }
 
-export const UserDetail = component.withSink<HTMLElement>({
+export const UserDetail = component.withDirectiveForwarding<HTMLElement>({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -653,7 +652,7 @@ export const UserDetail = component.withSink<HTMLElement>({
     children: fragment<void>(),
   },
   setup: ({ user, email, makeAdmin, children }) => (
-    <div @use()>
+    <div @forward()>
       <h3>{user().name}</h3>
       <p>Role: {user().role}</p>
 
