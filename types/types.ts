@@ -290,7 +290,7 @@ type SetupReturn<E> =
 //   are accepted.
 //
 //   The conformance of @forward() to the type parameter in
-//   withDirectiveForwarding<T> is enforced through the IntrinsicElements
+//   withDirectiveForwarding<S> is enforced through the IntrinsicElements
 //   interface — the standard TypeScript mechanism for mapping HTML tag
 //   names to their types.
 //
