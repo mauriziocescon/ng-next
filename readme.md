@@ -467,22 +467,9 @@ export const MenuConsumer = component({
   setup: () => {
     const items = signal<Item[]>(/** ... **/);
 
+    // Inline @fragment is auto-passed as the matching fragment input.
+    // Equivalent explicit form: declare @fragment outside, pass as menuItem={menuItem}.
     return (
-      /**
-       * Explicit form: @fragment declared outside the component tags,
-       * then passed as a named binding — equivalent to the inline form below.
-       *
-       * @fragment menuItem(item: Item) {
-       *  <div class="my-menu-item">
-       *    <MyMenuItem>{item.desc}</MyMenuItem>
-       *  </div>
-       * }
-       * <Menu items={items()} menuItem={menuItem} />
-       *
-       * Inline form: @fragment declared inside the component tags is
-       * automatically passed as the matching fragment input — no explicit
-       * menuItem={menuItem} needed.
-       */
       <Menu items={items()}>
         @fragment menuItem(item: Item) {
           <div class="my-menu-item">
@@ -609,23 +596,7 @@ export const UserDetailConsumer = component({
   },
 });
 
-/**
- * Wrapper mode: component.wrap(Target, { ... }).
- * Target is passed as a value; the type is inferred from it,
- * consistent with ref(Child), inject(Child), etc.
- * setup receives selected bindings.
- * providers (if declared) receive only selected input bindings.
- *
- * Wrapper bindings are a strict subset of the target bindings:
- * selected keys are visible in setup, and all remaining target
- * bindings are compiler-selected as the forwarding remainder.
- * The compiler statically unrolls <Target @forward() /> into
- * individual remainder bindings.
- *
- * @forward() has two contexts:
- * - on components: forwards remaining bindings and directives
- * - on elements: forwards directives to that element
- */
+// Wrapper: selected bindings go to setup, remainder forwarded via @forward()
 export const UserDetailWrapper = component.wrap(UserDetail, {
   bindings: {
     user: input.required<User>(),

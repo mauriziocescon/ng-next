@@ -282,6 +282,21 @@ type SetupReturn<E> =
 //   B inferred from bindings, setup receives Angular signal types
 //   (InputSignal, ModelSignal, OutputEmitterRef, …).
 //
+// component.withDirectiveForwarding<S>(...) — directive passthrough:
+//   Declares that the component accepts directives on its tag.
+//   Directives are propagated to and instantiated on the internal
+//   element marked with @forward(). S constrains which directives
+//   are compatible: only directives whose host is assignable from S
+//   are accepted.
+//
+//   The conformance of @forward() to the type parameter in
+//   withDirectiveForwarding<T> is enforced through the IntrinsicElements
+//   interface — the standard TypeScript mechanism for mapping HTML tag
+//   names to their types.
+//
+//   @forward() on elements: forwards directives to that element.
+//   @forward() on components (wrap): forwards remaining bindings and directives.
+//
 // component.wrap(Target, ...) — wrapper mode:
 //   Target is passed as a value; C is inferred from it (consistent
 //   with ref(Child), inject(Child), etc.).
@@ -297,11 +312,6 @@ type SetupReturn<E> =
 //   must include at least one @forward() usage.
 //   If this condition is not met, the compiler should emit a diagnostic
 //   listing the dropped remainder keys.
-//
-//   The conformance of @forward() to the type parameter in
-//   withDirectiveForwarding<T> is enforced through the IntrinsicElements
-//   interface — the standard TypeScript mechanism for mapping HTML tag
-//   names to their types.
 //
 //   Collision precedence: explicit bindings declared on the wrapped target
 //   element always override remainder bindings for the same key,
