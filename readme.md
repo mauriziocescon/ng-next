@@ -574,7 +574,7 @@ export const Button = component.withDirectiveForwarding<HTMLButtonElement>({
 });
 ```
 
-Wrapping components and forwarding inputs, outputs, and directives:
+Wrapping components and forwarding inputs, outputs, models, fragments, and directives:
 
 ```ts
 import { component, signal, input, computed } from '@angular/core';
