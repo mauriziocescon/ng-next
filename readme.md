@@ -531,6 +531,10 @@ export const ButtonConsumer = component({
     /**
      * The same directive cannot be applied more than once
      * to the same component / element.
+     *
+     * Type safety: Button forwards to HTMLButtonElement, so only
+     * directives whose host is assignable from HTMLButtonElement
+     * are accepted (e.g. host: ref<HTMLInputElement>() → compile error).
      */
     return (
       <Button
