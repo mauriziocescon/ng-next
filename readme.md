@@ -387,7 +387,7 @@ export const Counter = component({
 
 ## Composition with Fragments, Directives, and Forward syntax
 
-Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). Directives behave similarly to [Svelte attachments](https://svelte.dev/docs/svelte/@attach). Forward syntax can be used at the component function level, similarly to React. Note: the examples below are simplified.
+Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). Directive passthrough is declared with component sink metadata (`component.withSink<T>(...)`), and `@use()` marks where directives are applied. Forward syntax can be used at the component function level, similarly to React. Note: the examples below are simplified.
 
 Implicit children fragment (placement and lifecycle) and binding context:
 
@@ -546,9 +546,9 @@ export const ButtonConsumer = component({
 });
 
 // -- button in @mylib/button --------------------
-import { component, input, output, computed, fragment, attachment } from '@angular/core';
+import { component, input, output, computed, fragment } from '@angular/core';
 
-export const Button = component({
+export const Button = component.withSink<HTMLButtonElement>({
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -556,24 +556,18 @@ export const Button = component({
     disabled: input<boolean>(false),
     click: output<void>(),
     children: fragment.required<void>(),
-    /**
-     * Provided by ng from applied directives (not bindable directly)
-     * Name reserved to ng
-     */
-    attachments: attachment<HTMLButtonElement>(),
   },
-  setup: ({ type, class: className, style, disabled, click, children, attachments }) => {
+  setup: ({ type, class: className, style, disabled, click, children }) => {
     const innerStyle = computed(() => `${style()}; color: red;`);
 
     /**
-     * Directive Attachments: directives applied to <Button /> are propagated
+     * Directive sink: directives applied to <Button /> are propagated
      * and instantiated on the internal <button> element.
-     * The element type (HTMLButtonElement) is the only constraint
-     * the child needs to declare.
+     * setup does not receive sink metadata.
      */
     return (
       <button
-        @use(attachments)
+        @use()
         type={type()}
         class={className()}
         style={innerStyle()}
@@ -623,9 +617,9 @@ export const UserDetailConsumer = component({
  * individual remainder bindings.
  * @forward() can be applied only to components.
  *
- * attachments act as a behavior passthrough — forwarding directives
+ * sink metadata acts as a behavior passthrough — forwarding directives
  * from the caller through to the innermost element where
- * @use(attachments) is declared.
+ * @use() is declared.
  */
 export const UserDetailWrapper = component.wrap(UserDetail, {
   bindings: {
@@ -644,23 +638,22 @@ export const UserDetailWrapper = component.wrap(UserDetail, {
 });
 
 // -- UserDetail -----------------------------------
-import { component, input, model, output, fragment, attachment } from '@angular/core';
+import { component, input, model, output, fragment } from '@angular/core';
 
 export interface User {
   name: string;
   role: string;
 }
 
-export const UserDetail = component({
+export const UserDetail = component.withSink<HTMLElement>({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
     makeAdmin: output<void>(),
     children: fragment<void>(),
-    attachments: attachment<HTMLElement>(),
   },
-  setup: ({ user, email, makeAdmin, children, attachments }) => (
-    <div @use(attachments)>
+  setup: ({ user, email, makeAdmin, children }) => (
+    <div @use()>
       <h3>{user().name}</h3>
       <p>Role: {user().role}</p>
 
@@ -854,7 +847,7 @@ export const Counter = component({
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in — directives can only be applied to compatible elements,
 - `template reference variables`: likely replaced by `ref`,
 - `queries`: likely replaced by `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
-- `component and directive injection`: the preferred interaction model is an explicit `ref` passed as an `input`. Nevertheless, with `ref`/`expose` in place, component and directive injection are safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of abuse `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`attachments`, `children`);
+- `component and directive injection`: the preferred interaction model is an explicit `ref` passed as an `input`. Nevertheless, with `ref`/`expose` in place, component and directive injection are safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of abuse `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`);
 - `interface conformance`: opt-in via `satisfies` on `bindings` and `expose` — the same structural check that `implements` provides for classes.
 
 ### Notes

@@ -28,7 +28,6 @@ export type TemplateMarkup = { readonly [TEMPLATE]: true };
 // ────────────────────────────────────────────────────────────────
 
 declare const FRAGMENT: unique symbol;
-declare const ATTACHMENT: unique symbol;
 declare const FRAGMENT_OPTIONAL: unique symbol;
 declare const FRAGMENT_REQUIRED: unique symbol;
 
@@ -48,15 +47,11 @@ export type RequiredFragmentBinding<T> = {
   readonly [FRAGMENT_REQUIRED]: true;
 };
 export type FragmentBinding<T> = OptionalFragmentBinding<T> | RequiredFragmentBinding<T>;
-export type AttachmentBinding<T extends HTMLElement> = {
-  readonly [ATTACHMENT]: (host: T) => void;
-};
 
 export declare function fragment<T>(): OptionalFragmentBinding<T>;
 export declare namespace fragment {
   export function required<T>(): RequiredFragmentBinding<T>;
 }
-export declare function attachment<T extends HTMLElement>(): AttachmentBinding<T>;
 
 // ────────────────────────────────────────────────────────────────
 // 3. REF
@@ -80,20 +75,18 @@ export interface Ref<T> extends Signal<T> {
 // Layered binding model:
 // - Derivation: inputs only
 // - Directive: derivation + model/output/fragment
-// - Component: directive + attachment
+// - Component: directive
 // ────────────────────────────────────────────────────────────────
 
-type AnyNonAttachmentBinding =
+type AnyBindingValue =
   | InputSignal<any>
   | ModelSignal<any>
   | OutputEmitterRef<any>
   | OptionalFragmentBinding<any>
   | RequiredFragmentBinding<any>;
 
-type AnyBindingValue = AnyNonAttachmentBinding | AttachmentBinding<any>;
-
 export type DerivationBindingValue = InputSignal<any>;
-export type DirectiveBindingValue = AnyNonAttachmentBinding;
+export type DirectiveBindingValue = AnyBindingValue;
 export type ComponentBindingValue = AnyBindingValue;
 
 // ────────────────────────────────────────────────────────────────
@@ -113,10 +106,12 @@ export type ComponentBindingValue = AnyBindingValue;
 declare const BINDINGS: unique symbol;
 declare const EXPOSE: unique symbol;
 declare const HOST: unique symbol;
+declare const SINK: unique symbol;
 
-export type ComponentInstance<B, E = void> = {
+export type ComponentInstance<B, E = void, S extends HTMLElement = never> = {
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
+  readonly [SINK]: S;
 };
 
 export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
@@ -128,8 +123,11 @@ export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
 type ExposeOf<T> =
   T extends { readonly [EXPOSE]: infer E } ? E : never;
 
-type TargetBindings<C extends ComponentInstance<unknown, unknown>> =
+type TargetBindings<C extends ComponentInstance<unknown, unknown, any>> =
   C extends { readonly [BINDINGS]: infer B } ? B : never;
+
+type SinkOf<C extends ComponentInstance<any, any, any>> =
+  C extends { readonly [SINK]: infer S } ? S : never;
 
 type InputKeys<B> = {
   [K in keyof B]: B[K] extends ModelSignal<any> ? never
@@ -153,7 +151,6 @@ type BindingKind<V> =
     : V extends InputSignal<any> ? 'input'
     : V extends OutputEmitterRef<any> ? 'output'
     : V extends FragmentBinding<any> ? 'fragment'
-    : V extends AttachmentBinding<any> ? 'attachment'
     : 'unknown';
 
 type ExtraKeys<Sel extends Record<string, unknown>, All extends Record<string, unknown>> =
@@ -218,11 +215,6 @@ type ReservedBindingsConstraint<B extends Record<string, ComponentBindingValue>>
     ? B['children'] extends FragmentBinding<unknown> ? {} : {
       __reserved_children_error__: 'children binding must use fragment(...) or fragment.required(...)';
     }
-    : unknown) &
-  ('attachments' extends keyof B
-    ? B['attachments'] extends AttachmentBinding<any> ? {} : {
-      __reserved_attachments_error__: 'attachments binding must use attachment<...>()';
-    }
     : unknown);
 
 // Test-only exports for diagnostic contract checks in types.spec.ts
@@ -270,11 +262,8 @@ type SetupReturn<E> =
 //   Collision precedence: explicit bindings declared on the wrapped target
 //   element always override remainder bindings for the same key,
 //   regardless of source order. Lowering model: apply remainder first, explicit last.
-//   This applies uniformly to all binding kinds (input/model/output/fragment/attachment).
-//
-//   For AttachmentBinding keys in <Target @forward() />, the compiler passes them
-//   through intact to the target component; the chain is maintained
-//   from parent → wrapper → target element at run time.
+//   This applies uniformly to all binding kinds (input/model/output/fragment).
+//   Wrapper components inherit sink metadata from their target.
 //   @forward() can be used only on component elements.
 // ────────────────────────────────────────────────────────────────
 
@@ -301,8 +290,38 @@ export function component(config: any): any {
 
 // Wrapper namespace helper (target as first arg, C inferred from value)
 export namespace component {
+  export declare function withSink<
+    B extends Record<string, ComponentBindingValue>,
+    E = void
+  >(config: {
+    bindings: B;
+    setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+    providers?: (inputs: InputsOnly<B>) => Provider[];
+    style?: string;
+    styleUrl?: string;
+  } & ReservedBindingsConstraint<B>): ComponentInstance<B, E, HTMLElement>;
+
+  export declare function withSink<
+    S extends HTMLElement,
+    B extends Record<string, ComponentBindingValue>,
+    E = void
+  >(config: {
+    bindings: B;
+    setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+    providers?: (inputs: InputsOnly<B>) => Provider[];
+    style?: string;
+    styleUrl?: string;
+  } & ReservedBindingsConstraint<B>): ComponentInstance<B, E, S>;
+
+  export declare function withSink<S extends HTMLElement = HTMLElement, E = void>(config: {
+    setup: () => SetupReturn<E>;
+    providers?: () => Provider[];
+    style?: string;
+    styleUrl?: string;
+  }): ComponentInstance<{}, E, S>;
+
   export declare function wrap<
-    C extends ComponentInstance<unknown, unknown>,
+    C extends ComponentInstance<unknown, unknown, any>,
     Sel extends Record<string, ComponentBindingValue>,
     E = void
   >(
@@ -314,10 +333,11 @@ export namespace component {
       style?: string;
       styleUrl?: string;
     } : never
-  ): ComponentInstance<TargetBindings<C>, E>;
+  ): ComponentInstance<TargetBindings<C>, E, SinkOf<C>>;
 }
 
 (component as any).wrap = (_target: any, config: any) => config;
+(component as any).withSink = (config: any) => config;
 
 // ────────────────────────────────────────────────────────────────
 // 7. DIRECTIVE
@@ -367,13 +387,13 @@ export type DerivationInstance<B, T> = {
   readonly [RESULT]: T;
 };
 
-type NoModelBindings<B extends Record<string, DerivationBindingValue>> = {
+type DerivationBindingsConstraint<B extends Record<string, DerivationBindingValue>> = {
   [K in keyof B]: B[K] extends ModelSignal<any> ? never : B[K];
 };
 
-// With bindings (explicit derivation binding surface)
+// With bindings (input-only; excludes ModelSignal explicitly)
 export function derivation<B extends Record<string, DerivationBindingValue>, T>(config: {
-  bindings: B & NoModelBindings<B>;
+  bindings: B & DerivationBindingsConstraint<B>;
   setup: (bindings: B) => Signal<T>;
 }): DerivationInstance<B, T>;
 
@@ -399,7 +419,7 @@ export function derivation(config: any): any {
 // Native element
 export function ref<H extends HTMLElement>(): Ref<H | undefined>;
 // Component or Directive (expose inferred)
-export function ref<T extends ComponentInstance<unknown, unknown> | DirectiveInstance<HTMLElement, unknown, unknown>>(
+export function ref<T extends ComponentInstance<unknown, unknown, any> | DirectiveInstance<HTMLElement, unknown, unknown>>(
   type: T
 ): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
 
@@ -408,7 +428,7 @@ export function ref(_type?: any): any {
 }
 
 // Component or Directive (expose inferred)
-export function refMany<T extends ComponentInstance<unknown, unknown> | DirectiveInstance<HTMLElement, unknown, unknown>>(
+export function refMany<T extends ComponentInstance<unknown, unknown, any> | DirectiveInstance<HTMLElement, unknown, unknown>>(
   type: T
 ): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
 
@@ -463,7 +483,7 @@ export function injectionToken(_desc: string, _config: any): any {
 // inject(Class)      → instance
 // ────────────────────────────────────────────────────────────────
 
-export function inject<B, E>(token: ComponentInstance<B, E>): ExposeOf<ComponentInstance<B, E>>;
+export function inject<B, E, S extends HTMLElement>(token: ComponentInstance<B, E, S>): ExposeOf<ComponentInstance<B, E, S>>;
 export function inject<H extends HTMLElement, B, E>(token: DirectiveInstance<H, B, E>): ExposeOf<DirectiveInstance<H, B, E>>;
 export function inject<T>(token: InjectionToken<T>): T;
 export function inject<T>(token: new (...args: any[]) => T): T;
