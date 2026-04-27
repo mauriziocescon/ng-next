@@ -298,6 +298,11 @@ type SetupReturn<E> =
 //   If this condition is not met, the compiler should emit a diagnostic
 //   listing the dropped remainder keys.
 //
+//   The conformance of @forward() to the type parameter in
+//   withDirectiveForwarding<T> is enforced through the IntrinsicElements
+//   interface — the standard TypeScript mechanism for mapping HTML tag
+//   names to their types.
+//
 //   Collision precedence: explicit bindings declared on the wrapped target
 //   element always override remainder bindings for the same key,
 //   regardless of source order. Lowering model: apply remainder first, explicit last.

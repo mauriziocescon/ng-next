@@ -387,7 +387,9 @@ export const Counter = component({
 
 ## Composition with Fragments, Directives, and Forward Syntax
 
-Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). Directive passthrough is declared with component metadata (`component.withDirectiveForwarding<T>(...)`), and element-level `@forward()` marks where directives are applied. Note: the examples below are simplified.
+Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
+
+Directive passthrough is declared with component metadata (`component.withDirectiveForwarding<T>(...)`) and element-level `@forward()` marks where directives are applied. The conformance of `@forward()` to the type parameter `T` is enforced through the `IntrinsicElements` interface.
 
 Implicit children fragment — placement, lifecycle, and binding context:
 
@@ -563,7 +565,7 @@ export const Button = component.withDirectiveForwarding<HTMLButtonElement>({
     /**
      * Directive forwarding: directives applied to <Button /> are propagated to
      * and instantiated on the internal <button> (HTMLButtonElement) element.
-     * This passthrough is transparent at the setup level.
+     * This passthrough is transparent at setup level.
      */
     return (
       <button
