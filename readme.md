@@ -820,7 +820,7 @@ export const Counter = component({
 - `pipes`: replaced by derivations — derivations cover the same transform use case and also support DI,
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers),
 - `@let`: unchanged,
-- `bindings aliasing` at the setup level,
+- `bindings aliasing` at the setup level (ts destructuring),
 - `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in — directives can only be applied to compatible elements,
 - `template reference variables`: likely replaced by `ref`,
