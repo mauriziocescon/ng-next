@@ -177,6 +177,68 @@ const RenderItem = component({
 });
 
 // ────────────────────────────────────────────────────────────────
+// COMPONENT — bindings aliasing (TS destructuring in setup)
+//
+// Standard destructuring rename (e.g. { class: className }) lets
+// developers alias bindings at the setup level without any
+// framework-specific mechanism.
+// ────────────────────────────────────────────────────────────────
+
+// Component: alias input via destructuring
+const AliasedInput = component({
+  bindings: {
+    class: input<string>(),
+    style: input<string>(),
+  },
+  setup: ({ class: className, style: inlineStyle }) => {
+    const _cls: string | undefined = className();
+    const _sty: string | undefined = inlineStyle();
+    return tmpl;
+  },
+});
+
+// Component: alias model and output via destructuring
+const AliasedModelOutput = component({
+  bindings: {
+    value: model.required<number>(),
+    change: output<number>(),
+  },
+  setup: ({ value: val, change: onChange }) => {
+    const _v: number = val();
+    val.set(42);
+    onChange.emit(1);
+    return tmpl;
+  },
+});
+
+// Directive: alias bindings via destructuring
+const aliasedDirective = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    message: input.required<string>(),
+    dismiss: output<void>(),
+  },
+  setup: ({ message: msg, dismiss: onDismiss }, { host: el }) => {
+    const _m: string = msg();
+    onDismiss.emit();
+    const _el: Ref<HTMLElement | undefined> = el;
+  },
+});
+
+// Derivation: alias bindings via destructuring
+const aliasedDerivation = derivation({
+  bindings: {
+    qty: input.required<number>(),
+    item: input.required<Item>(),
+  },
+  setup: ({ qty: quantity, item: product }) => {
+    const _q: number = quantity();
+    const _p: Item = product();
+    return computed(() => product().desc + ' x ' + quantity());
+  },
+});
+
+// ────────────────────────────────────────────────────────────────
 // COMPONENT — providers receive only inputs (not models/outputs)
 // ────────────────────────────────────────────────────────────────
 
