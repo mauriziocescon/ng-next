@@ -22,11 +22,13 @@ export interface SourceSpan {
 }
 
 export interface ParseSpan {
+  readonly __brand: 'ParseSpan';
   start: number;
   end: number;
 }
 
 export interface AbsoluteSourceSpan {
+  readonly __brand: 'AbsoluteSourceSpan';
   start: number;
   end: number;
 }
@@ -50,10 +52,9 @@ export interface BaseAST {
 // 3. TEMPLATE ROOT & NODE UNION
 // ────────────────────────────────────────────────────────────────
 
-export interface TemplateAST {
+export interface TemplateAST extends BaseNode {
   type: 'Template';
   nodes: TemplateNode[];
-  sourceSpan: SourceSpan;
 }
 
 export type TemplateNode =
@@ -62,14 +63,10 @@ export type TemplateNode =
   | TextInterpolationNode
   | ControlFlowNode
   | TemplateDirectiveNode
-  | FragmentNode
   | LetNode;
 
 // ────────────────────────────────────────────────────────────────
 // 4. ELEMENT NODE
-//
-// Represents both native HTML elements and component elements.
-// isForwarded corresponds to @forward() in the template DSL.
 // ────────────────────────────────────────────────────────────────
 
 export interface ElementNode extends BaseNode {
@@ -81,7 +78,7 @@ export interface ElementNode extends BaseNode {
   outputs: BoundEventNode[];
   models: BoundModelNode[];
   directives: DirectiveBindingNode[];
-  references: ReferenceNode[];
+  references: RefNode[];
   children: TemplateNode[];
   fragments: FragmentNode[];
   i18n?: I18nMeta;
@@ -89,13 +86,6 @@ export interface ElementNode extends BaseNode {
 
 // ────────────────────────────────────────────────────────────────
 // 5. ATTRIBUTE & BINDING NODES
-//
-// TextAttributeNode: static attribute (e.g. type="text")
-// BoundAttributeNode: bind:prop={expr}, class:name={expr},
-//   style:prop={expr}, animate:name={expr}, or shorthand prop={expr}
-// BoundEventNode: on:event={handler}
-// BoundModelNode: model:prop={signal}
-// ReferenceNode: ref={variable}
 // ────────────────────────────────────────────────────────────────
 
 export enum BindingType {
@@ -104,6 +94,7 @@ export enum BindingType {
   Class = 2,
   Style = 3,
   Animation = 4,
+  Input = 5,
 }
 
 export interface TextAttributeNode extends BaseNode {
@@ -143,24 +134,22 @@ export interface BoundModelNode extends BaseNode {
   value: AST;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
+  i18n?: I18nMeta;
 }
 
-export interface ReferenceNode extends BaseNode {
-  type: 'Reference';
-  name: string;
-  value: AST;
+/**
+ * Unified ref node for elements, components, and directives.
+ * `target` is always a Variable — the framework wires it at creation time.
+ */
+export interface RefNode extends BaseNode {
+  type: 'Ref';
+  target: Variable;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }
 
 // ────────────────────────────────────────────────────────────────
 // 6. DIRECTIVE BINDING NODES
-//
-// use:directive(input={expr} on:output={handler}):when={cond}:ref={r}
-//
-// DirectiveBindingNode groups all bindings for a single use:
-// directive application on an element.
-// Modifiers (:when, :ref) sit outside the directive's own bindings.
 // ────────────────────────────────────────────────────────────────
 
 export interface DirectiveBindingNode extends BaseNode {
@@ -169,8 +158,8 @@ export interface DirectiveBindingNode extends BaseNode {
   inputs: DirectiveInputNode[];
   outputs: DirectiveOutputNode[];
   models: DirectiveModelNode[];
-  fragments: DirectiveFragmentNode[];
-  modifiers: DirectiveModifierNode[];
+  when?: DirectiveWhenNode;
+  ref?: RefNode;
   keySpan?: SourceSpan;
 }
 
@@ -199,18 +188,9 @@ export interface DirectiveModelNode extends BaseNode {
   valueSpan?: SourceSpan;
 }
 
-export interface DirectiveFragmentNode extends BaseNode {
-  type: 'DirectiveFragment';
-  name: string;
-  value: AST;
-  keySpan?: SourceSpan;
-  valueSpan?: SourceSpan;
-}
-
-export interface DirectiveModifierNode extends BaseNode {
-  type: 'DirectiveModifier';
-  name: 'when' | 'ref';
-  value: AST;
+export interface DirectiveWhenNode extends BaseNode {
+  type: 'DirectiveWhen';
+  condition: AST;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }
@@ -224,10 +204,10 @@ export interface TextNode extends BaseNode {
   value: string;
 }
 
-// {expr} — single expression interpolation
 export interface TextInterpolationNode extends BaseNode {
   type: 'TextInterpolation';
   expression: AST;
+  i18n?: I18nMeta;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -241,7 +221,7 @@ export interface LetNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 9. CONTROL FLOW — @if, @for, @switch
+// 9. CONTROL FLOW
 // ────────────────────────────────────────────────────────────────
 
 export type ControlFlowNode =
@@ -254,11 +234,18 @@ export interface IfNode extends BaseNode {
   branches: IfBranchNode[];
 }
 
-export interface IfBranchNode extends BaseNode {
-  type: 'IfBranch';
-  expression: AST | null; // null for @else
-  children: TemplateNode[];
+export type IfBranchNode = IfConditionBranch | ElseBranch;
+
+export interface IfConditionBranch extends BaseNode {
+  type: 'IfConditionBranch';
+  expression: AST;
   expressionAlias?: string;
+  children: TemplateNode[];
+}
+
+export interface ElseBranch extends BaseNode {
+  type: 'ElseBranch';
+  children: TemplateNode[];
 }
 
 export interface ForNode extends BaseNode {
@@ -268,8 +255,12 @@ export interface ForNode extends BaseNode {
   trackBy: AST;
   children: TemplateNode[];
   empty?: ForEmptyNode;
-  itemAlias?: string;
-  contextVariables?: Variable[];
+  contextVariables: ForContextVariable[];
+}
+
+export interface ForContextVariable {
+  kind: '$index' | '$count' | '$first' | '$last' | '$even' | '$odd';
+  alias?: string;
 }
 
 export interface ForEmptyNode extends BaseNode {
@@ -280,28 +271,30 @@ export interface ForEmptyNode extends BaseNode {
 export interface SwitchNode extends BaseNode {
   type: 'Switch';
   expression: AST;
-  cases: SwitchCaseNode[];
+  cases: SwitchBranchNode[];
 }
+
+export type SwitchBranchNode = SwitchCaseNode | SwitchDefaultNode;
 
 export interface SwitchCaseNode extends BaseNode {
   type: 'SwitchCase';
-  expression: AST | null; // null for @default
+  expression: AST;
+  children: TemplateNode[];
+}
+
+export interface SwitchDefaultNode extends BaseNode {
+  type: 'SwitchDefault';
   children: TemplateNode[];
 }
 
 // ────────────────────────────────────────────────────────────────
 // 10. TEMPLATE DIRECTIVES — @render, @derive
-//
-// These are template-level constructs (not element directives).
-// @render invokes a fragment; @derive creates a template-scoped
-// reactive computation from a derivation factory.
 // ────────────────────────────────────────────────────────────────
 
 export type TemplateDirectiveNode =
   | RenderNode
   | DeriveNode;
 
-// @render(fragment(args), { injector })
 export interface RenderNode extends BaseNode {
   type: 'Render';
   fragment: AST;
@@ -314,7 +307,6 @@ export interface RenderOptionsNode extends BaseNode {
   injector?: AST;
 }
 
-// @derive varName = derivationRef(key={expr} ...)
 export interface DeriveNode extends BaseNode {
   type: 'Derive';
   name: string;
@@ -330,11 +322,6 @@ export interface DerivationInputNode extends BaseNode {
 
 // ────────────────────────────────────────────────────────────────
 // 11. FRAGMENT NODES
-//
-// @fragment name(param: Type) { ... }
-//
-// Inline fragments declared inside a component element are
-// auto-passed as the matching fragment binding.
 // ────────────────────────────────────────────────────────────────
 
 export interface FragmentNode extends BaseNode {
@@ -352,9 +339,6 @@ export interface FragmentParameterNode extends BaseNode {
 
 // ────────────────────────────────────────────────────────────────
 // 12. EXPRESSION AST
-//
-// Expressions inside {}, binding values, and control flow
-// conditions. Mirrors Angular's existing expression parser output.
 // ────────────────────────────────────────────────────────────────
 
 export type AST =
@@ -371,16 +355,12 @@ export type AST =
   | FunctionCall
   | SafeMethodCall
   | MethodCall
-  | ThisReceiver
-  | ImplicitReceiver
-  | Chain
   | Variable
-  | Unary
-  | PrefixNot;
+  | Unary;
 
 export interface LiteralPrimitive extends BaseAST {
   type: 'LiteralPrimitive';
-  value: any;
+  value: string | number | boolean | null | undefined;
 }
 
 export interface LiteralArray extends BaseAST {
@@ -399,9 +379,15 @@ export interface LiteralMapKey {
   quoted: boolean;
 }
 
+export type BinaryOperator =
+  | '+' | '-' | '*' | '/' | '%'
+  | '==' | '!=' | '===' | '!=='
+  | '<' | '>' | '<=' | '>='
+  | '&&' | '||' | '??';
+
 export interface Binary extends BaseAST {
   type: 'Binary';
-  operation: string;
+  operation: BinaryOperator;
   left: AST;
   right: AST;
 }
@@ -466,32 +452,16 @@ export interface MethodCall extends BaseAST {
   args: AST[];
 }
 
-export interface ThisReceiver extends BaseAST {
-  type: 'ThisReceiver';
-}
-
-export interface ImplicitReceiver extends BaseAST {
-  type: 'ImplicitReceiver';
-}
-
-export interface Chain extends BaseAST {
-  type: 'Chain';
-  expressions: AST[];
-}
-
 export interface Variable extends BaseAST {
   type: 'Variable';
   name: string;
 }
 
+export type UnaryOperator = '-' | '+' | '!';
+
 export interface Unary extends BaseAST {
   type: 'Unary';
-  operator: string;
-  expr: AST;
-}
-
-export interface PrefixNot extends BaseAST {
-  type: 'PrefixNot';
+  operator: UnaryOperator;
   expression: AST;
 }
 
@@ -499,15 +469,13 @@ export interface PrefixNot extends BaseAST {
 // 13. METADATA TYPES
 // ────────────────────────────────────────────────────────────────
 
-// ── TypeNode: recursive TypeScript type representation ──────────
-
 export type TypeNode =
   | TypeReference
   | UnionType
   | IntersectionType
   | TupleType
   | ArrayType
-  | LiteralType
+  | TypeLiteral
   | KeywordType
   | FunctionType
   | ObjectLiteralType
@@ -521,26 +489,22 @@ export type TypeNode =
   | RestType
   | ParenthesizedType;
 
-/** Named type with optional type arguments: e.g. Signal<string>, Map<K, V> */
 export interface TypeReference {
   kind: 'TypeReference';
   name: string;
   typeArguments?: TypeNode[];
 }
 
-/** A | B | C */
 export interface UnionType {
   kind: 'UnionType';
   types: TypeNode[];
 }
 
-/** A & B & C */
 export interface IntersectionType {
   kind: 'IntersectionType';
   types: TypeNode[];
 }
 
-/** [Row], [string, number] */
 export interface TupleType {
   kind: 'TupleType';
   elements: TupleElement[];
@@ -553,25 +517,21 @@ export interface TupleElement {
   rest?: boolean;
 }
 
-/** T[] */
 export interface ArrayType {
   kind: 'ArrayType';
   elementType: TypeNode;
 }
 
-/** String, number, boolean, or template literal type values */
-export interface LiteralType {
-  kind: 'LiteralType';
+export interface TypeLiteral {
+  kind: 'TypeLiteral';
   value: string | number | boolean | bigint | null;
 }
 
-/** Primitive keywords: string, number, boolean, void, never, any, unknown, undefined, null, object, symbol, bigint */
 export interface KeywordType {
   kind: 'KeywordType';
   keyword: 'string' | 'number' | 'boolean' | 'void' | 'never' | 'any' | 'unknown' | 'undefined' | 'null' | 'object' | 'symbol' | 'bigint';
 }
 
-/** (a: string, b: number) => ReturnType */
 export interface FunctionType {
   kind: 'FunctionType';
   parameters: FunctionTypeParameter[];
@@ -592,7 +552,6 @@ export interface TypeParameterDeclaration {
   default?: TypeNode;
 }
 
-/** { key: Type; key2?: Type2 } */
 export interface ObjectLiteralType {
   kind: 'ObjectLiteralType';
   members: ObjectTypeMember[];
@@ -605,14 +564,12 @@ export interface ObjectTypeMember {
   readonly?: boolean;
 }
 
-/** T[K] */
 export interface IndexedAccessType {
   kind: 'IndexedAccessType';
   objectType: TypeNode;
   indexType: TypeNode;
 }
 
-/** T extends U ? X : Y */
 export interface ConditionalType {
   kind: 'ConditionalType';
   checkType: TypeNode;
@@ -621,7 +578,6 @@ export interface ConditionalType {
   falseType: TypeNode;
 }
 
-/** { [K in keyof T]: V } */
 export interface MappedType {
   kind: 'MappedType';
   typeParameter: TypeParameterDeclaration;
@@ -631,13 +587,11 @@ export interface MappedType {
   readonly?: '+' | '-' | boolean;
 }
 
-/** infer U */
 export interface InferType {
   kind: 'InferType';
   typeParameter: TypeParameterDeclaration;
 }
 
-/** `prefix${T}suffix` */
 export interface TemplateLiteralType {
   kind: 'TemplateLiteralType';
   head: string;
@@ -649,25 +603,21 @@ export interface TemplateLiteralSpan {
   literal: string;
 }
 
-/** typeof expr */
 export interface TypeofType {
   kind: 'TypeofType';
   expression: string;
 }
 
-/** keyof T */
 export interface KeyofType {
   kind: 'KeyofType';
   type: TypeNode;
 }
 
-/** ...T (in tuple context) */
 export interface RestType {
   kind: 'RestType';
   type: TypeNode;
 }
 
-/** (T) — preserves grouping */
 export interface ParenthesizedType {
   kind: 'ParenthesizedType';
   type: TypeNode;
@@ -683,96 +633,154 @@ export interface I18nMeta {
 
 // ────────────────────────────────────────────────────────────────
 // 14. VISITOR
-//
-// Visitor pattern for AST traversal. Each template node kind
-// has a corresponding visit method.
 // ────────────────────────────────────────────────────────────────
 
-export interface TemplateAstVisitor<T = any> {
-  visitElement(element: ElementNode, context: T): any;
-  visitText(text: TextNode, context: T): any;
-  visitTextInterpolation(interpolation: TextInterpolationNode, context: T): any;
-  visitLet(letNode: LetNode, context: T): any;
-  visitIf(ifNode: IfNode, context: T): any;
-  visitFor(forNode: ForNode, context: T): any;
-  visitSwitch(switchNode: SwitchNode, context: T): any;
-  visitRender(renderNode: RenderNode, context: T): any;
-  visitDerive(deriveNode: DeriveNode, context: T): any;
-  visitFragment(fragmentNode: FragmentNode, context: T): any;
+export interface TemplateAstVisitor<T = void> {
+  visitElement(element: ElementNode, context: T): void;
+  visitText(text: TextNode, context: T): void;
+  visitTextInterpolation(interpolation: TextInterpolationNode, context: T): void;
+  visitLet(letNode: LetNode, context: T): void;
+  visitFragment(fragmentNode: FragmentNode, context: T): void;
+  visitIf(ifNode: IfNode, context: T): void;
+  visitIfConditionBranch(branch: IfConditionBranch, context: T): void;
+  visitElseBranch(branch: ElseBranch, context: T): void;
+  visitFor(forNode: ForNode, context: T): void;
+  visitForEmpty(forEmpty: ForEmptyNode, context: T): void;
+  visitSwitch(switchNode: SwitchNode, context: T): void;
+  visitSwitchCase(switchCase: SwitchCaseNode, context: T): void;
+  visitSwitchDefault(switchDefault: SwitchDefaultNode, context: T): void;
+  visitRender(renderNode: RenderNode, context: T): void;
+  visitDerive(deriveNode: DeriveNode, context: T): void;
+  visitDerivationInput(input: DerivationInputNode, context: T): void;
+  visitTextAttribute(attr: TextAttributeNode, context: T): void;
+  visitBoundAttribute(attr: BoundAttributeNode, context: T): void;
+  visitBoundEvent(event: BoundEventNode, context: T): void;
+  visitBoundModel(model: BoundModelNode, context: T): void;
+  visitRef(ref: RefNode, context: T): void;
+  visitDirectiveBinding(directive: DirectiveBindingNode, context: T): void;
+  visitDirectiveInput(input: DirectiveInputNode, context: T): void;
+  visitDirectiveOutput(output: DirectiveOutputNode, context: T): void;
+  visitDirectiveModel(model: DirectiveModelNode, context: T): void;
+  visitDirectiveWhen(when: DirectiveWhenNode, context: T): void;
+  visitFragmentParameter(param: FragmentParameterNode, context: T): void;
+  visitRenderOptions(options: RenderOptionsNode, context: T): void;
 }
 
 // ────────────────────────────────────────────────────────────────
 // 15. TRAVERSAL UTILITIES
 // ────────────────────────────────────────────────────────────────
 
-export function visitAll(nodes: TemplateNode[], visitor: TemplateAstVisitor): void {
-  nodes.forEach(node => {
+export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>, context: T): void {
+  for (const node of nodes) {
     switch (node.type) {
       case 'Element':
-        visitor.visitElement(node, visitor);
+        visitor.visitElement(node, context);
+        for (const attr of node.attributes) visitor.visitTextAttribute(attr, context);
+        for (const input of node.inputs) visitor.visitBoundAttribute(input, context);
+        for (const output of node.outputs) visitor.visitBoundEvent(output, context);
+        for (const model of node.models) visitor.visitBoundModel(model, context);
+        for (const ref of node.references) visitor.visitRef(ref, context);
+        for (const dir of node.directives) {
+          visitor.visitDirectiveBinding(dir, context);
+          for (const input of dir.inputs) visitor.visitDirectiveInput(input, context);
+          for (const output of dir.outputs) visitor.visitDirectiveOutput(output, context);
+          for (const model of dir.models) visitor.visitDirectiveModel(model, context);
+          if (dir.when) visitor.visitDirectiveWhen(dir.when, context);
+          if (dir.ref) visitor.visitRef(dir.ref, context);
+        }
+        for (const frag of node.fragments) {
+          visitor.visitFragment(frag, context);
+          for (const param of frag.parameters) visitor.visitFragmentParameter(param, context);
+          walkAll(frag.children, visitor, context);
+        }
+        walkAll(node.children, visitor, context);
         break;
       case 'Text':
-        visitor.visitText(node, visitor);
+        visitor.visitText(node, context);
         break;
       case 'TextInterpolation':
-        visitor.visitTextInterpolation(node, visitor);
+        visitor.visitTextInterpolation(node, context);
         break;
       case 'Let':
-        visitor.visitLet(node, visitor);
+        visitor.visitLet(node, context);
         break;
       case 'If':
-        visitor.visitIf(node, visitor);
+        visitor.visitIf(node, context);
+        for (const branch of node.branches) {
+          if (branch.type === 'IfConditionBranch') {
+            visitor.visitIfConditionBranch(branch, context);
+          } else {
+            visitor.visitElseBranch(branch, context);
+          }
+          walkAll(branch.children, visitor, context);
+        }
         break;
       case 'For':
-        visitor.visitFor(node, visitor);
+        visitor.visitFor(node, context);
+        walkAll(node.children, visitor, context);
+        if (node.empty) {
+          visitor.visitForEmpty(node.empty, context);
+          walkAll(node.empty.children, visitor, context);
+        }
         break;
       case 'Switch':
-        visitor.visitSwitch(node, visitor);
+        visitor.visitSwitch(node, context);
+        for (const branch of node.cases) {
+          if (branch.type === 'SwitchCase') {
+            visitor.visitSwitchCase(branch, context);
+          } else {
+            visitor.visitSwitchDefault(branch, context);
+          }
+          walkAll(branch.children, visitor, context);
+        }
         break;
       case 'Render':
-        visitor.visitRender(node, visitor);
+        visitor.visitRender(node, context);
+        if (node.options) visitor.visitRenderOptions(node.options, context);
         break;
       case 'Derive':
-        visitor.visitDerive(node, visitor);
-        break;
-      case 'Fragment':
-        visitor.visitFragment(node, visitor);
+        visitor.visitDerive(node, context);
+        for (const input of node.inputs) visitor.visitDerivationInput(input, context);
         break;
     }
-  });
+  }
 }
 
 export function findElementsByName(ast: TemplateAST, name: string): ElementNode[] {
   const elements: ElementNode[] = [];
-  const visitor: TemplateAstVisitor = {
-    visitElement: (element: ElementNode) => {
-      if (element.name === name) {
-        elements.push(element);
-      }
-      visitAll(element.children, visitor);
-      visitAll(element.fragments, visitor);
+  const noop = () => {};
+  const visitor: TemplateAstVisitor<void> = {
+    visitElement: (element) => {
+      if (element.name === name) elements.push(element);
     },
-    visitText: () => {},
-    visitTextInterpolation: () => {},
-    visitLet: () => {},
-    visitIf: (ifNode: IfNode) => {
-      ifNode.branches.forEach(branch => visitAll(branch.children, visitor));
-    },
-    visitFor: (forNode: ForNode) => {
-      visitAll(forNode.children, visitor);
-      if (forNode.empty) {
-        visitAll(forNode.empty.children, visitor);
-      }
-    },
-    visitSwitch: (switchNode: SwitchNode) => {
-      switchNode.cases.forEach(c => visitAll(c.children, visitor));
-    },
-    visitRender: () => {},
-    visitDerive: () => {},
-    visitFragment: (fragmentNode: FragmentNode) => {
-      visitAll(fragmentNode.children, visitor);
-    },
+    visitText: noop,
+    visitTextInterpolation: noop,
+    visitLet: noop,
+    visitFragment: noop,
+    visitIf: noop,
+    visitIfConditionBranch: noop,
+    visitElseBranch: noop,
+    visitFor: noop,
+    visitForEmpty: noop,
+    visitSwitch: noop,
+    visitSwitchCase: noop,
+    visitSwitchDefault: noop,
+    visitRender: noop,
+    visitDerive: noop,
+    visitDerivationInput: noop,
+    visitTextAttribute: noop,
+    visitBoundAttribute: noop,
+    visitBoundEvent: noop,
+    visitBoundModel: noop,
+    visitRef: noop,
+    visitDirectiveBinding: noop,
+    visitDirectiveInput: noop,
+    visitDirectiveOutput: noop,
+    visitDirectiveModel: noop,
+    visitDirectiveWhen: noop,
+    visitFragmentParameter: noop,
+    visitRenderOptions: noop,
   };
-  visitAll(ast.nodes, visitor);
+  walkAll(ast.nodes, visitor, undefined as void);
   return elements;
 }
