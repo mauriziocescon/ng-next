@@ -499,8 +499,178 @@ export interface PrefixNot extends BaseAST {
 // 13. METADATA TYPES
 // ────────────────────────────────────────────────────────────────
 
-export interface TypeNode {
-  type: string;
+// ── TypeNode: recursive TypeScript type representation ──────────
+
+export type TypeNode =
+  | TypeReference
+  | UnionType
+  | IntersectionType
+  | TupleType
+  | ArrayType
+  | LiteralType
+  | KeywordType
+  | FunctionType
+  | ObjectLiteralType
+  | IndexedAccessType
+  | ConditionalType
+  | MappedType
+  | InferType
+  | TemplateLiteralType
+  | TypeofType
+  | KeyofType
+  | RestType
+  | ParenthesizedType;
+
+/** Named type with optional type arguments: e.g. Signal<string>, Map<K, V> */
+export interface TypeReference {
+  kind: 'TypeReference';
+  name: string;
+  typeArguments?: TypeNode[];
+}
+
+/** A | B | C */
+export interface UnionType {
+  kind: 'UnionType';
+  types: TypeNode[];
+}
+
+/** A & B & C */
+export interface IntersectionType {
+  kind: 'IntersectionType';
+  types: TypeNode[];
+}
+
+/** [Row], [string, number] */
+export interface TupleType {
+  kind: 'TupleType';
+  elements: TupleElement[];
+}
+
+export interface TupleElement {
+  type: TypeNode;
+  label?: string;
+  optional?: boolean;
+  rest?: boolean;
+}
+
+/** T[] */
+export interface ArrayType {
+  kind: 'ArrayType';
+  elementType: TypeNode;
+}
+
+/** String, number, boolean, or template literal type values */
+export interface LiteralType {
+  kind: 'LiteralType';
+  value: string | number | boolean | bigint | null;
+}
+
+/** Primitive keywords: string, number, boolean, void, never, any, unknown, undefined, null, object, symbol, bigint */
+export interface KeywordType {
+  kind: 'KeywordType';
+  keyword: 'string' | 'number' | 'boolean' | 'void' | 'never' | 'any' | 'unknown' | 'undefined' | 'null' | 'object' | 'symbol' | 'bigint';
+}
+
+/** (a: string, b: number) => ReturnType */
+export interface FunctionType {
+  kind: 'FunctionType';
+  parameters: FunctionTypeParameter[];
+  returnType: TypeNode;
+  typeParameters?: TypeParameterDeclaration[];
+}
+
+export interface FunctionTypeParameter {
+  name: string;
+  type: TypeNode;
+  optional?: boolean;
+  rest?: boolean;
+}
+
+export interface TypeParameterDeclaration {
+  name: string;
+  constraint?: TypeNode;
+  default?: TypeNode;
+}
+
+/** { key: Type; key2?: Type2 } */
+export interface ObjectLiteralType {
+  kind: 'ObjectLiteralType';
+  members: ObjectTypeMember[];
+}
+
+export interface ObjectTypeMember {
+  name: string;
+  type: TypeNode;
+  optional?: boolean;
+  readonly?: boolean;
+}
+
+/** T[K] */
+export interface IndexedAccessType {
+  kind: 'IndexedAccessType';
+  objectType: TypeNode;
+  indexType: TypeNode;
+}
+
+/** T extends U ? X : Y */
+export interface ConditionalType {
+  kind: 'ConditionalType';
+  checkType: TypeNode;
+  extendsType: TypeNode;
+  trueType: TypeNode;
+  falseType: TypeNode;
+}
+
+/** { [K in keyof T]: V } */
+export interface MappedType {
+  kind: 'MappedType';
+  typeParameter: TypeParameterDeclaration;
+  nameType?: TypeNode;
+  type: TypeNode;
+  optional?: '+' | '-' | boolean;
+  readonly?: '+' | '-' | boolean;
+}
+
+/** infer U */
+export interface InferType {
+  kind: 'InferType';
+  typeParameter: TypeParameterDeclaration;
+}
+
+/** `prefix${T}suffix` */
+export interface TemplateLiteralType {
+  kind: 'TemplateLiteralType';
+  head: string;
+  spans: TemplateLiteralSpan[];
+}
+
+export interface TemplateLiteralSpan {
+  type: TypeNode;
+  literal: string;
+}
+
+/** typeof expr */
+export interface TypeofType {
+  kind: 'TypeofType';
+  expression: string;
+}
+
+/** keyof T */
+export interface KeyofType {
+  kind: 'KeyofType';
+  type: TypeNode;
+}
+
+/** ...T (in tuple context) */
+export interface RestType {
+  kind: 'RestType';
+  type: TypeNode;
+}
+
+/** (T) — preserves grouping */
+export interface ParenthesizedType {
+  kind: 'ParenthesizedType';
+  type: TypeNode;
 }
 
 export interface I18nMeta {
