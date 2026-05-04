@@ -63,6 +63,7 @@ export type TemplateNode =
   | TextInterpolationNode
   | ControlFlowNode
   | TemplateDirectiveNode
+  | FragmentNode
   | LetNode;
 
 // ────────────────────────────────────────────────────────────────
@@ -73,6 +74,13 @@ export interface ForwardMarkerNode extends BaseNode {
   type: 'ForwardMarker';
 }
 
+/**
+ * Nested DOM content is lowered by the parser into a synthetic
+ * FragmentNode { name: 'children', parameters: [], children: [...] }
+ * appended to the `fragments` array. There is no separate `children`
+ * field — implicit children and explicit @fragment declarations
+ * share the same representation.
+ */
 export interface ElementNode extends BaseNode {
   type: 'Element';
   name: string;
@@ -749,6 +757,11 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
       case 'Derive':
         visitor.visitDerive(node, context);
         for (const input of node.inputs) visitor.visitDerivationInput(input, context);
+        break;
+      case 'Fragment':
+        visitor.visitFragment(node, context);
+        for (const param of node.parameters) visitor.visitFragmentParameter(param, context);
+        walkAll(node.children, visitor, context);
         break;
     }
   }
