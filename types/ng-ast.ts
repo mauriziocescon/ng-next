@@ -766,5 +766,3 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
     }
   }
 }
-
-
