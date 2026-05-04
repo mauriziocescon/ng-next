@@ -69,17 +69,20 @@ export type TemplateNode =
 // 4. ELEMENT NODE
 // ────────────────────────────────────────────────────────────────
 
+export interface ForwardMarkerNode extends BaseNode {
+  type: 'ForwardMarker';
+}
+
 export interface ElementNode extends BaseNode {
   type: 'Element';
   name: string;
-  isForwarded?: boolean;
+  forwardMarker?: ForwardMarkerNode;
   attributes: TextAttributeNode[];
   inputs: BoundAttributeNode[];
   outputs: BoundEventNode[];
   models: BoundModelNode[];
   directives: DirectiveBindingNode[];
   references: RefNode[];
-  children: TemplateNode[];
   fragments: FragmentNode[];
   i18n?: I18nMeta;
 }
@@ -112,6 +115,7 @@ export interface BoundAttributeNode extends BaseNode {
   bindingType: BindingType;
   value: AST;
   once: boolean;
+  isShorthand?: boolean;
   unit?: string;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
@@ -124,6 +128,7 @@ export interface BoundEventNode extends BaseNode {
   target?: string;
   phase?: string;
   handler: AST;
+  isShorthand?: boolean;
   keySpan?: SourceSpan;
   handlerSpan?: SourceSpan;
 }
@@ -132,6 +137,7 @@ export interface BoundModelNode extends BaseNode {
   type: 'BoundModel';
   name: string;
   value: AST;
+  isShorthand?: boolean;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
   i18n?: I18nMeta;
@@ -168,6 +174,7 @@ export interface DirectiveInputNode extends BaseNode {
   name: string;
   value: AST;
   once: boolean;
+  isShorthand?: boolean;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }
@@ -176,6 +183,7 @@ export interface DirectiveOutputNode extends BaseNode {
   type: 'DirectiveOutput';
   name: string;
   handler: AST;
+  isShorthand?: boolean;
   keySpan?: SourceSpan;
   handlerSpan?: SourceSpan;
 }
@@ -184,6 +192,7 @@ export interface DirectiveModelNode extends BaseNode {
   type: 'DirectiveModel';
   name: string;
   value: AST;
+  isShorthand?: boolean;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }
@@ -250,7 +259,8 @@ export interface ElseBranch extends BaseNode {
 
 export interface ForNode extends BaseNode {
   type: 'For';
-  item: Variable;
+  itemName: string;
+  itemSpan: SourceSpan;
   expression: AST;
   trackBy: AST;
   children: TemplateNode[];
@@ -297,8 +307,7 @@ export type TemplateDirectiveNode =
 
 export interface RenderNode extends BaseNode {
   type: 'Render';
-  fragment: AST;
-  args: AST[];
+  expression: AST;
   options?: RenderOptionsNode;
 }
 
@@ -693,7 +702,6 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
           for (const param of frag.parameters) visitor.visitFragmentParameter(param, context);
           walkAll(frag.children, visitor, context);
         }
-        walkAll(node.children, visitor, context);
         break;
       case 'Text':
         visitor.visitText(node, context);
