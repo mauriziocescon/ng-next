@@ -1,5 +1,54 @@
-// Angular Signal Components Template AST
-// TypeScript interfaces defining the Abstract Syntax Tree for template expressions
+// ────────────────────────────────────────────────────────────────
+// 1. SOURCE LOCATION
+// ────────────────────────────────────────────────────────────────
+
+export interface ParseSourceFile {
+  content: string;
+  url: string;
+}
+
+export interface ParseLocation {
+  file: ParseSourceFile;
+  offset: number;
+  line: number;
+  col: number;
+}
+
+export interface SourceSpan {
+  start: ParseLocation;
+  end: ParseLocation;
+  fullStart: ParseLocation;
+  details?: string;
+}
+
+export interface ParseSpan {
+  start: number;
+  end: number;
+}
+
+export interface AbsoluteSourceSpan {
+  start: number;
+  end: number;
+}
+
+// ────────────────────────────────────────────────────────────────
+// 2. BASE NODES
+// ────────────────────────────────────────────────────────────────
+
+export interface BaseNode {
+  sourceSpan: SourceSpan;
+  startSourceSpan?: SourceSpan;
+  endSourceSpan?: SourceSpan;
+}
+
+export interface BaseAST {
+  span: ParseSpan;
+  sourceSpan: AbsoluteSourceSpan;
+}
+
+// ────────────────────────────────────────────────────────────────
+// 3. TEMPLATE ROOT & NODE UNION
+// ────────────────────────────────────────────────────────────────
 
 export interface TemplateAST {
   type: 'Template';
@@ -12,37 +61,17 @@ export type TemplateNode =
   | TextNode
   | TextInterpolationNode
   | ControlFlowNode
-  | DirectiveNode
+  | TemplateDirectiveNode
   | FragmentNode
   | LetNode;
 
-// Base interfaces
-export interface BaseNode {
-  sourceSpan: SourceSpan;
-  startSourceSpan?: SourceSpan;
-  endSourceSpan?: SourceSpan;
-}
+// ────────────────────────────────────────────────────────────────
+// 4. ELEMENT NODE
+//
+// Represents both native HTML elements and component elements.
+// isForwarded corresponds to @forward() in the template DSL.
+// ────────────────────────────────────────────────────────────────
 
-export interface SourceSpan {
-  start: ParseLocation;
-  end: ParseLocation;
-  fullStart: ParseLocation;
-  details?: string;
-}
-
-export interface ParseLocation {
-  file: ParseSourceFile;
-  offset: number;
-  line: number;
-  col: number;
-}
-
-export interface ParseSourceFile {
-  content: string;
-  url: string;
-}
-
-// Element Nodes
 export interface ElementNode extends BaseNode {
   type: 'Element';
   name: string;
@@ -53,12 +82,30 @@ export interface ElementNode extends BaseNode {
   models: BoundModelNode[];
   directives: DirectiveBindingNode[];
   references: ReferenceNode[];
-  children: TemplateNode[]; // Represents the implicit children fragment markup
+  children: TemplateNode[];
   fragments: FragmentNode[];
   i18n?: I18nMeta;
 }
 
-// Attribute Nodes
+// ────────────────────────────────────────────────────────────────
+// 5. ATTRIBUTE & BINDING NODES
+//
+// TextAttributeNode: static attribute (e.g. type="text")
+// BoundAttributeNode: bind:prop={expr}, class:name={expr},
+//   style:prop={expr}, animate:name={expr}, or shorthand prop={expr}
+// BoundEventNode: on:event={handler}
+// BoundModelNode: model:prop={signal}
+// ReferenceNode: ref={variable}
+// ────────────────────────────────────────────────────────────────
+
+export enum BindingType {
+  Property = 0,
+  Attribute = 1,
+  Class = 2,
+  Style = 3,
+  Animation = 4,
+}
+
 export interface TextAttributeNode extends BaseNode {
   type: 'TextAttribute';
   name: string;
@@ -73,7 +120,7 @@ export interface BoundAttributeNode extends BaseNode {
   name: string;
   bindingType: BindingType;
   value: AST;
-  once: boolean; // Maintains support for the once: shorthand
+  once: boolean;
   unit?: string;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
@@ -98,6 +145,24 @@ export interface BoundModelNode extends BaseNode {
   valueSpan?: SourceSpan;
 }
 
+export interface ReferenceNode extends BaseNode {
+  type: 'Reference';
+  name: string;
+  value: AST;
+  keySpan?: SourceSpan;
+  valueSpan?: SourceSpan;
+}
+
+// ────────────────────────────────────────────────────────────────
+// 6. DIRECTIVE BINDING NODES
+//
+// use:directive(input={expr} on:output={handler}):when={cond}:ref={r}
+//
+// DirectiveBindingNode groups all bindings for a single use:
+// directive application on an element.
+// Modifiers (:when, :ref) sit outside the directive's own bindings.
+// ────────────────────────────────────────────────────────────────
+
 export interface DirectiveBindingNode extends BaseNode {
   type: 'DirectiveBinding';
   directiveName: string;
@@ -113,6 +178,7 @@ export interface DirectiveInputNode extends BaseNode {
   type: 'DirectiveInput';
   name: string;
   value: AST;
+  once: boolean;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }
@@ -149,15 +215,10 @@ export interface DirectiveModifierNode extends BaseNode {
   valueSpan?: SourceSpan;
 }
 
-export interface ReferenceNode extends BaseNode {
-  type: 'Reference';
-  name: string;
-  value: AST;
-  keySpan?: SourceSpan;
-  valueSpan?: SourceSpan;
-}
+// ────────────────────────────────────────────────────────────────
+// 7. TEXT & INTERPOLATION NODES
+// ────────────────────────────────────────────────────────────────
 
-// Text Nodes
 export interface TextNode extends BaseNode {
   type: 'Text';
   value: string;
@@ -169,14 +230,20 @@ export interface TextInterpolationNode extends BaseNode {
   expression: AST;
 }
 
-// @let declaration
+// ────────────────────────────────────────────────────────────────
+// 8. @let DECLARATION
+// ────────────────────────────────────────────────────────────────
+
 export interface LetNode extends BaseNode {
   type: 'Let';
   name: string;
   value: AST;
 }
 
-// Control Flow Nodes
+// ────────────────────────────────────────────────────────────────
+// 9. CONTROL FLOW — @if, @for, @switch
+// ────────────────────────────────────────────────────────────────
+
 export type ControlFlowNode =
   | IfNode
   | ForNode
@@ -222,8 +289,15 @@ export interface SwitchCaseNode extends BaseNode {
   children: TemplateNode[];
 }
 
-// Directive Nodes (Special template directives)
-export type DirectiveNode =
+// ────────────────────────────────────────────────────────────────
+// 10. TEMPLATE DIRECTIVES — @render, @derive
+//
+// These are template-level constructs (not element directives).
+// @render invokes a fragment; @derive creates a template-scoped
+// reactive computation from a derivation factory.
+// ────────────────────────────────────────────────────────────────
+
+export type TemplateDirectiveNode =
   | RenderNode
   | DeriveNode;
 
@@ -243,8 +317,8 @@ export interface RenderOptionsNode extends BaseNode {
 // @derive varName = derivationRef(key={expr} ...)
 export interface DeriveNode extends BaseNode {
   type: 'Derive';
-  name: string; // local variable name
-  derivation: AST; // reference to the derivation factory
+  name: string;
+  derivation: AST;
   inputs: DerivationInputNode[];
 }
 
@@ -254,7 +328,15 @@ export interface DerivationInputNode extends BaseNode {
   value: AST;
 }
 
-// Fragment Nodes
+// ────────────────────────────────────────────────────────────────
+// 11. FRAGMENT NODES
+//
+// @fragment name(param: Type) { ... }
+//
+// Inline fragments declared inside a component element are
+// auto-passed as the matching fragment binding.
+// ────────────────────────────────────────────────────────────────
+
 export interface FragmentNode extends BaseNode {
   type: 'Fragment';
   name: string;
@@ -268,7 +350,13 @@ export interface FragmentParameterNode extends BaseNode {
   typeAnnotation: TypeNode;
 }
 
-// Expression AST
+// ────────────────────────────────────────────────────────────────
+// 12. EXPRESSION AST
+//
+// Expressions inside {}, binding values, and control flow
+// conditions. Mirrors Angular's existing expression parser output.
+// ────────────────────────────────────────────────────────────────
+
 export type AST =
   | LiteralPrimitive
   | LiteralArray
@@ -290,7 +378,6 @@ export type AST =
   | Unary
   | PrefixNot;
 
-// Expression AST Nodes
 export interface LiteralPrimitive extends BaseAST {
   type: 'LiteralPrimitive';
   value: any;
@@ -408,29 +495,9 @@ export interface PrefixNot extends BaseAST {
   expression: AST;
 }
 
-export interface BaseAST {
-  span: ParseSpan;
-  sourceSpan: AbsoluteSourceSpan;
-}
-
-export interface ParseSpan {
-  start: number;
-  end: number;
-}
-
-export interface AbsoluteSourceSpan {
-  start: number;
-  end: number;
-}
-
-// Enums and Types
-export enum BindingType {
-  Property = 0,
-  Attribute = 1,
-  Class = 2,
-  Style = 3,
-  Animation = 4,
-}
+// ────────────────────────────────────────────────────────────────
+// 13. METADATA TYPES
+// ────────────────────────────────────────────────────────────────
 
 export interface TypeNode {
   type: string;
@@ -444,7 +511,13 @@ export interface I18nMeta {
   meaning?: string;
 }
 
-// Visitor Pattern for AST Traversal
+// ────────────────────────────────────────────────────────────────
+// 14. VISITOR
+//
+// Visitor pattern for AST traversal. Each template node kind
+// has a corresponding visit method.
+// ────────────────────────────────────────────────────────────────
+
 export interface TemplateAstVisitor<T = any> {
   visitElement(element: ElementNode, context: T): any;
   visitText(text: TextNode, context: T): any;
@@ -458,78 +531,78 @@ export interface TemplateAstVisitor<T = any> {
   visitFragment(fragmentNode: FragmentNode, context: T): any;
 }
 
-// Utility functions for AST manipulation
-export class TemplateAstHelper {
-  static findElementsByName(ast: TemplateAST, name: string): ElementNode[] {
-    const elements: ElementNode[] = [];
-    const visitor: TemplateAstVisitor = {
-      visitElement: (element: ElementNode) => {
-        if (element.name === name) {
-          elements.push(element);
-        }
-        TemplateAstHelper.visitAll(element.children, visitor);
-        TemplateAstHelper.visitAll(element.fragments, visitor);
-      },
-      visitText: () => {},
-      visitTextInterpolation: () => {},
-      visitLet: () => {},
-      visitIf: (ifNode: IfNode) => {
-        ifNode.branches.forEach(branch => TemplateAstHelper.visitAll(branch.children, visitor));
-      },
-      visitFor: (forNode: ForNode) => {
-        TemplateAstHelper.visitAll(forNode.children, visitor);
-        if (forNode.empty) {
-          TemplateAstHelper.visitAll(forNode.empty.children, visitor);
-        }
-      },
-      visitSwitch: (switchNode: SwitchNode) => {
-        switchNode.cases.forEach(caseNode => TemplateAstHelper.visitAll(caseNode.children, visitor));
-      },
-      visitRender: () => {},
-      visitDerive: () => {},
-      visitFragment: (fragmentNode: FragmentNode) => {
-        TemplateAstHelper.visitAll(fragmentNode.children, visitor);
-      },
-    };
-    this.visitAll(ast.nodes, visitor);
-    return elements;
-  }
+// ────────────────────────────────────────────────────────────────
+// 15. TRAVERSAL UTILITIES
+// ────────────────────────────────────────────────────────────────
 
-  static visitAll(nodes: TemplateNode[], visitor: TemplateAstVisitor): void {
-    nodes.forEach(node => {
-      switch (node.type) {
-        case 'Element':
-          visitor.visitElement(node, visitor);
-          break;
-        case 'Text':
-          visitor.visitText(node, visitor);
-          break;
-        case 'TextInterpolation':
-          visitor.visitTextInterpolation(node, visitor);
-          break;
-        case 'Let':
-          visitor.visitLet(node, visitor);
-          break;
-        case 'If':
-          visitor.visitIf(node, visitor);
-          break;
-        case 'For':
-          visitor.visitFor(node, visitor);
-          break;
-        case 'Switch':
-          visitor.visitSwitch(node, visitor);
-          break;
-        case 'Render':
-          visitor.visitRender(node, visitor);
-          break;
-        case 'Derive':
-          visitor.visitDerive(node, visitor);
-          break;
-        case 'Fragment':
-          visitor.visitFragment(node, visitor);
-          break;
+export function visitAll(nodes: TemplateNode[], visitor: TemplateAstVisitor): void {
+  nodes.forEach(node => {
+    switch (node.type) {
+      case 'Element':
+        visitor.visitElement(node, visitor);
+        break;
+      case 'Text':
+        visitor.visitText(node, visitor);
+        break;
+      case 'TextInterpolation':
+        visitor.visitTextInterpolation(node, visitor);
+        break;
+      case 'Let':
+        visitor.visitLet(node, visitor);
+        break;
+      case 'If':
+        visitor.visitIf(node, visitor);
+        break;
+      case 'For':
+        visitor.visitFor(node, visitor);
+        break;
+      case 'Switch':
+        visitor.visitSwitch(node, visitor);
+        break;
+      case 'Render':
+        visitor.visitRender(node, visitor);
+        break;
+      case 'Derive':
+        visitor.visitDerive(node, visitor);
+        break;
+      case 'Fragment':
+        visitor.visitFragment(node, visitor);
+        break;
+    }
+  });
+}
 
+export function findElementsByName(ast: TemplateAST, name: string): ElementNode[] {
+  const elements: ElementNode[] = [];
+  const visitor: TemplateAstVisitor = {
+    visitElement: (element: ElementNode) => {
+      if (element.name === name) {
+        elements.push(element);
       }
-    });
-  }
+      visitAll(element.children, visitor);
+      visitAll(element.fragments, visitor);
+    },
+    visitText: () => {},
+    visitTextInterpolation: () => {},
+    visitLet: () => {},
+    visitIf: (ifNode: IfNode) => {
+      ifNode.branches.forEach(branch => visitAll(branch.children, visitor));
+    },
+    visitFor: (forNode: ForNode) => {
+      visitAll(forNode.children, visitor);
+      if (forNode.empty) {
+        visitAll(forNode.empty.children, visitor);
+      }
+    },
+    visitSwitch: (switchNode: SwitchNode) => {
+      switchNode.cases.forEach(c => visitAll(c.children, visitor));
+    },
+    visitRender: () => {},
+    visitDerive: () => {},
+    visitFragment: (fragmentNode: FragmentNode) => {
+      visitAll(fragmentNode.children, visitor);
+    },
+  };
+  visitAll(ast.nodes, visitor);
+  return elements;
 }
