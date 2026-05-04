@@ -256,7 +256,7 @@ type ReservedBindingsConstraint<
       }
   : unknown;
 
-// Test-only exports for diagnostic contract checks in types.spec.ts
+// Test-only exports for diagnostic contract checks in ng-types.spec.ts
 export type __WrapSelectionDiagnostics<
   Sel extends Record<string, unknown>,
   All extends Record<string, unknown>,

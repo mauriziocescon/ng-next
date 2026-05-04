@@ -32,7 +32,7 @@ import {
   provide,
   ref,
   refMany,
-} from './types';
+} from './ng-types';
 
 declare const tmpl: TemplateMarkup;
 
