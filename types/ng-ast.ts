@@ -767,41 +767,4 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
   }
 }
 
-export function findElementsByName(ast: TemplateAST, name: string): ElementNode[] {
-  const elements: ElementNode[] = [];
-  const noop = () => {};
-  const visitor: TemplateAstVisitor<void> = {
-    visitElement: (element) => {
-      if (element.name === name) elements.push(element);
-    },
-    visitText: noop,
-    visitTextInterpolation: noop,
-    visitLet: noop,
-    visitFragment: noop,
-    visitIf: noop,
-    visitIfConditionBranch: noop,
-    visitElseBranch: noop,
-    visitFor: noop,
-    visitForEmpty: noop,
-    visitSwitch: noop,
-    visitSwitchCase: noop,
-    visitSwitchDefault: noop,
-    visitRender: noop,
-    visitDerive: noop,
-    visitDerivationInput: noop,
-    visitTextAttribute: noop,
-    visitBoundAttribute: noop,
-    visitBoundEvent: noop,
-    visitBoundModel: noop,
-    visitRef: noop,
-    visitDirectiveBinding: noop,
-    visitDirectiveInput: noop,
-    visitDirectiveOutput: noop,
-    visitDirectiveModel: noop,
-    visitDirectiveWhen: noop,
-    visitFragmentParameter: noop,
-    visitRenderOptions: noop,
-  };
-  walkAll(ast.nodes, visitor, undefined as void);
-  return elements;
-}
+
