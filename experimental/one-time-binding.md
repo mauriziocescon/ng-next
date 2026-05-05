@@ -52,14 +52,6 @@ export const UserDetailConsumer = component({
 });
 ```
 
-### Shorthand
-
-The name-matching shorthand works with `once:` — same rules as other prefixes:
-
-```ts
-<UserDetail once:{user} model:{email} on:{makeAdmin} />
-```
-
 ### Compiler Lowering
 
 When the consumer writes `once:user={user()}`, the compiler:

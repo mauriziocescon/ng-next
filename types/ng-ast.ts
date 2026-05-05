@@ -123,7 +123,6 @@ export interface BoundAttributeNode extends BaseNode {
   bindingType: BindingType;
   value: AST;
   once: boolean;
-  isShorthand?: boolean;
   unit?: string;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
@@ -136,7 +135,6 @@ export interface BoundEventNode extends BaseNode {
   target?: string;
   phase?: string;
   handler: AST;
-  isShorthand?: boolean;
   keySpan?: SourceSpan;
   handlerSpan?: SourceSpan;
 }
@@ -145,7 +143,6 @@ export interface BoundModelNode extends BaseNode {
   type: 'BoundModel';
   name: string;
   value: AST;
-  isShorthand?: boolean;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
   i18n?: I18nMeta;
@@ -182,7 +179,6 @@ export interface DirectiveInputNode extends BaseNode {
   name: string;
   value: AST;
   once: boolean;
-  isShorthand?: boolean;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }
@@ -191,7 +187,6 @@ export interface DirectiveOutputNode extends BaseNode {
   type: 'DirectiveOutput';
   name: string;
   handler: AST;
-  isShorthand?: boolean;
   keySpan?: SourceSpan;
   handlerSpan?: SourceSpan;
 }
@@ -200,7 +195,6 @@ export interface DirectiveModelNode extends BaseNode {
   type: 'DirectiveModel';
   name: string;
   value: AST;
-  isShorthand?: boolean;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }

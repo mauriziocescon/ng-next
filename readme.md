@@ -274,38 +274,25 @@ export const PriceSimulator = component({
 
 ## Binding syntax helpers
 
-- Name-matching: omit the value when the local variable name matches the binding; type inferred from the binding kind — `Signal<T>` for inputs, `WritableSignal<T>` for models, `(payload: T) => void` for outputs.
-- One-time shorthand: `once:` also supports name-matching shorthand (`once:{user}`).
 - Literal form equivalence for inputs: literal attributes and literal expressions are equivalent for inputs: `prop="value"` and `prop={'value'}` produce the same input value.
 - `:when`: conditionally applies a `use:` binding; sits outside the directive's inputs and cannot clash with them.
 
 ```ts
 import { component, signal } from '@angular/core';
 import { tooltip } from '@mylib/tooltip';
-import { UserDetail, User } from './user-detail.ng';
 
-export const UserCard = component({
+export const SearchBox = component({
   setup: () => {
-    const user = signal<User>(/** ... **/);
-    const email = signal<string>(/** ... **/);
+    const text = signal('');
     const showTip = signal(true);
-    const tip = signal('View details');
-
-    function userChange() {/** ... **/}
+    const tip = signal('Type to search');
 
     return (
-      // explicit form — always works
-      <UserDetail
-        user={user()}
-        model:email={email}
-        on:userChange={userChange}
-        use:tooltip(message={tip()}):when={showTip()} />
-
-      // shorthand — when local variable names match binding names
-      <UserDetail
-        {user}
-        model:{email}
-        on:{userChange}
+      // Literal equivalence: placeholder="Search" and placeholder={'Search'} are identical
+      <input
+        type="text"
+        placeholder="Search"
+        model:value={text}
         use:tooltip(message={tip()}):when={showTip()} />
     );
   },
@@ -319,7 +306,6 @@ export const UserCard = component({
 - `once:` applies only to inputs.
 - `once:model:*` and `once:on:*` are compile-time errors.
 - `once:prop` and `prop` together on the same element are a duplicate binding error.
-- Name-matching shorthand also works: `once:{user}`.
 - Literal input expressions are effectively one-time: `prop={'10'}` is semantically equivalent to `once:prop={v()}` where `v()` is a signal returning `'10'`.
 
 ```ts
