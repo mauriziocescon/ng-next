@@ -280,43 +280,39 @@ type SetupReturn<E> =
 //
 // component(...) — standard mode:
 //   B inferred from bindings, setup receives Angular signal types
-//   (InputSignal, ModelSignal, OutputEmitterRef, …).
+//   (InputSignal, ModelSignal, OutputEmitterRef, …). providers
+//   receives only inputs (not models or outputs) and runs before
+//   setup so DI is ready when setup executes.
 //
 // component.withDirectiveForwarding<S>(...) — directive passthrough:
 //   Declares that the component accepts directives on its tag.
 //   Directives are propagated to and instantiated on the internal
 //   element marked with @forward(). S constrains which directives
-//   are compatible: only directives whose host is assignable from S
-//   are accepted.
-//
-//   The conformance of @forward() to the type parameter in
-//   withDirectiveForwarding<S> is enforced through the IntrinsicElements
-//   interface — the standard TypeScript mechanism for mapping HTML tag
-//   names to their types.
-//
-//   @forward() on elements: forwards directives to that element.
-//   @forward() on components (wrap): forwards remaining bindings and directives.
+//   are compatible: only those whose host is assignable from S
+//   are accepted. Conformance of @forward() to S is enforced
+//   through IntrinsicElements — the standard TypeScript mechanism
+//   for mapping HTML tag names to their types.
 //
 // component.wrap(Target, ...) — wrapper mode:
 //   Target is passed as a value; C is inferred from it (consistent
-//   with ref(Child), inject(Child), etc.).
-//   bindings are a strict subset of target bindings while preserving
-//   key, binding kind, and inner type per selected key.
-//   setup receives selected bindings as first arg.
-//   @forward() is a compile-time forwarding marker (not a runtime object):
-//   the compiler unrolls <Target @forward() /> into individual
-//   remainder bindings.
+//   with ref(Child), inject(Child), etc.). bindings are a strict
+//   subset of target bindings, preserving key, binding kind, and
+//   inner type per selected key. setup receives selected bindings
+//   as first arg. Remaining bindings and directives are forwarded
+//   to the wrapped component via @forward().
 //
-//   @forward() should be enforced by template lowering:
-//   if Omit<TargetBindings<C>, keyof Sel> is non-empty, the wrapper template
-//   must include at least one @forward() usage.
-//   If this condition is not met, the compiler should emit a diagnostic
-//   listing the dropped remainder keys.
+// @forward() semantics (shared by directive passthrough and wrap):
+//   On elements: forwards directives to that element.
+//   On components (wrap): forwards remaining bindings and
+//   directives.
 //
-//   Collision precedence: explicit bindings declared on the wrapped target
-//   element always override remainder bindings for the same key,
-//   regardless of source order. Lowering model: apply remainder first, explicit last.
-//   This applies uniformly to all binding kinds (input/model/output/fragment).
+//   Compile-time marker — the compiler unrolls it into individual
+//   remainder bindings. If remainder is non-empty and no @forward()
+//   is present, the compiler emits a diagnostic.
+//
+//   Collision precedence: explicit bindings on the target element
+//   always override remainder bindings for the same key, regardless
+//   of source order. This applies uniformly to all binding kinds.
 // ────────────────────────────────────────────────────────────────
 
 // With bindings
@@ -447,6 +443,13 @@ export function directive(config: any): any {
 // Template-scoped reactive computation. Only InputSignal bindings
 // are allowed (no host, no outputs, no models — a derivation has
 // no DOM surface). setup must return Signal<T>.
+//
+// Scoped like @let — the name is not accessible outside the block
+// it is declared in. Lifetime matches a pure pipe: created when
+// the enclosing embedded view is created, destroyed when that view
+// is destroyed, recomputed (not recreated) when signal inputs
+// change. In a @for loop each iteration owns an independent
+// instance with its own injection context.
 // ────────────────────────────────────────────────────────────────
 
 declare const RESULT: unique symbol;

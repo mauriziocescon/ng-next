@@ -24,7 +24,8 @@
     "typecheck": "tsc --noEmit --strict --target es2022 --moduleResolution bundler types/ng-types.spec.ts"
   },
   "dependencies": {
-    "@angular/core": "^21.2.8",
-    "typescript": "^6.0.2"
+    "@angular/core": "^21.2.11",
+    "typescript": "^6.0.3",
+    "web-codegen-scorer": "^0.0.70"
   }
 }

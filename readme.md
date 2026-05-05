@@ -258,7 +258,9 @@ export const PriceSimulator = component({
      * Any derivation can be used directly in the template via @derive
      *
      * price shares the @for embedded view scope and is created once,
-     * following its lifecycle
+     * following its lifecycle. Same scope as @let, same lifetime as
+     * a pure pipe. Each row owns an independent instance. Not accessible
+     * outside its block.
      */
     return (
       @for (item of items(); track item.id) {
