@@ -1,5 +1,5 @@
 {
-  "name": "ng-outlook",
+  "name": "ng-next",
   "version": "1.0.0",
   "type": "module",
   "description": "Personal thoughts from a developer's perspective on the future of Angular (template level)",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mauriziocescon/ng-outlook"
+    "url": "https://github.com/mauriziocescon/ng-next"
   },
   "licenses": [
     {
