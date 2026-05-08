@@ -152,7 +152,7 @@ export const Panel = component({
   },
   providers: ({ title }) => [
     // title is OnceInput<string> here — read once via title()
-    provide({ token: PanelService, useFactory: () => new PanelService(title()) }),
+    provide({ token: PanelService, factory: () => new PanelService(title()) }),
   ],
 });
 ```

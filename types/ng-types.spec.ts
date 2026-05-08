@@ -286,7 +286,7 @@ const Counter = component({
   setup: () => tmpl,
   providers: ({ c }) => {
     const _cInput: InputSignal<number> = c;
-    return [provide({ token: Store, useFactory: () => new Store() })];
+    return [provide({ token: Store, factory: () => new Store() })];
   },
 });
 
@@ -973,13 +973,13 @@ const _injectedStore: Store = inject(Store);
 const _providers = [
   provide(compToken),
   provide(multiToken),
-  provide({ token: multiToken, useFactory: () => 10 }),
-  provide({ token: Store, useFactory: () => new Store() }),
+  provide({ token: multiToken, factory: () => 10 }),
+  provide({ token: Store, factory: () => new Store() }),
 ];
 
 // Multi provide factory returns a single item, not an array.
-// @ts-expect-error useFactory for multi token must return number, not number[]
-provide({ token: multiToken, useFactory: () => [1, 2, 3] });
+// @ts-expect-error factory for multi token must return number, not number[]
+provide({ token: multiToken, factory: () => [1, 2, 3] });
 
 // ────────────────────────────────────────────────────────────────
 // INTERFACE CONFORMANCE — satisfies on bindings and expose

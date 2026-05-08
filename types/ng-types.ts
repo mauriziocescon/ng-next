@@ -590,16 +590,16 @@ export function inject(_token: any): any {
 // 12. PROVIDE
 //
 // Shorthand — provide(token): uses the token's default factory.
-// Object    — provide({ token, useFactory }): overrides factory.
+// Object    — provide({ token, factory }): overrides factory.
 //
-// For multi tokens, useFactory returns a single item (T[number]),
+// For multi tokens, factory returns a single item (T[number]),
 // not the full array — each provide() call adds one entry.
 // ────────────────────────────────────────────────────────────────
 
 export function provide<T>(token: InjectionToken<T>): Provider;
 export function provide<T>(config: {
   token: InjectionToken<T> | (new (...args: any[]) => T);
-  useFactory: () => T extends (infer U)[] ? U : T;
+  factory: () => T extends (infer U)[] ? U : T;
 }): Provider;
 
 export function provide(_config: any): any {

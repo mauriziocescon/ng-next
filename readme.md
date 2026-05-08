@@ -368,7 +368,7 @@ export const Counter = component({
    * Only inputs are provided
    */
   providers: ({ c }) => [
-    provide({ token: CounterStore, useFactory: () => new CounterStore(c) }),
+    provide({ token: CounterStore, factory: () => new CounterStore(c) }),
   ],
 });
 ```
@@ -789,11 +789,11 @@ export const Counter = component({
     // multi: default factory called once per provide(multiToken)
     provide(multiToken),
     provide(multiToken),
-    provide({ token: multiToken, useFactory: () => 10 }),
-    provide({ token: multiToken, useFactory: () => initialValue() }),
+    provide({ token: multiToken, factory: () => 10 }),
+    provide({ token: multiToken, factory: () => initialValue() }),
 
     // class
-    provide({ token: Store, useFactory: () => new Store() }),
+    provide({ token: Store, factory: () => new Store() }),
   ],
 });
 ```
