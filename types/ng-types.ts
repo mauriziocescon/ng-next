@@ -601,7 +601,7 @@ export function inject(_token: any): any {
 // Shorthand — provide(token): uses the token's default factory.
 // Object    — provide({ token, factory }): overrides factory.
 //
-// For multi tokens, factory returns a single item (T[number]),
+// For multi tokens, factory returns a single item (T),
 // not the full array — each provide() call adds one entry.
 // ────────────────────────────────────────────────────────────────
 
