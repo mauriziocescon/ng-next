@@ -944,13 +944,22 @@ const multiToken = injectionToken('desc', {
 
 const _multiTokenType: InjectionToken<number[]> = multiToken;
 
-// Invalid token configuration combinations
-// @ts-expect-error token cannot be both root-level and multi
-const _NegTokenRootAndMulti = injectionToken('desc', {
+// Root-level multi: factory invoked once at root scope, collects into T[]
+const rootMultiToken = injectionToken('desc', {
   level: 'root',
   multi: true,
-  factory: () => 1,
+  factory: () => Math.random(),
 });
+
+const _rootMultiTokenType: InjectionToken<number[]> = rootMultiToken;
+
+// Component-level multi: must be provided explicitly, collects into T[]
+const compMultiToken = injectionToken('desc', {
+  multi: true,
+  factory: () => Math.random(),
+});
+
+const _compMultiTokenType: InjectionToken<number[]> = compMultiToken;
 
 // inject(Component) → expose type
 const _injectedChild: { text: Signal<string> } = inject(Child);

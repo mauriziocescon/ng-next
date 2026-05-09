@@ -560,6 +560,15 @@ export function injectionToken<T>(
   },
 ): InjectionToken<T[]>;
 
+export function injectionToken<T>(
+  desc: string,
+  config: {
+    level: 'root';
+    multi: true;
+    factory: () => T;
+  },
+): InjectionToken<T[]>;
+
 export function injectionToken(_desc: string, _config: any): any {
   return {} as any;
 }
