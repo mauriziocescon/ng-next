@@ -520,21 +520,37 @@ export function refMany(_type?: any): any {
 // ────────────────────────────────────────────────────────────────
 // 10. INJECTION TOKEN
 //
-// Three flavours:
-//   Component-level — must be provided explicitly via provide().
-//   Root-level      — factory invoked once at root scope.
-//   Multi           — collects multiple values into T[].
+// Two base forms:
+//   Without factory (InjectionTokenBase) — must use provide({ token, factory }).
+//   With factory (InjectionToken)        — can use provide(token) shorthand.
+//
+// Additional options:
+//   Root-level (level: 'root') — factory invoked once at root scope.
+//   Multi (multi: true)        — collects multiple values into T[].
+//
+// InjectionToken<T> extends InjectionTokenBase<T>, so inject() accepts both.
+// provide(token) shorthand only accepts InjectionToken<T> (with factory).
 // ────────────────────────────────────────────────────────────────
 
 declare const TOKEN_TYPE: unique symbol;
 declare const TOKEN_MULTI: unique symbol;
+declare const TOKEN_FACTORY: unique symbol;
 
-export interface InjectionToken<T> {
+// Base type — no factory, must use provide({ token, factory })
+export interface InjectionTokenBase<T> {
   readonly [TOKEN_TYPE]: T;
   readonly [TOKEN_MULTI]?: boolean;
 }
 
-// Component-level
+// With factory — can use provide(token) shorthand
+export interface InjectionToken<T> extends InjectionTokenBase<T> {
+  readonly [TOKEN_FACTORY]: true;
+}
+
+// Without factory — returns base type
+export function injectionToken<T>(desc: string): InjectionTokenBase<T>;
+
+// With factory — returns full type
 export function injectionToken<T>(
   desc: string,
   config: {
@@ -542,7 +558,7 @@ export function injectionToken<T>(
   },
 ): InjectionToken<T>;
 
-// Root-level
+// Root-level (requires factory for auto-provision)
 export function injectionToken<T>(
   desc: string,
   config: {
@@ -551,7 +567,15 @@ export function injectionToken<T>(
   },
 ): InjectionToken<T>;
 
-// Multi
+// Multi without factory
+export function injectionToken<T>(
+  desc: string,
+  config: {
+    multi: true;
+  },
+): InjectionTokenBase<T[]>;
+
+// Multi with factory
 export function injectionToken<T>(
   desc: string,
   config: {
@@ -560,6 +584,7 @@ export function injectionToken<T>(
   },
 ): InjectionToken<T[]>;
 
+// Root-level multi (requires factory)
 export function injectionToken<T>(
   desc: string,
   config: {
@@ -569,7 +594,7 @@ export function injectionToken<T>(
   },
 ): InjectionToken<T[]>;
 
-export function injectionToken(_desc: string, _config: any): any {
+export function injectionToken(_desc: string, _config?: any): any {
   return {} as any;
 }
 
@@ -588,7 +613,7 @@ export function inject<B, E, S extends HTMLElement>(
 export function inject<H extends HTMLElement, B, E>(
   token: DirectiveInstance<H, B, E>,
 ): ExposeOf<DirectiveInstance<H, B, E>>;
-export function inject<T>(token: InjectionToken<T>): T;
+export function inject<T>(token: InjectionTokenBase<T>): T;
 export function inject<T>(token: new (...args: any[]) => T): T;
 
 export function inject(_token: any): any {
@@ -605,9 +630,12 @@ export function inject(_token: any): any {
 // not the full array — each provide() call adds one entry.
 // ────────────────────────────────────────────────────────────────
 
+// Shorthand — only accepts InjectionToken (with factory)
 export function provide<T>(token: InjectionToken<T>): Provider;
+
+// Object form — accepts InjectionTokenBase (either type) or class
 export function provide<T>(config: {
-  token: InjectionToken<T> | (new (...args: any[]) => T);
+  token: InjectionTokenBase<T> | (new (...args: any[]) => T);
   factory: () => T extends (infer U)[] ? U : T;
 }): Provider;
 

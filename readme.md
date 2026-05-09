@@ -757,8 +757,15 @@ const rootToken = injectionToken('desc', {
 });
 
 /**
- * multi: factory used only by the provide(multiToken)
- * shorthand — not a root default entry
+ * Token without factory: must use provide({ token, factory })
+ * with an explicit factory. provide(otherCompToken) shorthand
+ * is a compile-time error.
+ */
+const otherCompToken = injectionToken<string>('desc');
+
+/**
+ * multi with factory: provide(multiToken) shorthand uses
+ * this factory — not a root default entry
  */
 const multiToken = injectionToken('desc', {
   multi: true,
@@ -790,15 +797,18 @@ export const Counter = component({
     return (...);
   },
   providers: ({ initialValue }) => [
-    // provide compToken at Counter level using the default factory
+    // provide compToken using the default factory (shorthand)
     provide(compToken),
 
-    // multi: default factory called once per provide(multiToken)
+    // multi with factory: shorthand works
     provide(multiToken),
     provide(multiToken),
     provide({ token: multiToken, factory: () => 10 }),
     provide({ token: multiToken, factory: () => initialValue() }),
 
+    // token without factory: must use object form
+    provide({ token: otherCompToken, factory: () => '' }),
+    
     // class
     provide({ token: Store, factory: () => new Store() }),
   ],

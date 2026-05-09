@@ -17,6 +17,7 @@ import {
   type DerivationInstance,
   type DirectiveInstance,
   type InjectionToken,
+  type InjectionTokenBase,
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
@@ -916,8 +917,13 @@ const Parent = component({
 // 10. INJECTION TOKEN
 // ────────────────────────────────────────────────────────────────
 
-// Component-level: must be provided explicitly
-const compToken = injectionToken('desc', {
+// Token without factory — returns InjectionTokenBase
+const noFactoryToken = injectionToken<string>('desc');
+
+const _noFactoryTokenType: InjectionTokenBase<string> = noFactoryToken;
+
+// Token with factory — returns InjectionToken
+const withFactoryToken = injectionToken('desc', {
   factory: () => {
     const counter = signal(0);
     return {
@@ -927,10 +933,16 @@ const compToken = injectionToken('desc', {
   },
 });
 
-const _compTokenType: InjectionToken<{
+const _withFactoryTokenType: InjectionToken<{
   value: Signal<number>;
   increase: () => void;
-}> = compToken;
+}> = withFactoryToken;
+
+// InjectionToken is assignable to InjectionTokenBase
+const _tokenExtendsBase: InjectionTokenBase<{
+  value: Signal<number>;
+  increase: () => void;
+}> = withFactoryToken;
 
 // Root-level: factory invoked once at root scope
 const rootToken = injectionToken('desc', {
@@ -949,7 +961,14 @@ const _rootTokenType: InjectionToken<{
   decrease: () => void;
 }> = rootToken;
 
-// Multi: type becomes T[]
+// Multi without factory — returns InjectionTokenBase<T[]>
+const multiNoFactoryToken = injectionToken<number>('desc', {
+  multi: true,
+});
+
+const _multiNoFactoryTokenType: InjectionTokenBase<number[]> = multiNoFactoryToken;
+
+// Multi with factory — returns InjectionToken<T[]>
 const multiToken = injectionToken('desc', {
   multi: true,
   factory: () => Math.random(),
@@ -966,14 +985,6 @@ const rootMultiToken = injectionToken('desc', {
 
 const _rootMultiTokenType: InjectionToken<number[]> = rootMultiToken;
 
-// Component-level multi: must be provided explicitly, collects into T[]
-const compMultiToken = injectionToken('desc', {
-  multi: true,
-  factory: () => Math.random(),
-});
-
-const _compMultiTokenType: InjectionToken<number[]> = compMultiToken;
-
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
 // ────────────────────────────────────────────────────────────────
@@ -987,10 +998,12 @@ const _injectedNoExpose: void = inject(NoExpose);
 // inject(Directive) → expose type
 const _injectedTooltip: { toggle: () => void } = inject(tooltip);
 
-// inject(InjectionToken) → token type
-const _injectedComp: { value: Signal<number>; increase: () => void } =
-  inject(compToken);
+// inject(InjectionToken) → token type (works with both InjectionTokenBase and InjectionToken)
+const _injectedWithFactory: { value: Signal<number>; increase: () => void } =
+  inject(withFactoryToken);
+const _injectedNoFactory: string = inject(noFactoryToken);
 const _injectedMulti: number[] = inject(multiToken);
+const _injectedMultiNoFactory: number[] = inject(multiNoFactoryToken);
 
 // inject(Class) → class instance
 const _injectedStore: Store = inject(Store);
@@ -999,11 +1012,25 @@ const _injectedStore: Store = inject(Store);
 // 12. PROVIDE
 // ────────────────────────────────────────────────────────────────
 
-// provide — shorthand and object form
-const _providers = [
-  provide(compToken),
+// provide shorthand — only works with InjectionToken (with factory)
+const _providersShorthand = [
+  provide(withFactoryToken),
   provide(multiToken),
-  provide({ token: multiToken, factory: () => 10 }),
+  provide(rootToken),
+];
+
+// provide shorthand with InjectionTokenBase — compile-time error
+// @ts-expect-error provide(token) shorthand requires token with factory
+provide(noFactoryToken);
+
+// @ts-expect-error provide(token) shorthand requires token with factory
+provide(multiNoFactoryToken);
+
+// Object form — works with both InjectionTokenBase and InjectionToken
+const _providersObjectForm = [
+  provide({ token: noFactoryToken, factory: () => 'explicit' }),
+  provide({ token: multiNoFactoryToken, factory: () => 42 }),
+  provide({ token: withFactoryToken, factory: () => ({ value: signal(0).asReadonly(), increase: () => {} }) }),
   provide({ token: Store, factory: () => new Store() }),
 ];
 
