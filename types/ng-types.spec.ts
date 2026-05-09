@@ -60,7 +60,20 @@ type Assert<T extends true> = T;
 type MergeProps<Left, Right> = Omit<Left, keyof Right> & Right;
 
 // ────────────────────────────────────────────────────────────────
-// FRAGMENT NOMINALITY
+// 1. TEMPLATE MARKUP
+//
+// TemplateMarkup is a branded type — distinct from plain objects.
+// ────────────────────────────────────────────────────────────────
+
+// TemplateMarkup is assignable to itself
+const _tmplAssign: TemplateMarkup = tmpl;
+
+// TemplateMarkup is not assignable from a plain object
+// @ts-expect-error plain object is not TemplateMarkup
+const _tmplNotPlain: TemplateMarkup = {};
+
+// ────────────────────────────────────────────────────────────────
+// 2. BRANDED BINDING TYPES — fragment nominality
 //
 // FragmentBinding optional/required forms are distinct.
 // ────────────────────────────────────────────────────────────────
@@ -79,7 +92,7 @@ type OptIsReq =
 const _optIsReq: OptIsReq = 'OK';
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT — basics
+// 6. COMPONENT — basics
 // ────────────────────────────────────────────────────────────────
 
 // —— Shorthand return: raw template ——
@@ -115,7 +128,7 @@ const MinimalFullProviders = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT — bindings (input, model, output, fragment)
+// 6. COMPONENT — bindings (input, model, output, fragment)
 //
 // Setup receives raw Angular types: InputSignal, ModelSignal,
 // OutputEmitterRef, FragmentBinding.
@@ -177,7 +190,7 @@ const RenderItem = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT — bindings aliasing (TS destructuring in setup)
+// 6. COMPONENT — bindings aliasing (TS destructuring in setup)
 //
 // Standard destructuring rename (e.g. { class: className }) lets
 // developers alias bindings at the setup level without any
@@ -239,7 +252,7 @@ const aliasedDerivation = derivation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT — providers receive only inputs (not models/outputs)
+// 6. COMPONENT — providers receive only inputs (not models/outputs)
 // ────────────────────────────────────────────────────────────────
 
 class Store {}
@@ -310,7 +323,7 @@ const WithMixed = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT — expose
+// 6. COMPONENT — expose
 //
 // expose defines the public interface accessible via ref and
 // inject. Components without expose resolve to void / undefined.
@@ -375,7 +388,7 @@ const voidExposeRef = ref(NoExpose);
 const _voidExposeCheck: Ref<undefined> = voidExposeRef;
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT — withDirectiveForwarding
+// 6. COMPONENT — withDirectiveForwarding
 // ────────────────────────────────────────────────────────────────
 
 const ForwardingDefault = component.withDirectiveForwarding({
@@ -412,7 +425,7 @@ const _NegForwardingMetadataInSetup = component.withDirectiveForwarding({
 });
 
 // ────────────────────────────────────────────────────────────────
-// COMPONENT — wrapper with selected bindings + forwarding marker
+// 6. COMPONENT — wrapper with selected bindings + forwarding marker
 //
 // Target passed as first arg; C is inferred from the value
 // (consistent with ref(Child), inject(Child), etc.).
@@ -588,7 +601,7 @@ type _NoForwardingWrapperKeepsNever = Assert<
 >;
 
 // ────────────────────────────────────────────────────────────────
-// FORWARD COLLISION PRECEDENCE (compiler contract)
+// 6. COMPONENT — forward collision precedence (compiler contract)
 //
 // Rule: explicit bindings override remainder bindings, regardless of
 // attribute order in source.
@@ -631,7 +644,7 @@ type _ExplicitThenForwardKeepsOthers = Assert<
 >;
 
 // ────────────────────────────────────────────────────────────────
-// DIRECTIVE — host as separate config, expose
+// 7. DIRECTIVE — host as separate config, expose
 //
 // host is a top-level config property (not a binding) because it
 // is framework-provided context, not consumer-bindable.
@@ -730,7 +743,7 @@ const directiveWithFragment = directive({
 });
 
 // ────────────────────────────────────────────────────────────────
-// DIRECTIVE-FORWARDING COMPATIBILITY
+// 7. DIRECTIVE — forwarding compatibility
 //
 // A directive can attach to a forwarded element only if the
 // forwarded element type is assignable to the directive host type.
@@ -769,7 +782,7 @@ const _negButtonForwardingRejectsInputDirective: DirectiveFitsForwardedElement<
 > = true;
 
 // ────────────────────────────────────────────────────────────────
-// DERIVATION — only inputs, setup returns Signal<T>
+// 8. DERIVATION — only inputs, setup returns Signal<T>
 // ────────────────────────────────────────────────────────────────
 
 const simulation = derivation({
@@ -818,7 +831,7 @@ const _NegDerivationFragment = derivation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// REF UTILITIES — ref, refMany, read-only enforcement
+// 9. REF UTILITIES — ref, refMany, read-only enforcement
 //
 // ref()  → single instance (Ref<T | undefined>)
 // refMany() → multiple instances (Ref<T[]>)
@@ -900,7 +913,7 @@ const Parent = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// DI — injection tokens, inject, provide
+// 10. INJECTION TOKEN
 // ────────────────────────────────────────────────────────────────
 
 // Component-level: must be provided explicitly
@@ -961,6 +974,10 @@ const compMultiToken = injectionToken('desc', {
 
 const _compMultiTokenType: InjectionToken<number[]> = compMultiToken;
 
+// ────────────────────────────────────────────────────────────────
+// 11. INJECT
+// ────────────────────────────────────────────────────────────────
+
 // inject(Component) → expose type
 const _injectedChild: { text: Signal<string> } = inject(Child);
 
@@ -977,6 +994,10 @@ const _injectedMulti: number[] = inject(multiToken);
 
 // inject(Class) → class instance
 const _injectedStore: Store = inject(Store);
+
+// ────────────────────────────────────────────────────────────────
+// 12. PROVIDE
+// ────────────────────────────────────────────────────────────────
 
 // provide — shorthand and object form
 const _providers = [
