@@ -766,8 +766,15 @@ const multiToken = injectionToken('desc', {
 });
 
 /**
- * class
+ * root + multi: factory invoked once at root scope,
+ * collects into T[] — no need to provide it explicitly
  */
+const rootMultiToken = injectionToken('desc', {
+  level: 'root',
+  multi: true,
+  factory: () => Math.random(),
+});
+
 class Store {}
 
 export const Counter = component({
