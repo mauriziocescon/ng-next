@@ -525,8 +525,10 @@ export function refMany(_type?: any): any {
 //   With factory (InjectionToken)        — can use provide(token) shorthand.
 //
 // Additional options:
-//   Root-level (level: 'root') — factory invoked once at root scope.
-//   Multi (multi: true)        — collects multiple values into T[].
+//   Auto-provided (autoProvided: true) — factory invoked once at root scope.
+//   Multi (multi: true)                — collects multiple values into T[].
+//
+// Default is autoProvided: false — the token must be explicitly provided.
 //
 // InjectionToken<T> extends InjectionTokenBase<T>, so inject() accepts both.
 // provide(token) shorthand only accepts InjectionToken<T> (with factory).
@@ -558,11 +560,11 @@ export function injectionToken<T>(
   },
 ): InjectionToken<T>;
 
-// Root-level (requires factory for auto-provision)
+// Auto-provided (requires factory for auto-provision)
 export function injectionToken<T>(
   desc: string,
   config: {
-    level: 'root';
+    autoProvided: true;
     factory: () => T;
   },
 ): InjectionToken<T>;
@@ -584,11 +586,11 @@ export function injectionToken<T>(
   },
 ): InjectionToken<T[]>;
 
-// Root-level multi (requires factory)
+// Auto-provided multi (requires factory)
 export function injectionToken<T>(
   desc: string,
   config: {
-    level: 'root';
+    autoProvided: true;
     multi: true;
     factory: () => T;
   },

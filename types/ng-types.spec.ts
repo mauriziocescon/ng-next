@@ -944,9 +944,9 @@ const _tokenExtendsBase: InjectionTokenBase<{
   increase: () => void;
 }> = withFactoryToken;
 
-// Root-level: factory invoked once at root scope
+// Auto-provided: factory invoked once at root scope
 const rootToken = injectionToken('desc', {
-  level: 'root',
+  autoProvided: true,
   factory: () => {
     const counter = signal(0);
     return {
@@ -976,9 +976,9 @@ const multiToken = injectionToken('desc', {
 
 const _multiTokenType: InjectionToken<number[]> = multiToken;
 
-// Root-level multi: factory invoked once at root scope, collects into T[]
+// Auto-provided multi: factory invoked once at root scope, collects into T[]
 const rootMultiToken = injectionToken('desc', {
-  level: 'root',
+  autoProvided: true,
   multi: true,
   factory: () => Math.random(),
 });

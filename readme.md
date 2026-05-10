@@ -736,11 +736,11 @@ const compToken = injectionToken('desc', {
 });
 
 /**
- * Root provider: factory invoked once at root scope —
+ * Auto-provided: factory invoked once at root scope —
  * no need to provide it explicitly
  */
 const rootToken = injectionToken('desc', {
-  level: 'root',
+  autoProvided: true,
   factory: () => {
     const counter = signal(0);
 
@@ -773,11 +773,11 @@ const multiToken = injectionToken('desc', {
 });
 
 /**
- * root + multi: factory invoked once at root scope,
+ * autoProvided + multi: factory invoked once at root scope,
  * collects into T[] — no need to provide it explicitly
  */
 const rootMultiToken = injectionToken('desc', {
-  level: 'root',
+  autoProvided: true,
   multi: true,
   factory: () => Math.random(),
 });
