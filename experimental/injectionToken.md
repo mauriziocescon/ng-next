@@ -22,7 +22,6 @@ const t2: InjectionToken<string> = token; // ❌ should error — tokens are not
     {
       provide: token,
       useFactory: () => ({ x: '1' }), // ❌ should error — factory returns wrong type
-      multi: true, // ⚠️ multi is untyped — no compile-time enforcement
     },
   ],
   template: `{{ t | json }}`,
@@ -35,12 +34,70 @@ export class App {
 **Proposed fix:** the new `injectionToken` function uses branded types (`TOKEN_TYPE`, `TOKEN_MULTI`, `TOKEN_FACTORY`) so that:
 
 - tokens are nominally typed — assignment between `InjectionToken<number>` and `InjectionToken<string>` is a compile error,
-- `multi` is encoded in the token type — `provide()` enforces single-item factory return,
 - `inject()` infers `T` from the token — no generic override needed or allowed.
 
 ---
 
-## 2. Default factory not usable as a shorthand provider
+## 2. Multi-token support
+
+Today, `multi` is only a provider-level flag with no type-level representation:
+
+```ts
+import { Component, inject, InjectionToken } from '@angular/core';
+
+const token = new InjectionToken<number>('multi');
+
+@Component({
+  selector: 'App',
+  providers: [
+    { provide: token, useFactory: () => 1, multi: true },
+    { provide: token, useFactory: () => 'oops', multi: true }, // ❌ no error — wrong type
+    { provide: token, useFactory: () => 2 }, // ❌ no error — forgot multi, throws at runtime
+  ],
+  template: ``,
+})
+export class App {
+  values = inject(token); // inferred as number, actually number[] at runtime
+}
+```
+
+Problems:
+- `multi` is not part of the token's type — nothing prevents mixing `multi: true` and `multi: false` for the same token (caught only at runtime).
+- `inject()` returns `T` instead of `T[]` — the array shape is invisible to the type system.
+- Factory return type is not checked against the token's declared type.
+
+**Proposed fix:** the new API encodes `multi` directly on the token. The token's type becomes `T[]`, each `provide()` call contributes a single `T` item, and `inject()` correctly returns `T[]`:
+
+```ts
+// multi with factory: provide(multiToken) shorthand uses this factory
+const multiToken = injectionToken({
+  debugName: 'multiToken',
+  multi: true,
+  factory: () => Math.random(),
+});
+
+// autoProvided + multi: factory invoked once at root scope, collects into T[]
+const rootMultiToken = injectionToken({
+  debugName: 'rootMultiToken',
+  autoProvided: true,
+  multi: true,
+  factory: () => Math.random(),
+});
+
+// Usage in providers
+providers: () => [
+  provide(multiToken),
+  provide(multiToken),
+  provide({ token: multiToken, factory: () => 10 }),
+]
+
+// inject returns number[]
+const multi = inject(multiToken);
+```
+
+---
+
+## 3. Default factory not usable as a shorthand provider
 
 A token with a `factory` cannot be used directly in `providers` today:
 
@@ -77,26 +134,60 @@ export class App {
 }
 ```
 
-**Proposed fix:** the new API distinguishes two token shapes:
+**Proposed fix:** the new API distinguishes three token shapes:
 
-- `InjectionTokenBase<T>` — no factory, must use `provide({ token, factory })`,
-- `InjectionToken<T>` — has factory, supports `provide(token)` shorthand.
-
-The shorthand invokes the token's factory in the current injector scope (not only root):
+1. **Token with factory** — supports `provide(token)` shorthand at any injector level:
 
 ```ts
-const barToken = injectionToken({
-  debugName: 'Bar',
-  factory: () => inject(FooService).bar,
+const compToken = injectionToken({
+  debugName: 'compToken',
+  factory: () => {
+    const counter = signal(0);
+    return {
+      value: counter.asReadonly(),
+      decrease: () => counter.update(v => v - 1),
+      increase: () => counter.update(v => v + 1),
+    };
+  },
 });
 
-// shorthand works at any level
-providers: () => [provide(barToken)]
+// shorthand works at component, directive, or route level
+providers: () => [provide(compToken)]
+```
+
+2. **Token with `autoProvided: true`** — factory invoked once at root scope, no explicit `provide()` needed:
+
+```ts
+const rootToken = injectionToken({
+  debugName: 'rootToken',
+  autoProvided: true,
+  factory: () => {
+    const counter = signal(0);
+    return {
+      value: counter.asReadonly(),
+      decrease: () => counter.update(v => v - 1),
+      increase: () => counter.update(v => v + 1),
+    };
+  },
+});
+
+// inject directly — no provider registration required
+const rootCounter = inject(rootToken);
+```
+
+3. **Token without factory** — must use `provide({ token, factory })` with an explicit factory; `provide(token)` shorthand is a compile-time error:
+
+```ts
+const otherCompToken = injectionToken<string>({ debugName: 'otherCompToken' });
+
+// ❌ provide(otherCompToken) — compile error
+// ✅ must supply a factory
+providers: () => [provide({ token: otherCompToken, factory: () => '' })]
 ```
 
 ---
 
-## 3. Inconsistent debugging name convention
+## 4. Inconsistent debugging name convention
 
 Today, `InjectionToken` requires a positional `desc` string for debugging, while signal APIs use an optional `debugName` property that the compiler sets automatically:
 
@@ -109,4 +200,3 @@ const token = injectionToken<number>({ debugName: 'test' });
 ```
 
 **Proposed fix:** the new `injectionToken` function replaces the positional `desc` string with an optional `debugName` property in the config object — consistent with `signal('value', { debugName: '...' })` and `computed(() => ..., { debugName: '...' })`. This removes the mandatory string argument and unifies the debugging story across all reactive primitives.
-
