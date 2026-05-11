@@ -918,12 +918,12 @@ const Parent = component({
 // ────────────────────────────────────────────────────────────────
 
 // Token without factory — returns InjectionTokenBase
-const noFactoryToken = injectionToken<string>('desc');
+const noFactoryToken = injectionToken<string>();
 
 const _noFactoryTokenType: InjectionTokenBase<string> = noFactoryToken;
 
 // Token with factory — returns InjectionToken
-const withFactoryToken = injectionToken('desc', {
+const withFactoryToken = injectionToken({
   factory: () => {
     const counter = signal(0);
     return {
@@ -945,7 +945,7 @@ const _tokenExtendsBase: InjectionTokenBase<{
 }> = withFactoryToken;
 
 // Auto-provided: factory invoked once at root scope
-const rootToken = injectionToken('desc', {
+const rootToken = injectionToken({
   autoProvided: true,
   factory: () => {
     const counter = signal(0);
@@ -962,14 +962,14 @@ const _rootTokenType: InjectionToken<{
 }> = rootToken;
 
 // Multi without factory — returns InjectionTokenBase<T[]>
-const multiNoFactoryToken = injectionToken<number>('desc', {
+const multiNoFactoryToken = injectionToken<number>({
   multi: true,
 });
 
 const _multiNoFactoryTokenType: InjectionTokenBase<number[]> = multiNoFactoryToken;
 
 // Multi with factory — returns InjectionToken<T[]>
-const multiToken = injectionToken('desc', {
+const multiToken = injectionToken({
   multi: true,
   factory: () => Math.random(),
 });
@@ -977,7 +977,7 @@ const multiToken = injectionToken('desc', {
 const _multiTokenType: InjectionToken<number[]> = multiToken;
 
 // Auto-provided multi: factory invoked once at root scope, collects into T[]
-const rootMultiToken = injectionToken('desc', {
+const rootMultiToken = injectionToken({
   autoProvided: true,
   multi: true,
   factory: () => Math.random(),

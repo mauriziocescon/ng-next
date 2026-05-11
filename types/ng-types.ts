@@ -550,53 +550,43 @@ export interface InjectionToken<T> extends InjectionTokenBase<T> {
 }
 
 // Without factory — returns base type
-export function injectionToken<T>(desc: string): InjectionTokenBase<T>;
+export function injectionToken<T>(config?: { debugName?: string }): InjectionTokenBase<T>;
 
 // With factory — returns full type
-export function injectionToken<T>(
-  desc: string,
-  config: {
-    factory: () => T;
-  },
-): InjectionToken<T>;
+export function injectionToken<T>(config: {
+  debugName?: string;
+  factory: () => T;
+}): InjectionToken<T>;
 
 // Auto-provided (requires factory for auto-provision)
-export function injectionToken<T>(
-  desc: string,
-  config: {
-    autoProvided: true;
-    factory: () => T;
-  },
-): InjectionToken<T>;
+export function injectionToken<T>(config: {
+  debugName?: string;
+  autoProvided: true;
+  factory: () => T;
+}): InjectionToken<T>;
 
 // Multi without factory
-export function injectionToken<T>(
-  desc: string,
-  config: {
-    multi: true;
-  },
-): InjectionTokenBase<T[]>;
+export function injectionToken<T>(config: {
+  debugName?: string;
+  multi: true;
+}): InjectionTokenBase<T[]>;
 
 // Multi with factory
-export function injectionToken<T>(
-  desc: string,
-  config: {
-    multi: true;
-    factory: () => T;
-  },
-): InjectionToken<T[]>;
+export function injectionToken<T>(config: {
+  debugName?: string;
+  multi: true;
+  factory: () => T;
+}): InjectionToken<T[]>;
 
 // Auto-provided multi (requires factory)
-export function injectionToken<T>(
-  desc: string,
-  config: {
-    autoProvided: true;
-    multi: true;
-    factory: () => T;
-  },
-): InjectionToken<T[]>;
+export function injectionToken<T>(config: {
+  debugName?: string;
+  autoProvided: true;
+  multi: true;
+  factory: () => T;
+}): InjectionToken<T[]>;
 
-export function injectionToken(_desc: string, _config?: any): any {
+export function injectionToken(_config?: any): any {
   return {} as any;
 }
 

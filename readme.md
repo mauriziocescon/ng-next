@@ -719,7 +719,8 @@ import { component, inject, provide, injectionToken, input, signal } from '@angu
  * factory = default factory used by the provide(compToken)
  * shorthand — not a fallback
  */
-const compToken = injectionToken('desc', {
+const compToken = injectionToken({
+  debugName: 'compToken',
   factory: () => {
     const counter = signal(0);
 
@@ -739,7 +740,8 @@ const compToken = injectionToken('desc', {
  * Auto-provided: factory invoked once at root scope —
  * no need to provide it explicitly
  */
-const rootToken = injectionToken('desc', {
+const rootToken = injectionToken({
+  debugName: 'rootToken',
   autoProvided: true,
   factory: () => {
     const counter = signal(0);
@@ -761,13 +763,14 @@ const rootToken = injectionToken('desc', {
  * with an explicit factory. provide(otherCompToken) shorthand
  * is a compile-time error.
  */
-const otherCompToken = injectionToken<string>('desc');
+const otherCompToken = injectionToken<string>({ debugName: 'otherCompToken' });
 
 /**
  * multi with factory: provide(multiToken) shorthand uses
  * this factory — not a root default entry
  */
-const multiToken = injectionToken('desc', {
+const multiToken = injectionToken({
+  debugName: 'multiToken',
   multi: true,
   factory: () => Math.random(),
 });
@@ -776,7 +779,8 @@ const multiToken = injectionToken('desc', {
  * autoProvided + multi: factory invoked once at root scope,
  * collects into T[] — no need to provide it explicitly
  */
-const rootMultiToken = injectionToken('desc', {
+const rootMultiToken = injectionToken({
+  debugName: 'rootMultiToken',
   autoProvided: true,
   multi: true,
   factory: () => Math.random(),
