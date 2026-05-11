@@ -1,14 +1,14 @@
-# `InjectionToken` Pain Points and Proposed Fixes
+# `injectionToken`: type-safe, shorthand-friendly replacement for `InjectionToken`
 
-This document describes current Angular `InjectionToken` pain points and how the proposed `injectionToken` functional API addresses them.
+## Summary
 
----
+The current `InjectionToken` API has type-safety gaps, ergonomic limitations around provider shorthand, and naming inconsistencies with the signal APIs. This issue proposes a new `injectionToken()` function that addresses all four.
 
 ## Current limitations
 
 ### 1. Type safety gaps
 
-Today, `InjectionToken` has several type-safety holes:
+`InjectionToken` allows several unsafe patterns that the compiler does not catch:
 
 ```ts
 import { Component, inject, InjectionToken } from '@angular/core';
@@ -35,7 +35,7 @@ export class App {
 
 ### 2. Multi-token support
 
-Today, `multi` is only a provider-level flag with no type-level representation:
+`multi` is only a provider-level flag with no type-level representation:
 
 ```ts
 import { Component, inject, InjectionToken } from '@angular/core';
@@ -63,7 +63,7 @@ Problems:
 
 ### 3. Default factory not usable as a shorthand provider
 
-A token with a `factory` cannot be used directly in `providers` today:
+A token declared with a `factory` cannot be passed directly into a component's `providers` array. The factory only applies when the token is `providedIn: 'root'`:
 
 ```ts
 import { Component, inject, InjectionToken } from '@angular/core';
@@ -100,7 +100,7 @@ export class App {
 
 ### 4. Inconsistent debugging name convention
 
-Today, `InjectionToken` requires a positional `desc` string for debugging, while signal APIs use an optional `debugName` property that the compiler sets automatically:
+`InjectionToken` takes a positional `desc` string, while signal-based APIs (`signal`, `computed`, `linkedSignal`) use an optional `debugName` property that the compiler sets automatically:
 
 ```ts
 // Current
@@ -141,7 +141,7 @@ const rootMultiToken = injectionToken({
   factory: () => Math.random(),
 });
 
-// Usage in providers
+// Usage in providers — each provide() call contributes one entry
 providers: () => [
   provide(multiToken),
   provide(multiToken),
@@ -156,7 +156,7 @@ const multi = inject(multiToken);
 
 The new API distinguishes three token shapes:
 
-1. **Token with factory** — supports `provide(token)` shorthand at any injector level:
+1. **Token with factory** — not provided in root by default; throws if not provided in the injector tree. The factory is the default used by the `provide(token)` shorthand — not a fallback:
 
 ```ts
 const compToken = injectionToken({
@@ -284,4 +284,74 @@ export function provide<T>(config: {
   token: InjectionToken<T> | (new (...args: any[]) => T);
   factory: () => T extends (infer U)[] ? U : T;
 }): Provider;
+```
+
+---
+
+## Full example
+
+```ts
+import { Component, inject, input, signal } from '@angular/core';
+import { injectionToken, provide } from '@angular/core';
+
+const compToken = injectionToken({
+  debugName: 'compToken',
+  factory: () => {
+    const counter = signal(0);
+    return {
+      value: counter.asReadonly(),
+      decrease: () => counter.update(v => v - 1),
+      increase: () => counter.update(v => v + 1),
+    };
+  },
+});
+
+const rootToken = injectionToken({
+  debugName: 'rootToken',
+  autoProvided: true,
+  factory: () => {
+    const counter = signal(0);
+    return {
+      value: counter.asReadonly(),
+      decrease: () => counter.update(v => v - 1),
+      increase: () => counter.update(v => v + 1),
+    };
+  },
+});
+
+const otherCompToken = injectionToken<string>({ debugName: 'otherCompToken' });
+
+const multiToken = injectionToken({
+  debugName: 'multiToken',
+  multi: true,
+  factory: () => Math.random(),
+});
+
+class Store {}
+
+@Component({
+  selector: 'app-counter',
+  template: `
+    <h1>Counter</h1>
+    <div>Value: {{ compCounter.value() }}</div>
+    <button (click)="compCounter.decrease()">-</button>
+    <button (click)="compCounter.increase()">+</button>
+  `,
+  providers: [
+    provide(compToken),
+    provide(multiToken),
+    provide(multiToken),
+    provide({ token: multiToken, factory: () => 10 }),
+    provide({ token: otherCompToken, factory: () => '' }),
+    provide({ token: Store, factory: () => new Store() }),
+  ],
+})
+export class CounterComponent {
+  initialValue = input<number>();
+
+  rootCounter = inject(rootToken);
+  compCounter = inject(compToken);
+  multi = inject(multiToken); // number[]
+  store = inject(Store);
+}
 ```
