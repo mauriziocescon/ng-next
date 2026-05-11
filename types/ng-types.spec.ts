@@ -16,7 +16,7 @@ import {
   type ComponentBindingValue,
   type DerivationInstance,
   type DirectiveInstance,
-  type InjectionToken,
+  type InjectableToken,
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
@@ -916,12 +916,12 @@ const Parent = component({
 // 10. INJECTION TOKEN
 // ────────────────────────────────────────────────────────────────
 
-// Token without factory — returns InjectionToken
+// Token without factory — returns InjectableToken
 const noFactoryToken = injectionToken<string>();
 
-const _noFactoryTokenType: InjectionToken<string> = noFactoryToken;
+const _noFactoryTokenType: InjectableToken<string> = noFactoryToken;
 
-// Token with factory — returns InjectionToken (ProvidableToken is assignable)
+// Token with factory — returns InjectableToken (ProvidableToken is assignable)
 const withFactoryToken = injectionToken({
   factory: () => {
     const counter = signal(0);
@@ -932,7 +932,7 @@ const withFactoryToken = injectionToken({
   },
 });
 
-const _withFactoryTokenType: InjectionToken<{
+const _withFactoryTokenType: InjectableToken<{
   value: Signal<number>;
   increase: () => void;
 }> = withFactoryToken;
@@ -949,25 +949,25 @@ const rootToken = injectionToken({
   },
 });
 
-const _rootTokenType: InjectionToken<{
+const _rootTokenType: InjectableToken<{
   value: Signal<number>;
   decrease: () => void;
 }> = rootToken;
 
-// Multi without factory — returns InjectionToken<T[]>
+// Multi without factory — returns InjectableToken<T[]>
 const multiNoFactoryToken = injectionToken<number>({
   multi: true,
 });
 
-const _multiNoFactoryTokenType: InjectionToken<number[]> = multiNoFactoryToken;
+const _multiNoFactoryTokenType: InjectableToken<number[]> = multiNoFactoryToken;
 
-// Multi with factory — returns InjectionToken<T[]>
+// Multi with factory — returns InjectableToken<T[]>
 const multiToken = injectionToken({
   multi: true,
   factory: () => Math.random(),
 });
 
-const _multiTokenType: InjectionToken<number[]> = multiToken;
+const _multiTokenType: InjectableToken<number[]> = multiToken;
 
 // Auto-provided multi: factory invoked once at root scope, collects into T[]
 const rootMultiToken = injectionToken({
@@ -976,7 +976,7 @@ const rootMultiToken = injectionToken({
   factory: () => Math.random(),
 });
 
-const _rootMultiTokenType: InjectionToken<number[]> = rootMultiToken;
+const _rootMultiTokenType: InjectableToken<number[]> = rootMultiToken;
 
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
@@ -991,7 +991,7 @@ const _injectedNoExpose: void = inject(NoExpose);
 // inject(Directive) → expose type
 const _injectedTooltip: { toggle: () => void } = inject(tooltip);
 
-// inject(InjectionToken) → token type
+// inject(InjectableToken) → token type
 const _injectedWithFactory: { value: Signal<number>; increase: () => void } =
   inject(withFactoryToken);
 const _injectedNoFactory: string = inject(noFactoryToken);
@@ -1005,7 +1005,7 @@ const _injectedStore: Store = inject(Store);
 // 12. PROVIDE
 // ────────────────────────────────────────────────────────────────
 
-// provide shorthand — only works with InjectionToken (with factory)
+// provide shorthand — only works with InjectableToken (with factory)
 const _providersShorthand = [
   provide(withFactoryToken),
   provide(multiToken),
@@ -1019,7 +1019,7 @@ provide(noFactoryToken);
 // @ts-expect-error provide(token) shorthand requires token with factory
 provide(multiNoFactoryToken);
 
-// Object form — works with both InjectionTokenBase and InjectionToken
+// Object form — works with both InjectableToken (base) and ProvidableToken
 const _providersObjectForm = [
   provide({ token: noFactoryToken, factory: () => 'explicit' }),
   provide({ token: multiNoFactoryToken, factory: () => 42 }),

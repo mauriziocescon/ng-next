@@ -520,13 +520,13 @@ export function refMany(_type?: any): any {
 // ────────────────────────────────────────────────────────────────
 // 10. INJECTION TOKEN
 //
-// Single public type: InjectionToken<T>.
+// Single public type: InjectableToken<T>.
 // Internal subtype: ProvidableToken<T> (not exported) — returned
 // when a factory is provided.
 //
 // provide(token) shorthand only accepts ProvidableToken<T>.
-// provide({ token, factory }) accepts any InjectionToken<T>.
-// inject() accepts any InjectionToken<T>.
+// provide({ token, factory }) accepts any InjectableToken<T>.
+// inject() accepts any InjectableToken<T>.
 //
 // Additional options:
 //   Auto-provided (autoProvided: true) — factory invoked once at root scope.
@@ -540,18 +540,18 @@ declare const TOKEN_MULTI: unique symbol;
 declare const PROVIDABLE_TOKEN: unique symbol;
 
 // Single public type
-export interface InjectionToken<T> {
+export interface InjectableToken<T> {
   readonly [TOKEN_TYPE]: T;
   readonly [TOKEN_MULTI]?: boolean;
 }
 
 // Internal — NOT exported
-interface ProvidableToken<T> extends InjectionToken<T> {
+interface ProvidableToken<T> extends InjectableToken<T> {
   readonly [PROVIDABLE_TOKEN]: true;
 }
 
-// Without factory — returns InjectionToken<T>
-export function injectionToken<T>(config?: { debugName?: string }): InjectionToken<T>;
+// Without factory — returns InjectableToken<T>
+export function injectionToken<T>(config?: { debugName?: string }): InjectableToken<T>;
 
 // With factory — returns ProvidableToken<T>
 export function injectionToken<T>(config: {
@@ -570,7 +570,7 @@ export function injectionToken<T>(config: {
 export function injectionToken<T>(config: {
   debugName?: string;
   multi: true;
-}): InjectionToken<T[]>;
+}): InjectableToken<T[]>;
 
 // Multi with factory
 export function injectionToken<T>(config: {
@@ -606,7 +606,7 @@ export function inject<B, E, S extends HTMLElement>(
 export function inject<H extends HTMLElement, B, E>(
   token: DirectiveInstance<H, B, E>,
 ): ExposeOf<DirectiveInstance<H, B, E>>;
-export function inject<T>(token: InjectionToken<T>): T;
+export function inject<T>(token: InjectableToken<T>): T;
 export function inject<T>(token: new (...args: any[]) => T): T;
 
 export function inject(_token: any): any {
@@ -626,9 +626,9 @@ export function inject(_token: any): any {
 // Shorthand — only accepts ProvidableToken (has factory)
 export function provide<T>(token: ProvidableToken<T>): Provider;
 
-// Object form — accepts any InjectionToken or class
+// Object form — accepts any InjectableToken or class
 export function provide<T>(config: {
-  token: InjectionToken<T> | (new (...args: any[]) => T);
+  token: InjectableToken<T> | (new (...args: any[]) => T);
   factory: () => T extends (infer U)[] ? U : T;
 }): Provider;
 
