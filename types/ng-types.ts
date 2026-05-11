@@ -520,63 +520,64 @@ export function refMany(_type?: any): any {
 // ────────────────────────────────────────────────────────────────
 // 10. INJECTION TOKEN
 //
-// Two base forms:
-//   Without factory (InjectionTokenBase) — must use provide({ token, factory }).
-//   With factory (InjectionToken)        — can use provide(token) shorthand.
+// Single public type: InjectionToken<T>.
+// Internal subtype: ProvidableToken<T> (not exported) — returned
+// when a factory is provided.
+//
+// provide(token) shorthand only accepts ProvidableToken<T>.
+// provide({ token, factory }) accepts any InjectionToken<T>.
+// inject() accepts any InjectionToken<T>.
 //
 // Additional options:
 //   Auto-provided (autoProvided: true) — factory invoked once at root scope.
 //   Multi (multi: true)                — collects multiple values into T[].
 //
 // Default is autoProvided: false — the token must be explicitly provided.
-//
-// InjectionToken<T> extends InjectionTokenBase<T>, so inject() accepts both.
-// provide(token) shorthand only accepts InjectionToken<T> (with factory).
 // ────────────────────────────────────────────────────────────────
 
 declare const TOKEN_TYPE: unique symbol;
 declare const TOKEN_MULTI: unique symbol;
-declare const TOKEN_FACTORY: unique symbol;
+declare const PROVIDABLE_TOKEN: unique symbol;
 
-// Base type — no factory, must use provide({ token, factory })
-export interface InjectionTokenBase<T> {
+// Single public type
+export interface InjectionToken<T> {
   readonly [TOKEN_TYPE]: T;
   readonly [TOKEN_MULTI]?: boolean;
 }
 
-// With factory — can use provide(token) shorthand
-export interface InjectionToken<T> extends InjectionTokenBase<T> {
-  readonly [TOKEN_FACTORY]: true;
+// Internal — NOT exported
+interface ProvidableToken<T> extends InjectionToken<T> {
+  readonly [PROVIDABLE_TOKEN]: true;
 }
 
-// Without factory — returns base type
-export function injectionToken<T>(config?: { debugName?: string }): InjectionTokenBase<T>;
+// Without factory — returns InjectionToken<T>
+export function injectionToken<T>(config?: { debugName?: string }): InjectionToken<T>;
 
-// With factory — returns full type
+// With factory — returns ProvidableToken<T>
 export function injectionToken<T>(config: {
   debugName?: string;
   factory: () => T;
-}): InjectionToken<T>;
+}): ProvidableToken<T>;
 
-// Auto-provided (requires factory for auto-provision)
+// Auto-provided (requires factory)
 export function injectionToken<T>(config: {
   debugName?: string;
   autoProvided: true;
   factory: () => T;
-}): InjectionToken<T>;
+}): ProvidableToken<T>;
 
 // Multi without factory
 export function injectionToken<T>(config: {
   debugName?: string;
   multi: true;
-}): InjectionTokenBase<T[]>;
+}): InjectionToken<T[]>;
 
 // Multi with factory
 export function injectionToken<T>(config: {
   debugName?: string;
   multi: true;
   factory: () => T;
-}): InjectionToken<T[]>;
+}): ProvidableToken<T[]>;
 
 // Auto-provided multi (requires factory)
 export function injectionToken<T>(config: {
@@ -584,7 +585,7 @@ export function injectionToken<T>(config: {
   autoProvided: true;
   multi: true;
   factory: () => T;
-}): InjectionToken<T[]>;
+}): ProvidableToken<T[]>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
@@ -605,7 +606,7 @@ export function inject<B, E, S extends HTMLElement>(
 export function inject<H extends HTMLElement, B, E>(
   token: DirectiveInstance<H, B, E>,
 ): ExposeOf<DirectiveInstance<H, B, E>>;
-export function inject<T>(token: InjectionTokenBase<T>): T;
+export function inject<T>(token: InjectionToken<T>): T;
 export function inject<T>(token: new (...args: any[]) => T): T;
 
 export function inject(_token: any): any {
@@ -622,12 +623,12 @@ export function inject(_token: any): any {
 // not the full array — each provide() call adds one entry.
 // ────────────────────────────────────────────────────────────────
 
-// Shorthand — only accepts InjectionToken (with factory)
-export function provide<T>(token: InjectionToken<T>): Provider;
+// Shorthand — only accepts ProvidableToken (has factory)
+export function provide<T>(token: ProvidableToken<T>): Provider;
 
-// Object form — accepts InjectionTokenBase (either type) or class
+// Object form — accepts any InjectionToken or class
 export function provide<T>(config: {
-  token: InjectionTokenBase<T> | (new (...args: any[]) => T);
+  token: InjectionToken<T> | (new (...args: any[]) => T);
   factory: () => T extends (infer U)[] ? U : T;
 }): Provider;
 

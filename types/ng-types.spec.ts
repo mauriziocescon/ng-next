@@ -17,7 +17,6 @@ import {
   type DerivationInstance,
   type DirectiveInstance,
   type InjectionToken,
-  type InjectionTokenBase,
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
@@ -917,12 +916,12 @@ const Parent = component({
 // 10. INJECTION TOKEN
 // ────────────────────────────────────────────────────────────────
 
-// Token without factory — returns InjectionTokenBase
+// Token without factory — returns InjectionToken
 const noFactoryToken = injectionToken<string>();
 
-const _noFactoryTokenType: InjectionTokenBase<string> = noFactoryToken;
+const _noFactoryTokenType: InjectionToken<string> = noFactoryToken;
 
-// Token with factory — returns InjectionToken
+// Token with factory — returns InjectionToken (ProvidableToken is assignable)
 const withFactoryToken = injectionToken({
   factory: () => {
     const counter = signal(0);
@@ -934,12 +933,6 @@ const withFactoryToken = injectionToken({
 });
 
 const _withFactoryTokenType: InjectionToken<{
-  value: Signal<number>;
-  increase: () => void;
-}> = withFactoryToken;
-
-// InjectionToken is assignable to InjectionTokenBase
-const _tokenExtendsBase: InjectionTokenBase<{
   value: Signal<number>;
   increase: () => void;
 }> = withFactoryToken;
@@ -961,12 +954,12 @@ const _rootTokenType: InjectionToken<{
   decrease: () => void;
 }> = rootToken;
 
-// Multi without factory — returns InjectionTokenBase<T[]>
+// Multi without factory — returns InjectionToken<T[]>
 const multiNoFactoryToken = injectionToken<number>({
   multi: true,
 });
 
-const _multiNoFactoryTokenType: InjectionTokenBase<number[]> = multiNoFactoryToken;
+const _multiNoFactoryTokenType: InjectionToken<number[]> = multiNoFactoryToken;
 
 // Multi with factory — returns InjectionToken<T[]>
 const multiToken = injectionToken({
@@ -998,7 +991,7 @@ const _injectedNoExpose: void = inject(NoExpose);
 // inject(Directive) → expose type
 const _injectedTooltip: { toggle: () => void } = inject(tooltip);
 
-// inject(InjectionToken) → token type (works with both InjectionTokenBase and InjectionToken)
+// inject(InjectionToken) → token type
 const _injectedWithFactory: { value: Signal<number>; increase: () => void } =
   inject(withFactoryToken);
 const _injectedNoFactory: string = inject(noFactoryToken);
@@ -1019,7 +1012,7 @@ const _providersShorthand = [
   provide(rootToken),
 ];
 
-// provide shorthand with InjectionTokenBase — compile-time error
+// provide shorthand with factory-less token — compile-time error
 // @ts-expect-error provide(token) shorthand requires token with factory
 provide(noFactoryToken);
 
