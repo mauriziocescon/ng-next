@@ -978,6 +978,29 @@ const rootMultiToken = injectionToken({
 
 const _rootMultiTokenType: InjectableToken<number[]> = rootMultiToken;
 
+// Explicit autoProvided: false — accepted on all non-auto-provided overloads
+const explicitFalseNoFactory = injectionToken<string>({ autoProvided: false });
+const _explicitFalseNoFactoryType: InjectableToken<string> = explicitFalseNoFactory;
+
+const explicitFalseWithFactory = injectionToken({ autoProvided: false, factory: () => 99 });
+const _explicitFalseWithFactoryType: InjectableToken<number> = explicitFalseWithFactory;
+
+const explicitFalseMultiNoFactory = injectionToken<number>({ autoProvided: false, multi: true });
+const _explicitFalseMultiNoFactoryType: InjectableToken<number[]> = explicitFalseMultiNoFactory;
+
+const explicitFalseMultiWithFactory = injectionToken({ autoProvided: false, multi: true, factory: () => 'x' });
+const _explicitFalseMultiWithFactoryType: InjectableToken<string[]> = explicitFalseMultiWithFactory;
+
+// Explicit multi: false — accepted on all non-multi overloads
+const explicitMultiFalseNoFactory = injectionToken<string>({ multi: false });
+const _explicitMultiFalseNoFactoryType: InjectableToken<string> = explicitMultiFalseNoFactory;
+
+const explicitMultiFalseWithFactory = injectionToken({ multi: false, factory: () => 42 });
+const _explicitMultiFalseWithFactoryType: InjectableToken<number> = explicitMultiFalseWithFactory;
+
+const explicitMultiFalseAutoProvided = injectionToken({ multi: false, autoProvided: true, factory: () => 'y' });
+const _explicitMultiFalseAutoProvidedType: InjectableToken<string> = explicitMultiFalseAutoProvided;
+
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
 // ────────────────────────────────────────────────────────────────

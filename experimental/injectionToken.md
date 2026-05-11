@@ -226,11 +226,13 @@ interface ProvidableToken<T> extends InjectableToken<T> {
 // ── injectionToken ──────────────────────────────────────────────
 
 // Without factory — returns InjectableToken<T>
-export function injectionToken<T>(config?: { debugName?: string }): InjectableToken<T>;
+export function injectionToken<T>(config?: { debugName?: string; autoProvided?: false; multi?: false }): InjectableToken<T>;
 
 // With factory — returns ProvidableToken<T>
 export function injectionToken<T>(config: {
   debugName?: string;
+  autoProvided?: false;
+  multi?: false;
   factory: () => T;
 }): ProvidableToken<T>;
 
@@ -238,18 +240,21 @@ export function injectionToken<T>(config: {
 export function injectionToken<T>(config: {
   debugName?: string;
   autoProvided: true;
+  multi?: false;
   factory: () => T;
 }): ProvidableToken<T>;
 
 // Multi without factory
 export function injectionToken<T>(config: {
   debugName?: string;
+  autoProvided?: false;
   multi: true;
 }): InjectableToken<T[]>;
 
 // Multi with factory
 export function injectionToken<T>(config: {
   debugName?: string;
+  autoProvided?: false;
   multi: true;
   factory: () => T;
 }): ProvidableToken<T[]>;
