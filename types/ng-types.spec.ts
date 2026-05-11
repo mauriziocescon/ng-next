@@ -256,7 +256,7 @@ const aliasedDerivation = derivation({
 // 6. COMPONENT — providers receive only inputs (not models/outputs)
 // ────────────────────────────────────────────────────────────────
 
-class Store {}
+class Store { readonly __brand = 'Store' as const; }
 
 // All four binding kinds: providers excludes everything except InputSignal
 const AllBindingKinds = component({
@@ -1079,6 +1079,13 @@ provide({ token: multiToken, factory: () => [1, 2, 3] });
 // Array-valued non-multi token: factory returns the full array (not unwrapped)
 // @ts-expect-error factory for non-multi string[] token must return string[], not string
 provide({ token: arrayValueToken, factory: () => 'single' });
+
+// Class token: factory must return an instance of the class
+// @ts-expect-error factory returns boolean, not Store
+provide({ token: Store, factory: () => true });
+
+// @ts-expect-error factory returns string, not Store
+provide({ token: Store, factory: () => 'not a store' });
 
 // ────────────────────────────────────────────────────────────────
 // INTERFACE CONFORMANCE — satisfies on bindings and expose

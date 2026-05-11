@@ -679,8 +679,11 @@ export function provide<T>(token: ProvidableToken<T>): Provider;
 // Object form — multi token (factory returns single item T)
 export function provide<T>(config: { token: InjectableMultiToken<T>; factory: () => T }): Provider;
 
-// Object form — single token or class (factory returns T)
-export function provide<T>(config: { token: NonMultiToken<T> | (new (...args: any[]) => T); factory: () => T }): Provider;
+// Object form — single token (factory returns T)
+export function provide<T>(config: { token: NonMultiToken<T>; factory: () => T }): Provider;
+
+// Object form — class (factory returns instance of T)
+export function provide<T>(config: { token: new (...args: any[]) => T; factory: () => T }): Provider;
 
 export function provide(_config: any): any {
   return {} as any;
