@@ -102,14 +102,6 @@ export class App {
 
 Today, `InjectionToken` requires a positional `desc` string for debugging, while signal APIs use an optional `debugName` property that the compiler sets automatically:
 
-```ts
-// Current
-const token = new InjectionToken<number>('test');
-
-// Proposed — aligns with signal debugName convention
-const token = injectionToken<number>({ debugName: 'test' });
-```
-
 ---
 
 ## Proposed fixes
