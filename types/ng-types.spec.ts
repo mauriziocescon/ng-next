@@ -17,6 +17,7 @@ import {
   type DerivationInstance,
   type DirectiveInstance,
   type InjectableToken,
+  type InjectableMultiToken,
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
@@ -954,20 +955,23 @@ const _rootTokenType: InjectableToken<{
   decrease: () => void;
 }> = rootToken;
 
-// Multi without factory — returns InjectableToken<T[]>
+// Multi without factory — returns InjectableMultiToken<T>
 const multiNoFactoryToken = injectionToken<number>({
   multi: true,
 });
 
-const _multiNoFactoryTokenType: InjectableToken<number[]> = multiNoFactoryToken;
+const _multiNoFactoryTokenType: InjectableMultiToken<number> = multiNoFactoryToken;
+// InjectableMultiToken<T> extends InjectableToken<T[]>, so this also works:
+const _multiNoFactoryTokenAsBase: InjectableToken<number[]> = multiNoFactoryToken;
 
-// Multi with factory — returns InjectableToken<T[]>
+// Multi with factory — returns InjectableMultiToken<T> (ProvidableMultiToken is assignable)
 const multiToken = injectionToken({
   multi: true,
   factory: () => Math.random(),
 });
 
-const _multiTokenType: InjectableToken<number[]> = multiToken;
+const _multiTokenType: InjectableMultiToken<number> = multiToken;
+const _multiTokenAsBase: InjectableToken<number[]> = multiToken;
 
 // Auto-provided multi: factory invoked once at root scope, collects into T[]
 const rootMultiToken = injectionToken({
@@ -976,7 +980,8 @@ const rootMultiToken = injectionToken({
   factory: () => Math.random(),
 });
 
-const _rootMultiTokenType: InjectableToken<number[]> = rootMultiToken;
+const _rootMultiTokenType: InjectableMultiToken<number> = rootMultiToken;
+const _rootMultiTokenAsBase: InjectableToken<number[]> = rootMultiToken;
 
 // Explicit autoProvided: false — accepted on all non-auto-provided overloads
 const explicitFalseNoFactory = injectionToken<string>({ autoProvided: false });
@@ -986,10 +991,10 @@ const explicitFalseWithFactory = injectionToken({ autoProvided: false, factory: 
 const _explicitFalseWithFactoryType: InjectableToken<number> = explicitFalseWithFactory;
 
 const explicitFalseMultiNoFactory = injectionToken<number>({ autoProvided: false, multi: true });
-const _explicitFalseMultiNoFactoryType: InjectableToken<number[]> = explicitFalseMultiNoFactory;
+const _explicitFalseMultiNoFactoryType: InjectableMultiToken<number> = explicitFalseMultiNoFactory;
 
 const explicitFalseMultiWithFactory = injectionToken({ autoProvided: false, multi: true, factory: () => 'x' });
-const _explicitFalseMultiWithFactoryType: InjectableToken<string[]> = explicitFalseMultiWithFactory;
+const _explicitFalseMultiWithFactoryType: InjectableMultiToken<string> = explicitFalseMultiWithFactory;
 
 // Explicit multi: false — accepted on all non-multi overloads
 const explicitMultiFalseNoFactory = injectionToken<string>({ multi: false });
@@ -1000,6 +1005,23 @@ const _explicitMultiFalseWithFactoryType: InjectableToken<number> = explicitMult
 
 const explicitMultiFalseAutoProvided = injectionToken({ multi: false, autoProvided: true, factory: () => 'y' });
 const _explicitMultiFalseAutoProvidedType: InjectableToken<string> = explicitMultiFalseAutoProvided;
+
+// Single token with array value type
+const arrayValueToken = injectionToken<string[]>({ debugName: 'tags' });
+const _arrayValueTokenType: InjectableToken<string[]> = arrayValueToken;
+
+// Single token with array value type and factory
+const arrayValueWithFactory = injectionToken({ factory: () => ['a', 'b', 'c'] });
+const _arrayValueWithFactoryType: InjectableToken<string[]> = arrayValueWithFactory;
+
+// provide({ token, factory }) for array-valued non-multi token: factory returns the full array
+const _provideArrayValue = provide({ token: arrayValueToken, factory: () => ['x', 'y'] });
+const _provideArrayValueWithFactory = provide({ token: arrayValueWithFactory, factory: () => ['z'] });
+
+// Multi token is NOT assignable to non-multi InjectableToken with same inner type
+// (InjectableMultiToken<number> has TOKEN_MULTI brand, plain InjectableToken<number[]> does not)
+// @ts-expect-error multi token is not assignable to plain non-multi token of same shape
+const _multiNotAssignableToNonMulti: typeof arrayValueToken = multiNoFactoryToken;
 
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
@@ -1053,6 +1075,10 @@ const _providersObjectForm = [
 // Multi provide factory returns a single item, not an array.
 // @ts-expect-error factory for multi token must return number, not number[]
 provide({ token: multiToken, factory: () => [1, 2, 3] });
+
+// Array-valued non-multi token: factory returns the full array (not unwrapped)
+// @ts-expect-error factory for non-multi string[] token must return string[], not string
+provide({ token: arrayValueToken, factory: () => 'single' });
 
 // ────────────────────────────────────────────────────────────────
 // INTERFACE CONFORMANCE — satisfies on bindings and expose
