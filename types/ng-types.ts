@@ -550,6 +550,37 @@ interface ProvidableToken<T> extends InjectableToken<T> {
   readonly [PROVIDABLE_TOKEN]: true;
 }
 
+// Auto-provided multi (requires factory)
+export function injectionToken<T>(config: {
+  debugName?: string;
+  autoProvided: true;
+  multi: true;
+  factory: () => T;
+}): ProvidableToken<T[]>;
+
+// Auto-provided (requires factory)
+export function injectionToken<T>(config: {
+  debugName?: string;
+  autoProvided: true;
+  multi?: false;
+  factory: () => T;
+}): ProvidableToken<T>;
+
+// Multi with factory
+export function injectionToken<T>(config: {
+  debugName?: string;
+  autoProvided?: false;
+  multi: true;
+  factory: () => T;
+}): ProvidableToken<T[]>;
+
+// Multi without factory
+export function injectionToken<T>(config: {
+  debugName?: string;
+  autoProvided?: false;
+  multi: true;
+}): InjectableToken<T[]>;
+
 // Without factory — returns InjectableToken<T>
 export function injectionToken<T>(config?: { debugName?: string; autoProvided?: false; multi?: false }): InjectableToken<T>;
 
@@ -560,37 +591,6 @@ export function injectionToken<T>(config: {
   multi?: false;
   factory: () => T;
 }): ProvidableToken<T>;
-
-// Auto-provided (requires factory)
-export function injectionToken<T>(config: {
-  debugName?: string;
-  autoProvided: true;
-  multi?: false;
-  factory: () => T;
-}): ProvidableToken<T>;
-
-// Multi without factory
-export function injectionToken<T>(config: {
-  debugName?: string;
-  autoProvided?: false;
-  multi: true;
-}): InjectableToken<T[]>;
-
-// Multi with factory
-export function injectionToken<T>(config: {
-  debugName?: string;
-  autoProvided?: false;
-  multi: true;
-  factory: () => T;
-}): ProvidableToken<T[]>;
-
-// Auto-provided multi (requires factory)
-export function injectionToken<T>(config: {
-  debugName?: string;
-  autoProvided: true;
-  multi: true;
-  factory: () => T;
-}): ProvidableToken<T[]>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
