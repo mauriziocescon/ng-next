@@ -1023,6 +1023,18 @@ const _provideArrayValueWithFactory = provide({ token: arrayValueWithFactory, fa
 // @ts-expect-error multi token is not assignable to plain non-multi token of same shape
 const _multiNotAssignableToNonMulti: typeof arrayValueToken = multiNoFactoryToken;
 
+// Empty object config — equivalent to no-arg call
+const emptyConfigToken = injectionToken<string>({});
+const _emptyConfigTokenType: InjectableToken<string> = emptyConfigToken;
+
+// Negative: autoProvided: true without factory — compile-time error
+// @ts-expect-error autoProvided: true requires a factory
+const _negAutoProvidedNoFactory = injectionToken<string>({ autoProvided: true });
+
+// Negative: autoProvided: true + multi: true without factory — compile-time error
+// @ts-expect-error autoProvided: true + multi: true requires a factory
+const _negAutoProvidedMultiNoFactory = injectionToken<number>({ autoProvided: true, multi: true });
+
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
 // ────────────────────────────────────────────────────────────────
@@ -1086,6 +1098,27 @@ provide({ token: Store, factory: () => true });
 
 // @ts-expect-error factory returns string, not Store
 provide({ token: Store, factory: () => 'not a store' });
+
+// Shorthand with auto-provided multi token (ProvidableMultiToken)
+const _provideRootMultiShorthand = provide(rootMultiToken);
+
+// Object form with auto-provided token (override factory at component level)
+const _provideRootTokenOverride = provide({ token: rootToken, factory: () => ({ value: signal(0).asReadonly(), decrease: () => {} }) });
+
+// Object form with ProvidableMultiToken (override factory)
+const _provideMultiTokenOverride = provide({ token: multiToken, factory: () => 99 });
+
+// Negative: wrong factory return type for single token
+// @ts-expect-error factory returns number, not string
+provide({ token: noFactoryToken, factory: () => 123 });
+
+// Negative: wrong factory return type for multi token with factory
+// @ts-expect-error factory returns string, not number
+provide({ token: multiToken, factory: () => 'wrong' });
+
+// Negative: provide(Class) shorthand — classes are not ProvidableToken
+// @ts-expect-error provide(Class) shorthand is not allowed, must use object form
+provide(Store);
 
 // ────────────────────────────────────────────────────────────────
 // INTERFACE CONFORMANCE — satisfies on bindings and expose
