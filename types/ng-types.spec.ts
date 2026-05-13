@@ -961,8 +961,6 @@ const multiNoFactoryToken = injectionToken<number>({
 });
 
 const _multiNoFactoryTokenType: InjectableMultiToken<number> = multiNoFactoryToken;
-// InjectableMultiToken<T> extends InjectableToken<T[]>, so this also works:
-const _multiNoFactoryTokenAsBase: InjectableToken<number[]> = multiNoFactoryToken;
 
 // Multi with factory — returns InjectableMultiToken<T> (ProvidableMultiToken is assignable)
 const multiToken = injectionToken({
@@ -971,7 +969,6 @@ const multiToken = injectionToken({
 });
 
 const _multiTokenType: InjectableMultiToken<number> = multiToken;
-const _multiTokenAsBase: InjectableToken<number[]> = multiToken;
 
 // Auto-provided multi: factory invoked once at root scope, collects into T[]
 const rootMultiToken = injectionToken({
@@ -981,7 +978,6 @@ const rootMultiToken = injectionToken({
 });
 
 const _rootMultiTokenType: InjectableMultiToken<number> = rootMultiToken;
-const _rootMultiTokenAsBase: InjectableToken<number[]> = rootMultiToken;
 
 // Explicit autoProvided: false — accepted on all non-auto-provided overloads
 const explicitFalseNoFactory = injectionToken<string>({ autoProvided: false });
@@ -1018,9 +1014,9 @@ const _arrayValueWithFactoryType: InjectableToken<string[]> = arrayValueWithFact
 const _provideArrayValue = provide({ token: arrayValueToken, factory: () => ['x', 'y'] });
 const _provideArrayValueWithFactory = provide({ token: arrayValueWithFactory, factory: () => ['z'] });
 
-// Multi token is NOT assignable to non-multi InjectableToken with same inner type
-// (InjectableMultiToken<number> has TOKEN_MULTI brand, plain InjectableToken<number[]> does not)
-// @ts-expect-error multi token is not assignable to plain non-multi token of same shape
+// Multi token is NOT assignable to InjectableToken — the two hierarchies are
+// structurally incompatible.
+// @ts-expect-error InjectableMultiToken is not assignable to InjectableToken
 const _multiNotAssignableToNonMulti: typeof arrayValueToken = multiNoFactoryToken;
 
 // Empty object config — equivalent to no-arg call

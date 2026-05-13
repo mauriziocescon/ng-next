@@ -532,9 +532,8 @@ export function refMany(_type?: any): any {
 //
 // Options:
 //   autoProvided: true — factory invoked once at root scope.
-//   multi: true        — branded at the token level so the type
-//                        system distinguishes "multi collecting T[]"
-//                        from "single token whose value is T[]".
+//                        Only valid when factory is also provided.
+//   multi: true        — selects the InjectableMultiToken hierarchy.
 // ────────────────────────────────────────────────────────────────
 
 declare const TOKEN_VALUE: unique symbol;
@@ -546,8 +545,8 @@ export interface InjectableToken<T> {
   readonly [TOKEN_VALUE]: T;
 }
 
-// Multi token — inject() returns T[], provide factory returns T
-export interface InjectableMultiToken<T> extends InjectableToken<T[]> {
+// Multi token — inject() returns T[], provide factory returns a single T.
+export interface InjectableMultiToken<T> {
   readonly [TOKEN_MULTI]: T;
 }
 
@@ -561,69 +560,35 @@ interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
   readonly [TOKEN_HAS_FACTORY]: true;
 }
 
-// Config for `injectionToken()` with `autoProvided: true` and `multi: true`.
-interface InjectionTokenAutoProvidedMulti<T> {
+// Multi with factory — autoProvided is only accepted when factory is present.
+export function injectionToken<T>(config: {
   debugName?: string;
-  autoProvided: true;
-  multi: true;
   factory: () => T;
-}
+  autoProvided?: boolean;
+  multi: true;
+}): ProvidableMultiToken<T>;
 
-// Config for `injectionToken()` with `autoProvided: true`.
-interface InjectionTokenAutoProvided<T> {
+// Single with factory — autoProvided is only accepted when factory is present.
+export function injectionToken<T>(config: {
   debugName?: string;
-  autoProvided: true;
+  factory: () => T;
+  autoProvided?: boolean;
   multi?: false;
-  factory: () => T;
-}
+}): ProvidableToken<T>;
 
-// Config for `injectionToken()` with `multi: true` and a factory.
-interface InjectionTokenMultiWithFactory<T> {
-  debugName?: string;
-  autoProvided?: false;
-  multi: true;
-  factory: () => T;
-}
-
-// Config for `injectionToken()` with `multi: true` and no factory (requires explicit type parameter).
-interface InjectionTokenMulti {
+// Multi without factory — explicit type parameter required.
+export function injectionToken<T>(config: {
   debugName?: string;
   autoProvided?: false;
   multi: true;
-}
+}): InjectableMultiToken<T>;
 
-// Config for `injectionToken()` without a factory (requires explicit type parameter).
-interface InjectionTokenBase {
+// Single without factory — explicit type parameter required (or call with no arg).
+export function injectionToken<T>(config?: {
   debugName?: string;
   autoProvided?: false;
   multi?: false;
-}
-
-// Config for `injectionToken()` with a factory.
-interface InjectionTokenWithFactory<T> {
-  debugName?: string;
-  autoProvided?: false;
-  multi?: false;
-  factory: () => T;
-}
-
-// Auto-provided multi (requires factory)
-export function injectionToken<T>(config: InjectionTokenAutoProvidedMulti<T>): ProvidableMultiToken<T>;
-
-// Auto-provided (requires factory)
-export function injectionToken<T>(config: InjectionTokenAutoProvided<T>): ProvidableToken<T>;
-
-// Multi with factory
-export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
-
-// Multi without factory
-export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
-
-// With factory — returns ProvidableToken<T>
-export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
-
-// Without factory — returns InjectableToken<T>
-export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
+}): InjectableToken<T>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
@@ -644,6 +609,7 @@ export function inject<B, E, S extends HTMLElement>(
 export function inject<H extends HTMLElement, B, E>(
   token: DirectiveInstance<H, B, E>,
 ): ExposeOf<DirectiveInstance<H, B, E>>;
+export function inject<T>(token: InjectableMultiToken<T>): T[];
 export function inject<T>(token: InjectableToken<T>): T;
 export function inject<T>(token: new (...args: any[]) => T): T;
 
@@ -660,15 +626,11 @@ export function inject(_token: any): any {
 // For multi tokens, factory returns a single item (T),
 // not the full array — each provide() call adds one entry.
 //
-// Multi tokens use InjectableMultiToken<T> which brands the item
-// type, so the type system correctly distinguishes "multi token
-// collecting T[]" from "single token whose value happens to be T[]".
+// InjectableMultiToken<T> and InjectableToken<T> are structurally
+// incompatible (different brand symbols, no shared fields), so the
+// single-token overload can use InjectableToken<T> directly without
+// an exclusion guard.
 // ────────────────────────────────────────────────────────────────
-
-// Excludes multi tokens from the single-token overload so that
-// InjectableMultiToken<T> (which extends InjectableToken<T[]>)
-// cannot fall through to the non-multi overload.
-type NonMultiToken<T> = InjectableToken<T> & { readonly [TOKEN_MULTI]?: never };
 
 // Shorthand — multi token with factory
 export function provide<T>(token: ProvidableMultiToken<T>): Provider;
@@ -680,7 +642,7 @@ export function provide<T>(token: ProvidableToken<T>): Provider;
 export function provide<T>(config: { token: InjectableMultiToken<T>; factory: () => T }): Provider;
 
 // Object form — single token (factory returns T)
-export function provide<T>(config: { token: NonMultiToken<T>; factory: () => T }): Provider;
+export function provide<T>(config: { token: InjectableToken<T>; factory: () => T }): Provider;
 
 // Object form — class (factory returns instance of T)
 export function provide<T>(config: { token: new (...args: any[]) => T; factory: () => T }): Provider;
