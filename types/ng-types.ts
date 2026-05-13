@@ -560,35 +560,40 @@ interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
   readonly [TOKEN_HAS_FACTORY]: true;
 }
 
-// Multi with factory — autoProvided is only accepted when factory is present.
-export function injectionToken<T>(config: {
+// Config: multi token with factory (autoProvided accepted).
+interface InjectionTokenMultiWithFactory<T> {
   debugName?: string;
   factory: () => T;
   autoProvided?: boolean;
   multi: true;
-}): ProvidableMultiToken<T>;
+}
 
-// Single with factory — autoProvided is only accepted when factory is present.
-export function injectionToken<T>(config: {
+// Config: single token with factory (autoProvided accepted).
+interface InjectionTokenWithFactory<T> {
   debugName?: string;
   factory: () => T;
   autoProvided?: boolean;
   multi?: false;
-}): ProvidableToken<T>;
+}
 
-// Multi without factory — explicit type parameter required.
-export function injectionToken<T>(config: {
+// Config: multi token without factory (explicit type parameter required).
+interface InjectionTokenMulti {
   debugName?: string;
   autoProvided?: false;
   multi: true;
-}): InjectableMultiToken<T>;
+}
 
-// Single without factory — explicit type parameter required (or call with no arg).
-export function injectionToken<T>(config?: {
+// Config: single token without factory (explicit type parameter required).
+interface InjectionTokenBase {
   debugName?: string;
   autoProvided?: false;
   multi?: false;
-}): InjectableToken<T>;
+}
+
+export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
+export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
+export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
+export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
@@ -632,19 +637,10 @@ export function inject(_token: any): any {
 // an exclusion guard.
 // ────────────────────────────────────────────────────────────────
 
-// Shorthand — multi token with factory
 export function provide<T>(token: ProvidableMultiToken<T>): Provider;
-
-// Shorthand — single token with factory
 export function provide<T>(token: ProvidableToken<T>): Provider;
-
-// Object form — multi token (factory returns single item T)
 export function provide<T>(config: { token: InjectableMultiToken<T>; factory: () => T }): Provider;
-
-// Object form — single token (factory returns T)
 export function provide<T>(config: { token: InjectableToken<T>; factory: () => T }): Provider;
-
-// Object form — class (factory returns instance of T)
 export function provide<T>(config: { token: new (...args: any[]) => T; factory: () => T }): Provider;
 
 export function provide(_config: any): any {
