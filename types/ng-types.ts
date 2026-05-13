@@ -590,10 +590,10 @@ interface InjectionTokenBase {
   multi?: false;
 }
 
-export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
-export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
-export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
 export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
+export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
+export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
+export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
