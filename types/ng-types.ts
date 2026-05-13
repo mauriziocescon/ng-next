@@ -537,13 +537,13 @@ export function refMany(_type?: any): any {
 //                        from "single token whose value is T[]".
 // ────────────────────────────────────────────────────────────────
 
-declare const TOKEN_TYPE: unique symbol;
+declare const TOKEN_VALUE: unique symbol;
 declare const TOKEN_MULTI: unique symbol;
-declare const PROVIDABLE_TOKEN: unique symbol;
+declare const TOKEN_HAS_FACTORY: unique symbol;
 
 // Base token — inject() returns T
 export interface InjectableToken<T> {
-  readonly [TOKEN_TYPE]: T;
+  readonly [TOKEN_VALUE]: T;
 }
 
 // Multi token — inject() returns T[], provide factory returns T
@@ -553,12 +553,12 @@ export interface InjectableMultiToken<T> extends InjectableToken<T[]> {
 
 // Internal — NOT exported. Single token with factory (shorthand-eligible).
 interface ProvidableToken<T> extends InjectableToken<T> {
-  readonly [PROVIDABLE_TOKEN]: true;
+  readonly [TOKEN_HAS_FACTORY]: true;
 }
 
 // Internal — NOT exported. Multi token with factory (shorthand-eligible).
 interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
-  readonly [PROVIDABLE_TOKEN]: true;
+  readonly [TOKEN_HAS_FACTORY]: true;
 }
 
 // Config for `injectionToken()` with `autoProvided: true` and `multi: true`.
