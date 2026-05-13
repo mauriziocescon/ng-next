@@ -18,7 +18,7 @@ const t1 = injectionToken<number>();
 const t2 = injectionToken<string>({
   factory: () => '',
   autoProvided: false,
-  multi: false,
+  multi: true,
 });
 
 const t3 = t2;
