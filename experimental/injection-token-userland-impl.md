@@ -261,13 +261,13 @@ export function provide<T>(config: { token: InjectableMultiToken<T>; factory: ()
 /**
  * Provides a class token with an explicit factory.
  *
- * @param config.token A class constructor.
+ * @param config.token A class constructor (concrete or abstract).
  * @param config.factory A factory returning an instance of `T`.
  *
  * @example
  * provide({ token: Store, factory: () => new Store() })
  */
-export function provide<T>(config: { token: new (...args: any[]) => T; factory: () => T }): Provider;
+export function provide<T>(config: { token: abstract new (...args: any[]) => T; factory: () => T }): Provider;
 
 // ─── provide() implementation ───────────────────────────────────
 
@@ -318,22 +318,22 @@ export function injectToken<T>(
 /**
  * Injects a single-value token or a class instance.
  *
- * @param token An `InjectableToken<T>` or a class constructor.
+ * @param token An `InjectableToken<T>` or a class constructor (concrete or abstract).
  * @returns The provided value or class instance.
  *
  * @example
  * const counter = injectToken(counterToken); // { value: Signal<number>; ... }
  * const store = injectToken(Store);          // Store
  */
-export function injectToken<T>(token: InjectableToken<T> | (new (...args: any[]) => T)): T;
+export function injectToken<T>(token: InjectableToken<T> | (abstract new (...args: any[]) => T)): T;
 /** @see {@link injectToken} */
 export function injectToken<T>(
-  token: InjectableToken<T> | (new (...args: any[]) => T),
+  token: InjectableToken<T> | (abstract new (...args: any[]) => T),
   options: InjectOptions & { optional?: false },
 ): T;
 /** @see {@link injectToken} — returns `null` if not provided and `optional: true`. */
 export function injectToken<T>(
-  token: InjectableToken<T> | (new (...args: any[]) => T),
+  token: InjectableToken<T> | (abstract new (...args: any[]) => T),
   options: InjectOptions,
 ): T | null;
 

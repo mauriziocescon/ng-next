@@ -1054,6 +1054,20 @@ const _injectedMultiNoFactory: number[] = inject(multiNoFactoryToken);
 // inject(Class) → class instance
 const _injectedStore: Store = inject(Store);
 
+// inject(abstract class) → class instance
+abstract class AbstractService { abstract run(): void; }
+class ConcreteService extends AbstractService { run() {} }
+
+const _injectedAbstract: AbstractService = inject(AbstractService);
+
+// inject(generic class) → class instance
+class GenericClass<T extends number> { value!: T; }
+const _injectedGeneric: GenericClass<number> = inject(GenericClass);
+
+// inject(generic abstract class) → class instance
+abstract class GenericAbstract<T extends string> { abstract get(): T; }
+const _injectedGenericAbstract: GenericAbstract<string> = inject(GenericAbstract);
+
 // ────────────────────────────────────────────────────────────────
 // 12. PROVIDE
 // ────────────────────────────────────────────────────────────────
@@ -1094,6 +1108,12 @@ provide({ token: Store, factory: () => true });
 
 // @ts-expect-error factory returns string, not Store
 provide({ token: Store, factory: () => 'not a store' });
+
+// Abstract class token: factory must return an instance of the abstract class
+const _provideAbstract = provide({ token: AbstractService, factory: () => new ConcreteService() });
+
+// @ts-expect-error factory returns string, not AbstractService
+provide({ token: AbstractService, factory: () => 'wrong' });
 
 // Shorthand with auto-provided multi token (ProvidableMultiToken)
 const _provideRootMultiShorthand = provide(rootMultiToken);

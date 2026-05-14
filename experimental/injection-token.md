@@ -286,7 +286,7 @@ export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): Pr
 // rather than falling through to the single-token overload.
 export function inject<T>(token: InjectableMultiToken<T>): T[];
 export function inject<T>(token: InjectableToken<T>): T;
-export function inject<T>(token: new (...args: any[]) => T): T;
+export function inject<T>(token: abstract new (...args: any[]) => T): T;
 
 // ── provide ─────────────────────────────────────────────────────
 
@@ -303,7 +303,7 @@ export function provide<T>(config: { token: InjectableMultiToken<T>; factory: ()
 export function provide<T>(config: { token: InjectableToken<T>; factory: () => T }): Provider;
 
 // Object form — class (factory returns instance of T)
-export function provide<T>(config: { token: new (...args: any[]) => T; factory: () => T }): Provider;
+export function provide<T>(config: { token: abstract new (...args: any[]) => T; factory: () => T }): Provider;
 ```
 
 ---

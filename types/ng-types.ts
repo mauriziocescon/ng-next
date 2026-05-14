@@ -616,7 +616,7 @@ export function inject<H extends HTMLElement, B, E>(
 ): ExposeOf<DirectiveInstance<H, B, E>>;
 export function inject<T>(token: InjectableMultiToken<T>): T[];
 export function inject<T>(token: InjectableToken<T>): T;
-export function inject<T>(token: new (...args: any[]) => T): T;
+export function inject<T>(token: abstract new (...args: any[]) => T): T;
 
 export function inject(_token: any): any {
   return {} as any;
@@ -641,7 +641,7 @@ export function provide<T>(token: ProvidableMultiToken<T>): Provider;
 export function provide<T>(token: ProvidableToken<T>): Provider;
 export function provide<T>(config: { token: InjectableMultiToken<T>; factory: () => T }): Provider;
 export function provide<T>(config: { token: InjectableToken<T>; factory: () => T }): Provider;
-export function provide<T>(config: { token: new (...args: any[]) => T; factory: () => T }): Provider;
+export function provide<T>(config: { token: abstract new (...args: any[]) => T; factory: () => T }): Provider;
 
 export function provide(_config: any): any {
   return {} as any;
