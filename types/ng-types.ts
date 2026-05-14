@@ -590,10 +590,10 @@ interface InjectionTokenBase {
   multi?: false;
 }
 
-export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
-export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
-export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
 export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
+export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
+export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
+export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
@@ -614,9 +614,9 @@ export function inject<B, E, S extends HTMLElement>(
 export function inject<H extends HTMLElement, B, E>(
   token: DirectiveInstance<H, B, E>,
 ): ExposeOf<DirectiveInstance<H, B, E>>;
+export function inject<T>(token: abstract new (...args: any[]) => T): T;
 export function inject<T>(token: InjectableMultiToken<T>): T[];
 export function inject<T>(token: InjectableToken<T>): T;
-export function inject<T>(token: abstract new (...args: any[]) => T): T;
 
 export function inject(_token: any): any {
   return {} as any;

@@ -123,25 +123,20 @@ interface InjectionTokenMultiWithFactoryConfig<T> {
 // ─── injectionToken() overloads ─────────────────────────────────
 
 /**
- * Creates a DI token without a factory.
- * Must be provided explicitly via `provide({ token, factory })`.
+ * Creates a multi-value DI token with a built-in factory.
+ * Can be provided via the `provide(token)` shorthand — each call contributes one `T`.
  *
  * @example
- * const CONFIG = injectionToken<AppConfig>({ debugName: 'CONFIG' });
- * // provide(CONFIG)         ← compile error
- * // provide({ token: CONFIG, factory: () => ({...}) })  ← OK
+ * const PLUGINS = injectionToken({
+ *   debugName: 'PLUGINS',
+ *   multi: true,
+ *   factory: () => defaultPlugin(),
+ * });
+ * // provide(PLUGINS)  ← contributes one entry using the built-in factory
  */
-export function injectionToken<T>(config?: InjectionTokenBaseConfig): InjectableToken<T>;
-
-/**
- * Creates a multi-value DI token without a factory.
- * Must be provided explicitly via `provide({ token, factory })`.
- *
- * @example
- * const HOOKS = injectionToken<Hook>({ debugName: 'HOOKS', multi: true });
- * // provide({ token: HOOKS, factory: () => myHook })  ← contributes one Hook
- */
-export function injectionToken<T>(config: InjectionTokenMultiConfig): InjectableMultiToken<T>;
+export function injectionToken<T>(
+  config: InjectionTokenMultiWithFactoryConfig<T>,
+): ProvidableMultiToken<T>;
 
 /**
  * Creates a DI token with a built-in factory.
@@ -159,20 +154,25 @@ export function injectionToken<T>(config: InjectionTokenMultiConfig): Injectable
 export function injectionToken<T>(config: InjectionTokenWithFactoryConfig<T>): ProvidableToken<T>;
 
 /**
- * Creates a multi-value DI token with a built-in factory.
- * Can be provided via the `provide(token)` shorthand — each call contributes one `T`.
+ * Creates a multi-value DI token without a factory.
+ * Must be provided explicitly via `provide({ token, factory })`.
  *
  * @example
- * const PLUGINS = injectionToken({
- *   debugName: 'PLUGINS',
- *   multi: true,
- *   factory: () => defaultPlugin(),
- * });
- * // provide(PLUGINS)  ← contributes one entry using the built-in factory
+ * const HOOKS = injectionToken<Hook>({ debugName: 'HOOKS', multi: true });
+ * // provide({ token: HOOKS, factory: () => myHook })  ← contributes one Hook
  */
-export function injectionToken<T>(
-  config: InjectionTokenMultiWithFactoryConfig<T>,
-): ProvidableMultiToken<T>;
+export function injectionToken<T>(config: InjectionTokenMultiConfig): InjectableMultiToken<T>;
+
+/**
+ * Creates a DI token without a factory.
+ * Must be provided explicitly via `provide({ token, factory })`.
+ *
+ * @example
+ * const CONFIG = injectionToken<AppConfig>({ debugName: 'CONFIG' });
+ * // provide(CONFIG)         ← compile error
+ * // provide({ token: CONFIG, factory: () => ({...}) })  ← OK
+ */
+export function injectionToken<T>(config?: InjectionTokenBaseConfig): InjectableToken<T>;
 
 // ─── injectionToken() implementation ────────────────────────────
 
@@ -216,6 +216,16 @@ export function injectionToken<T>(config?: any): any {
 // ─── provide() overloads ────────────────────────────────────────
 
 /**
+ * Provides a multi token using its built-in factory. Each call contributes one entry.
+ *
+ * @param token A `ProvidableMultiToken` created with `injectionToken({ factory, multi: true })`.
+ *
+ * @example
+ * providers: [provide(pluginToken), provide(pluginToken)]  // two entries
+ */
+export function provide<T>(token: ProvidableMultiToken<T>): Provider;
+
+/**
  * Provides a token using its built-in factory.
  *
  * @param token A `ProvidableToken` created with `injectionToken({ factory })`.
@@ -225,16 +235,6 @@ export function injectionToken<T>(config?: any): any {
  * providers: [provide(counterToken)]
  */
 export function provide<T>(token: ProvidableToken<T>): Provider;
-
-/**
- * Provides a multi token using its built-in factory. Each call contributes one entry.
- *
- * @param token A `ProvidableMultiToken` created with `injectionToken({ factory, multi: true })`.
- *
- * @example
- * providers: [provide(pluginToken), provide(pluginToken)]  // two entries
- */
-export function provide<T>(token: ProvidableMultiToken<T>): Provider;
 
 /**
  * Provides a single-value token with an explicit factory.

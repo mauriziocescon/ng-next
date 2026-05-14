@@ -267,17 +267,17 @@ interface InjectionTokenBase {
   multi?: false;
 }
 
-// Without factory — returns InjectableToken<T>
-export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
-
-// Multi without factory
-export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
+// Multi with factory — most specific, tried first
+export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
 
 // With factory — returns ProvidableToken<T>
 export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
 
-// Multi with factory (last — best error when factory is missing)
-export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
+// Multi without factory
+export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
+
+// Without factory — least specific fallback
+export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
 
 // ── inject ──────────────────────────────────────────────────────
 
