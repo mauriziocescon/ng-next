@@ -16,8 +16,10 @@ const token = new InjectionToken<number>('multi');
 // new
 const t1 = injectionToken<number>();
 const t2 = injectionToken<string>({
-  factory: () => '',
-  autoProvided: false,
+  factory: () => {
+    return '';
+  },
+  autoProvided: true,
   multi: true,
 });
 
