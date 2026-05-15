@@ -290,20 +290,22 @@ export function inject<T>(token: abstract new (...args: any[]) => T): T;
 
 // ── provide ─────────────────────────────────────────────────────
 
-// Shorthand — multi token with factory
-export function provide<T>(token: ProvidableMultiToken<T>): Provider;
+type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 
-// Shorthand — single token with factory
-export function provide<T>(token: ProvidableToken<T>): Provider;
+type DefaultProviderToken<T> =
+  | ProvidableMultiToken<T>
+  | ProvidableToken<T>;
 
-// Object form — multi token (factory returns single item T)
-export function provide<T>(config: { token: InjectableMultiToken<T>; factory: () => T }): Provider;
+type ExplicitProviderToken<T> =
+  | InjectableMultiToken<T>
+  | InjectableToken<T>
+  | AbstractCtor<T>;
 
-// Object form — single token (factory returns T)
-export function provide<T>(config: { token: InjectableToken<T>; factory: () => T }): Provider;
+// Shorthand — token with factory
+export function provide<T>(token: DefaultProviderToken<T>): Provider;
 
-// Object form — class (factory returns instance of T)
-export function provide<T>(config: { token: abstract new (...args: any[]) => T; factory: () => T }): Provider;
+// Object form — explicit factory for token or class
+export function provide<T>(config: { token: ExplicitProviderToken<T>; factory: () => T }): Provider;
 ```
 
 ---

@@ -213,61 +213,43 @@ export function injectionToken<T>(config?: any): any {
   return token;
 }
 
-// ─── provide() overloads ────────────────────────────────────────
+// ─── provide() token aliases ────────────────────────────────────
 
-/**
- * Provides a multi token using its built-in factory. Each call contributes one entry.
- *
- * @param token A `ProvidableMultiToken` created with `injectionToken({ factory, multi: true })`.
- *
- * @example
- * providers: [provide(pluginToken), provide(pluginToken)]  // two entries
- */
-export function provide<T>(token: ProvidableMultiToken<T>): Provider;
+type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
+
+type DefaultProviderToken<T> =
+  | ProvidableMultiToken<T>
+  | ProvidableToken<T>;
+
+type ExplicitProviderToken<T> =
+  | InjectableMultiToken<T>
+  | InjectableToken<T>
+  | AbstractCtor<T>;
+
+// ─── provide() overloads ────────────────────────────────────────
 
 /**
  * Provides a token using its built-in factory.
  *
- * @param token A `ProvidableToken` created with `injectionToken({ factory })`.
- * @returns A `Provider` suitable for a component/directive/route `providers` array.
+ * For multi tokens, each call contributes one entry.
  *
  * @example
  * providers: [provide(counterToken)]
+ * providers: [provide(pluginToken), provide(pluginToken)]  // two entries
  */
-export function provide<T>(token: ProvidableToken<T>): Provider;
+export function provide<T>(token: DefaultProviderToken<T>): Provider;
 
 /**
- * Provides a single-value token with an explicit factory.
+ * Provides a token or class with an explicit factory.
  *
- * @param config.token The `InjectableToken` to provide.
- * @param config.factory A factory returning `T`.
+ * For multi tokens, the factory returns one `T` item.
  *
  * @example
  * provide({ token: configToken, factory: () => ({ apiUrl: '/api' }) })
- */
-export function provide<T>(config: { token: InjectableToken<T>; factory: () => T }): Provider;
-
-/**
- * Provides a multi-value token with an explicit factory. The factory returns one `T` item.
- *
- * @param config.token The `InjectableMultiToken` to provide.
- * @param config.factory A factory returning a single `T` contribution.
- *
- * @example
  * provide({ token: pluginToken, factory: () => ({ name: 'custom' }) })
- */
-export function provide<T>(config: { token: InjectableMultiToken<T>; factory: () => T }): Provider;
-
-/**
- * Provides a class token with an explicit factory.
- *
- * @param config.token A class constructor (concrete or abstract).
- * @param config.factory A factory returning an instance of `T`.
- *
- * @example
  * provide({ token: Store, factory: () => new Store() })
  */
-export function provide<T>(config: { token: abstract new (...args: any[]) => T; factory: () => T }): Provider;
+export function provide<T>(config: { token: ExplicitProviderToken<T>; factory: () => T }): Provider;
 
 // ─── provide() implementation ───────────────────────────────────
 

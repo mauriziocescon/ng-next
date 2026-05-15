@@ -631,17 +631,23 @@ export function inject(_token: any): any {
 // For multi tokens, factory returns a single item (T),
 // not the full array — each provide() call adds one entry.
 //
-// InjectableMultiToken<T> and InjectableToken<T> are structurally
-// incompatible (different brand symbols, no shared fields), so the
-// single-token overload can use InjectableToken<T> directly without
-// an exclusion guard.
+// InjectableMultiToken<T>, InjectableToken<T>, and class tokens all
+// contribute a single T value when provided explicitly.
 // ────────────────────────────────────────────────────────────────
 
-export function provide<T>(token: ProvidableMultiToken<T>): Provider;
-export function provide<T>(token: ProvidableToken<T>): Provider;
-export function provide<T>(config: { token: InjectableMultiToken<T>; factory: () => T }): Provider;
-export function provide<T>(config: { token: InjectableToken<T>; factory: () => T }): Provider;
-export function provide<T>(config: { token: abstract new (...args: any[]) => T; factory: () => T }): Provider;
+type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
+
+type DefaultProviderToken<T> =
+  | ProvidableMultiToken<T>
+  | ProvidableToken<T>;
+
+type ExplicitProviderToken<T> =
+  | InjectableMultiToken<T>
+  | InjectableToken<T>
+  | AbstractCtor<T>;
+
+export function provide<T>(token: DefaultProviderToken<T>): Provider;
+export function provide<T>(config: { token: ExplicitProviderToken<T>; factory: () => T }): Provider;
 
 export function provide(_config: any): any {
   return {} as any;
