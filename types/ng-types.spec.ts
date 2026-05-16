@@ -970,15 +970,6 @@ const multiToken = injectionToken({
 
 const _multiTokenType: InjectableMultiToken<number> = multiToken;
 
-// Auto-provided multi: factory invoked once at root scope, collects into T[]
-const rootMultiToken = injectionToken({
-  autoProvided: true,
-  multi: true,
-  factory: () => Math.random(),
-});
-
-const _rootMultiTokenType: InjectableMultiToken<number> = rootMultiToken;
-
 // Explicit autoProvided: false — accepted on all non-auto-provided overloads
 const explicitFalseNoFactory = injectionToken<string>({ autoProvided: false });
 const _explicitFalseNoFactoryType: InjectableToken<string> = explicitFalseNoFactory;
@@ -1027,8 +1018,12 @@ const _emptyConfigTokenType: InjectableToken<string> = emptyConfigToken;
 // @ts-expect-error autoProvided: true requires a factory
 const _negAutoProvidedNoFactory = injectionToken<string>({ autoProvided: true });
 
-// Negative: autoProvided: true + multi: true without factory — compile-time error
-// @ts-expect-error autoProvided: true + multi: true requires a factory
+// Negative: autoProvided: true + multi: true is not supported, even with a factory
+// @ts-expect-error autoProvided: true is not supported for multi tokens
+const _negAutoProvidedMultiWithFactory = injectionToken({ autoProvided: true, multi: true, factory: () => 1 });
+
+// Negative: autoProvided: true + multi: true is not supported without a factory
+// @ts-expect-error autoProvided: true is not supported for multi tokens
 const _negAutoProvidedMultiNoFactory = injectionToken<number>({ autoProvided: true, multi: true });
 
 // ────────────────────────────────────────────────────────────────
@@ -1114,9 +1109,6 @@ const _provideAbstract = provide(AbstractService, () => new ConcreteService());
 
 // @ts-expect-error factory returns string, not AbstractService
 provide(AbstractService, () => 'wrong');
-
-// Shorthand with auto-provided multi token (ProvidableMultiToken)
-const _provideRootMultiShorthand = provide(rootMultiToken);
 
 // Explicit factory form with auto-provided token (override factory at component level)
 const _provideRootTokenOverride = provide(rootToken, () => ({ value: signal(0).asReadonly(), decrease: () => {} }));

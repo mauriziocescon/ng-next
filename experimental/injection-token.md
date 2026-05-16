@@ -2,7 +2,7 @@
 
 ## Summary
 
-The current `InjectionToken` API has type-safety gaps (no nominal typing, unchecked factory return types, overridable generics on `inject()`), no type-level representation of `multi`, no way to use a token's factory as a provider shorthand, and a naming convention inconsistent with signal-based APIs. This issue proposes a new `injectionToken()` function that fixes all of these through branded types, token-level multi encoding, three distinct token shapes with shorthand support, and a unified `debugName` convention.
+The current `InjectionToken` API has type-safety gaps (no nominal typing, unchecked factory return types, overridable generics on `inject()`), no type-level representation of `multi`, no way to use a token's factory as a provider shorthand, and a naming convention inconsistent with signal-based APIs. This issue proposes a new `injectionToken()` function that fixes all of these through branded types, token-level multi encoding, shorthand support for tokens with factories, single-token auto-provisioning, and a unified `debugName` convention.
 
 ## Current limitations
 

@@ -10,7 +10,7 @@
 |---------|-----------|
 | Branded nominal types | TypeScript `unique symbol` brands — compile-time only |
 | `injectionToken()` factory | Creates a standard `InjectionToken` instance via its public constructor |
-| `autoProvided` | Passes `{ providedIn: 'root', factory }` to the `InjectionToken` constructor |
+| `autoProvided` | For single tokens only, passes `{ providedIn: 'root', factory }` to the `InjectionToken` constructor |
 | `provide()` shorthand | Returns a standard `{ provide, useFactory, multi? }` object |
 | Multi at token level | Compile-time brand + `provide()` emits `multi: true` on the provider |
 | `debugName` convention | Passed as the `_desc` string to `InjectionToken` constructor |
@@ -117,7 +117,7 @@ interface InjectionTokenMultiWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
   multi: true;
-  autoProvided?: boolean;
+  autoProvided?: false;
 }
 
 // ─── injectionToken() overloads ─────────────────────────────────
@@ -125,6 +125,7 @@ interface InjectionTokenMultiWithFactoryConfig<T> {
 /**
  * Creates a multi-value DI token with a built-in factory.
  * Can be provided via the `provide(token)` shorthand — each call contributes one `T`.
+ * Cannot be combined with `autoProvided: true`.
  *
  * @example
  * const PLUGINS = injectionToken({
@@ -177,6 +178,10 @@ export function injectionToken<T>(config?: InjectionTokenBaseConfig): Injectable
 // ─── injectionToken() implementation ────────────────────────────
 
 export function injectionToken<T>(config?: any): any {
+  if (config?.autoProvided && config?.multi) {
+    throw new Error('autoProvided: true is not supported for multi tokens.');
+  }
+
   const desc = config?.debugName ?? '';
   const factory = config?.factory;
   const autoProvided = config?.autoProvided ?? false;
@@ -186,7 +191,7 @@ export function injectionToken<T>(config?: any): any {
   let token: InjectionToken<any>;
 
   if (factory && autoProvided) {
-    // autoProvided: register with providedIn:'root' so the injector picks it up automatically
+    // autoProvided single token: register with providedIn:'root' so the injector picks it up automatically
     token = new InjectionToken<T>(desc, {
       providedIn: 'root',
       factory,
@@ -330,7 +335,7 @@ The R3Injector uses the token **instance** as the key in its internal `records` 
 
 ### `autoProvided` → `providedIn: 'root'`
 
-When `autoProvided: true`, we pass `{ providedIn: 'root', factory }` to the `InjectionToken` constructor. This causes the constructor to internally set `ɵprov` on the token. The R3Injector's `injectableDefInScope` check then finds it and auto-creates the record — identical to `@Injectable({ providedIn: 'root' })`.
+When `autoProvided: true` is used on a single-value token, we pass `{ providedIn: 'root', factory }` to the `InjectionToken` constructor. This causes the constructor to internally set `ɵprov` on the token. The R3Injector's `injectableDefInScope` check then finds it and auto-creates the record — identical to `@Injectable({ providedIn: 'root' })`.
 
 ### `provide()` → standard `Provider`
 
@@ -408,14 +413,6 @@ const pluginToken = injectionToken({
   factory: () => ({ name: 'default' }),
 });
 
-// Auto-provided multi (root-scoped)
-const rootPluginToken = injectionToken({
-  debugName: 'rootPluginToken',
-  autoProvided: true,
-  multi: true,
-  factory: () => ({ name: 'root-default' }),
-});
-
 // Token without factory
 const configToken = injectionToken<{ apiUrl: string }>({ debugName: 'configToken' });
 
@@ -439,7 +436,6 @@ export class MyComponent {
   counter = injectStrict(counterToken);        // inferred: { value: Signal<number>; increment: () => void }
   logger = injectStrict(loggerToken);          // inferred: { log: (msg: string) => void }
   plugins = injectStrict(pluginToken);         // inferred: { name: string }[]
-  rootPlugins = injectStrict(rootPluginToken); // inferred: { name: string }[]
   config = injectStrict(configToken);          // inferred: { apiUrl: string }
   store = injectStrict(Store);                 // inferred: Store
 }

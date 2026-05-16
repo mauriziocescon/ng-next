@@ -532,8 +532,11 @@ export function refMany(_type?: any): any {
 //
 // Options:
 //   autoProvided: true — factory invoked once at root scope.
-//                        Only valid when factory is also provided.
+//                        Only valid for non-multi tokens when factory
+//                        is also provided.
 //   multi: true        — selects the InjectableMultiToken hierarchy.
+//                        Multi tokens are contributed through providers;
+//                        they cannot be auto-provided at root.
 // ────────────────────────────────────────────────────────────────
 
 declare const TOKEN_VALUE: unique symbol;
@@ -560,11 +563,11 @@ interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
   readonly [TOKEN_HAS_FACTORY]: true;
 }
 
-// Config: multi token with factory (autoProvided accepted).
+// Config: multi token with factory. Shorthand-eligible, but not auto-provided.
 interface InjectionTokenMultiWithFactory<T> {
   debugName?: string;
   factory: () => T;
-  autoProvided?: boolean;
+  autoProvided?: false;
   multi: true;
 }
 
