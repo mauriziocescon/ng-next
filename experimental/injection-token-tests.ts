@@ -33,6 +33,14 @@ const pluginToken = injectionToken({
   factory: () => ({ name: 'default' }),
 });
 
+// Auto-provided multi (root-scoped)
+const rootPluginToken = injectionToken({
+  debugName: 'rootPluginToken',
+  autoProvided: true,
+  multi: true,
+  factory: () => ({ name: 'root-default' }),
+});
+
 // Token without factory
 const configToken = injectionToken<{ apiUrl: string }>({
   debugName: 'configToken',
@@ -78,6 +86,8 @@ abstract class AC<T extends string> {}
     <hr />
     plugins: {{ plugins | json }}
     <hr />
+    root plugins: {{ rootPlugins | json }}
+    <hr />
     config: {{ config | json }}
     <hr />
     unknown: {{ unknown | json }}
@@ -95,6 +105,7 @@ export class Comp {
   counter = injectStrict(counterToken);
   logger = injectStrict(loggerToken);
   plugins = injectStrict(pluginToken);
+  rootPlugins = injectStrict(rootPluginToken);
   config = injectStrict(configToken);
 
   // c = injectStrict<string>(counterToken); // ✅ compile error

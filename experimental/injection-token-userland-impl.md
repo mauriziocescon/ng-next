@@ -389,7 +389,7 @@ const counterToken = injectionToken({
     const count = signal(0);
     return {
       value: count.asReadonly(),
-      increment: () => count.update(v => v + 1),
+      increment: () => count.update((v) => v + 1),
     };
   },
 });
@@ -406,6 +406,14 @@ const pluginToken = injectionToken({
   debugName: 'pluginToken',
   multi: true,
   factory: () => ({ name: 'default' }),
+});
+
+// Auto-provided multi (root-scoped)
+const rootPluginToken = injectionToken({
+  debugName: 'rootPluginToken',
+  autoProvided: true,
+  multi: true,
+  factory: () => ({ name: 'root-default' }),
 });
 
 // Token without factory
@@ -428,11 +436,12 @@ class Store {
   template: `...`,
 })
 export class MyComponent {
-  counter = injectStrict(counterToken);      // inferred: { value: Signal<number>; increment: () => void }
-  logger = injectStrict(loggerToken);        // inferred: { log: (msg: string) => void }
-  plugins = injectStrict(pluginToken);       // inferred: { name: string }[]
-  config = injectStrict(configToken);        // inferred: { apiUrl: string }
-  store = injectStrict(Store);               // inferred: Store
+  counter = injectStrict(counterToken);        // inferred: { value: Signal<number>; increment: () => void }
+  logger = injectStrict(loggerToken);          // inferred: { log: (msg: string) => void }
+  plugins = injectStrict(pluginToken);         // inferred: { name: string }[]
+  rootPlugins = injectStrict(rootPluginToken); // inferred: { name: string }[]
+  config = injectStrict(configToken);          // inferred: { apiUrl: string }
+  store = injectStrict(Store);                 // inferred: Store
 }
 ```
 
