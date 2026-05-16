@@ -956,15 +956,12 @@ const _rootTokenType: InjectableToken<{
 }> = rootToken;
 
 // Multi without factory — returns InjectableMultiToken<T>
-const multiNoFactoryToken = injectionToken<number>({
-  multi: true,
-});
+const multiNoFactoryToken = injectionToken.multi<number>();
 
 const _multiNoFactoryTokenType: InjectableMultiToken<number> = multiNoFactoryToken;
 
 // Multi with factory — returns InjectableMultiToken<T> (ProvidableMultiToken is assignable)
-const multiToken = injectionToken({
-  multi: true,
+const multiToken = injectionToken.multi({
   factory: () => Math.random(),
 });
 
@@ -977,21 +974,16 @@ const _explicitFalseNoFactoryType: InjectableToken<string> = explicitFalseNoFact
 const explicitFalseWithFactory = injectionToken({ autoProvided: false, factory: () => 99 });
 const _explicitFalseWithFactoryType: InjectableToken<number> = explicitFalseWithFactory;
 
-const explicitFalseMultiNoFactory = injectionToken<number>({ autoProvided: false, multi: true });
-const _explicitFalseMultiNoFactoryType: InjectableMultiToken<number> = explicitFalseMultiNoFactory;
+const namedMultiNoFactoryToken = injectionToken.multi<number>({
+  debugName: 'namedMultiNoFactoryToken',
+});
+const _namedMultiNoFactoryTokenType: InjectableMultiToken<number> = namedMultiNoFactoryToken;
 
-const explicitFalseMultiWithFactory = injectionToken({ autoProvided: false, multi: true, factory: () => 'x' });
-const _explicitFalseMultiWithFactoryType: InjectableMultiToken<string> = explicitFalseMultiWithFactory;
-
-// Explicit multi: false — accepted on all non-multi overloads
-const explicitMultiFalseNoFactory = injectionToken<string>({ multi: false });
-const _explicitMultiFalseNoFactoryType: InjectableToken<string> = explicitMultiFalseNoFactory;
-
-const explicitMultiFalseWithFactory = injectionToken({ multi: false, factory: () => 42 });
-const _explicitMultiFalseWithFactoryType: InjectableToken<number> = explicitMultiFalseWithFactory;
-
-const explicitMultiFalseAutoProvided = injectionToken({ multi: false, autoProvided: true, factory: () => 'y' });
-const _explicitMultiFalseAutoProvidedType: InjectableToken<string> = explicitMultiFalseAutoProvided;
+const namedMultiWithFactory = injectionToken.multi({
+  debugName: 'namedMultiWithFactory',
+  factory: () => 'x',
+});
+const _namedMultiWithFactoryType: InjectableMultiToken<string> = namedMultiWithFactory;
 
 // Single token with array value type
 const arrayValueToken = injectionToken<string[]>({ debugName: 'tags' });
@@ -1018,13 +1010,24 @@ const _emptyConfigTokenType: InjectableToken<string> = emptyConfigToken;
 // @ts-expect-error autoProvided: true requires a factory
 const _negAutoProvidedNoFactory = injectionToken<string>({ autoProvided: true });
 
-// Negative: autoProvided: true + multi: true is not supported, even with a factory
-// @ts-expect-error autoProvided: true is not supported for multi tokens
-const _negAutoProvidedMultiWithFactory = injectionToken({ autoProvided: true, multi: true, factory: () => 1 });
+// Negative: multi is no longer a config flag on injectionToken(...)
+// @ts-expect-error use injectionToken.multi(...) for multi tokens
+const _negOldMultiWithFactory = injectionToken({ multi: true, factory: () => 1 });
 
-// Negative: autoProvided: true + multi: true is not supported without a factory
-// @ts-expect-error autoProvided: true is not supported for multi tokens
-const _negAutoProvidedMultiNoFactory = injectionToken<number>({ autoProvided: true, multi: true });
+// @ts-expect-error use injectionToken.multi(...) for multi tokens
+const _negOldMultiNoFactory = injectionToken<number>({ multi: true });
+
+// @ts-expect-error multi: false is no longer accepted; omit the option
+const _negOldMultiFalseNoFactory = injectionToken<string>({ multi: false });
+
+// @ts-expect-error multi: false is no longer accepted; omit the option
+const _negOldMultiFalseWithFactory = injectionToken({ multi: false, factory: () => 42 });
+
+// @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
+const _negMultiAutoProvidedFalse = injectionToken.multi<number>({ autoProvided: false });
+
+// @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
+const _negMultiAutoProvidedTrue = injectionToken.multi({ autoProvided: true, factory: () => 1 });
 
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT

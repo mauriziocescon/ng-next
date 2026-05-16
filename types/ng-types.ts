@@ -530,13 +530,14 @@ export function refMany(_type?: any): any {
 //   ProvidableMultiToken<T> — has factory, provide(token) works.
 //   Tokens without factory require provide(token, factory).
 //
+// API shape:
+//   injectionToken(...)       — creates a single-value token.
+//   injectionToken.multi(...) — creates a multi-value token.
+//
 // Options:
-//   autoProvided: true — factory invoked once at root scope.
-//                        Only valid for non-multi tokens when factory
-//                        is also provided.
-//   multi: true        — selects the InjectableMultiToken hierarchy.
-//                        Multi tokens are contributed through providers;
-//                        they cannot be auto-provided at root.
+//   autoProvided: true — only available on single-value tokens with
+//                        a factory. The factory is invoked once at
+//                        root scope.
 // ────────────────────────────────────────────────────────────────
 
 declare const TOKEN_VALUE: unique symbol;
@@ -563,12 +564,10 @@ interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
   readonly [TOKEN_HAS_FACTORY]: true;
 }
 
-// Config: multi token with factory. Shorthand-eligible, but not auto-provided.
+// Config: multi token with factory. Shorthand-eligible.
 interface InjectionTokenMultiWithFactory<T> {
   debugName?: string;
   factory: () => T;
-  autoProvided?: false;
-  multi: true;
 }
 
 // Config: single token with factory (autoProvided accepted).
@@ -576,31 +575,36 @@ interface InjectionTokenWithFactory<T> {
   debugName?: string;
   factory: () => T;
   autoProvided?: boolean;
-  multi?: false;
 }
 
 // Config: multi token without factory (explicit type parameter required).
-interface InjectionTokenMulti {
+interface InjectionTokenMultiBase {
   debugName?: string;
-  autoProvided?: false;
-  multi: true;
 }
 
 // Config: single token without factory (explicit type parameter required).
 interface InjectionTokenBase {
   debugName?: string;
   autoProvided?: false;
-  multi?: false;
 }
 
-export function injectionToken<T>(config: InjectionTokenMultiWithFactory<T>): ProvidableMultiToken<T>;
 export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
-export function injectionToken<T>(config: InjectionTokenMulti): InjectableMultiToken<T>;
 export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
 }
+
+export namespace injectionToken {
+  export declare function multi<T>(
+    config: InjectionTokenMultiWithFactory<T>,
+  ): ProvidableMultiToken<T>;
+  export declare function multi<T>(
+    config?: InjectionTokenMultiBase,
+  ): InjectableMultiToken<T>;
+}
+
+(injectionToken as any).multi = (_config?: any) => ({} as any);
 
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT

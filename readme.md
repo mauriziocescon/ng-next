@@ -766,12 +766,11 @@ const rootToken = injectionToken({
 const otherCompToken = injectionToken<string>({ debugName: 'otherCompToken' });
 
 /**
- * multi with factory: provide(multiToken) shorthand uses
- * this factory — not a root default entry
+ * Multi token with factory: provide(multiToken) shorthand uses
+ * this factory — not a root default entry.
  */
-const multiToken = injectionToken({
+const multiToken = injectionToken.multi({
   debugName: 'multiToken',
-  multi: true,
   factory: () => Math.random(),
 });
 

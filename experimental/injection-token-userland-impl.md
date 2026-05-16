@@ -12,7 +12,7 @@
 | `injectionToken()` factory | Creates a standard `InjectionToken` instance via its public constructor |
 | `autoProvided` | For single tokens only, passes `{ providedIn: 'root', factory }` to the `InjectionToken` constructor |
 | `provide()` shorthand | Returns a standard `{ provide, useFactory, multi? }` object |
-| Multi at token level | Compile-time brand + `provide()` emits `multi: true` on the provider |
+| Multi at token level | `injectionToken.multi(...)` returns a branded multi token; `provide()` emits `multi: true` on the provider |
 | `debugName` convention | Passed as the `_desc` string to `InjectionToken` constructor |
 | `injectStrict()` for classes | Delegates to Angular's `inject()` with a class constructor token |
 
@@ -62,7 +62,7 @@ export interface InjectableToken<T> extends InjectionToken<T> {
  * Each `provide()` call contributes one `T` item.
  * `injectStrict(token)` returns `T[]`.
  *
- * @see {@link injectionToken} to create one.
+ * @see {@link injectionToken.multi} to create one.
  */
 export interface InjectableMultiToken<T> extends InjectionToken<T[]> {
   readonly [TOKEN_MULTI]: T;
@@ -84,7 +84,7 @@ export interface ProvidableToken<T> extends InjectableToken<T> {
  * A multi-value token created with a factory.
  * Eligible for the `provide(token)` shorthand (no explicit factory needed).
  *
- * @see {@link injectionToken} with `factory` and `multi: true`.
+ * @see {@link injectionToken.multi} with a `factory` option.
  */
 export interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
   readonly [TOKEN_HAS_FACTORY]: true;
@@ -96,48 +96,25 @@ export interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
 
 interface InjectionTokenBaseConfig {
   debugName?: string;
-  multi?: false;
-  autoProvided?: false;
-}
-
-interface InjectionTokenMultiConfig {
-  debugName?: string;
-  multi: true;
   autoProvided?: false;
 }
 
 interface InjectionTokenWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
-  multi?: false;
   autoProvided?: boolean;
+}
+
+interface InjectionTokenMultiConfig {
+  debugName?: string;
 }
 
 interface InjectionTokenMultiWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
-  multi: true;
-  autoProvided?: false;
 }
 
 // ─── injectionToken() overloads ─────────────────────────────────
-
-/**
- * Creates a multi-value DI token with a built-in factory.
- * Can be provided via the `provide(token)` shorthand — each call contributes one `T`.
- * Cannot be combined with `autoProvided: true`.
- *
- * @example
- * const PLUGINS = injectionToken({
- *   debugName: 'PLUGINS',
- *   multi: true,
- *   factory: () => defaultPlugin(),
- * });
- * // provide(PLUGINS)  ← contributes one entry using the built-in factory
- */
-export function injectionToken<T>(
-  config: InjectionTokenMultiWithFactoryConfig<T>,
-): ProvidableMultiToken<T>;
 
 /**
  * Creates a DI token with a built-in factory.
@@ -155,16 +132,6 @@ export function injectionToken<T>(
 export function injectionToken<T>(config: InjectionTokenWithFactoryConfig<T>): ProvidableToken<T>;
 
 /**
- * Creates a multi-value DI token without a factory.
- * Must be provided explicitly via `provide(token, factory)`.
- *
- * @example
- * const HOOKS = injectionToken<Hook>({ debugName: 'HOOKS', multi: true });
- * // provide(HOOKS, () => myHook)  ← contributes one Hook
- */
-export function injectionToken<T>(config: InjectionTokenMultiConfig): InjectableMultiToken<T>;
-
-/**
  * Creates a DI token without a factory.
  * Must be provided explicitly via `provide(token, factory)`.
  *
@@ -178,13 +145,47 @@ export function injectionToken<T>(config?: InjectionTokenBaseConfig): Injectable
 // ─── injectionToken() implementation ────────────────────────────
 
 export function injectionToken<T>(config?: any): any {
-  if (config?.autoProvided && config?.multi) {
-    throw new Error('autoProvided: true is not supported for multi tokens.');
-  }
+  return createInjectionToken(config, false);
+}
 
+export namespace injectionToken {
+  /**
+   * Creates a multi-value DI token with a built-in factory.
+   * Can be provided via the `provide(token)` shorthand — each call contributes one `T`.
+   *
+   * @example
+   * const PLUGINS = injectionToken.multi({
+   *   debugName: 'PLUGINS',
+   *   factory: () => defaultPlugin(),
+   * });
+   * // provide(PLUGINS)  ← contributes one entry using the built-in factory
+   */
+  export function multi<T>(
+    config: InjectionTokenMultiWithFactoryConfig<T>,
+  ): ProvidableMultiToken<T>;
+
+  /**
+   * Creates a multi-value DI token without a factory.
+   * Must be provided explicitly via `provide(token, factory)`.
+   *
+   * @example
+   * const HOOKS = injectionToken.multi<Hook>({ debugName: 'HOOKS' });
+   * // provide(HOOKS, () => myHook)  ← contributes one Hook
+   */
+  export function multi<T>(config?: InjectionTokenMultiConfig): InjectableMultiToken<T>;
+  export function multi<T>(config?: any): any {
+    return createInjectionToken(config, true);
+  }
+}
+
+function createInjectionToken<T>(config: any, multi: boolean): any {
   const desc = config?.debugName ?? '';
   const factory = config?.factory;
   const autoProvided = config?.autoProvided ?? false;
+
+  if (multi && autoProvided) {
+    throw new Error('autoProvided is not supported for multi tokens.');
+  }
 
   // Create a standard InjectionToken.
   // For multi tokens, the runtime type is T[] but the token is keyed by instance identity.
@@ -211,7 +212,7 @@ export function injectionToken<T>(config?: any): any {
   }
 
   // Mark multi tokens (runtime flag for provide() to read)
-  if (config?.multi) {
+  if (multi) {
     (token as any).__multi = true;
   }
 
@@ -343,7 +344,7 @@ When `autoProvided: true` is used on a single-value token, we pass `{ providedIn
 
 ### Multi at runtime
 
-Multi is a **provider-level** flag in Angular's DI. The token itself doesn't carry multi semantics at runtime — it's the `{ multi: true }` on each provider entry that triggers the array-collection behavior in `R3Injector.processProvider`. Our `provide()` function reads the `__multi` flag from the token and emits `multi: true` automatically.
+Multi is a **provider-level** flag in Angular's DI. The proposed API makes the token's cardinality explicit with `injectionToken.multi(...)`; `provide()` reads the token's multi metadata and emits `{ multi: true }` on each provider entry automatically.
 
 ### Branded types — zero runtime cost
 
@@ -371,7 +372,7 @@ The userland version exports `injectStrict()` as a stricter typed wrapper. Devel
 These are non-standard properties on the token instance. They're prefixed with `__` to avoid collisions. A more robust approach would use a `WeakMap` side-table:
 
 ```ts
-const tokenMeta = new WeakMap<InjectionToken<any>, { factory?: () => any; multi?: boolean }>();
+const tokenMeta = new WeakMap<InjectionToken<any>, { factory?: () => any; isMulti?: boolean }>();
 ```
 
 ### 4. No private API dependency
@@ -407,9 +408,8 @@ const loggerToken = injectionToken({
 });
 
 // Multi token
-const pluginToken = injectionToken({
+const pluginToken = injectionToken.multi({
   debugName: 'pluginToken',
-  multi: true,
   factory: () => ({ name: 'default' }),
 });
 

@@ -27,9 +27,8 @@ const loggerToken = injectionToken({
 });
 
 // Multi token
-const pluginToken = injectionToken({
+const pluginToken = injectionToken.multi({
   debugName: 'pluginToken',
-  multi: true,
   factory: () => ({ name: 'default' }),
 });
 
