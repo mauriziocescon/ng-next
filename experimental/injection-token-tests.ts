@@ -62,11 +62,11 @@ const y = injectStrict(AC);
   providers: [
     provide(counterToken),
     provide(pluginToken),
-    provide({ token: pluginToken, factory: () => ({ name: 'custom' }) }),
-    provide({ token: configToken, factory: () => ({ apiUrl: '/api' }) }),
+    provide(pluginToken, () => ({ name: 'custom' })),
+    provide(configToken, () => ({ apiUrl: '/api' })),
     // provide(configToken),  // ✅ compile error: configToken has no TOKEN_HAS_FACTORY
-    provide({ token: unknownTypeToken, factory: () => '' }),
-    provide({ token: Store, factory: () => new Store('provide') }),
+    provide(unknownTypeToken, () => ''),
+    provide(Store, () => new Store('provide')),
   ],
   template: `
     counter: {{ counter.value() }}

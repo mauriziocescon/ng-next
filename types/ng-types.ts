@@ -528,7 +528,7 @@ export function refMany(_type?: any): any {
 // Factory & shorthand:
 //   ProvidableToken<T>      — has factory, provide(token) works.
 //   ProvidableMultiToken<T> — has factory, provide(token) works.
-//   Tokens without factory require provide({ token, factory }).
+//   Tokens without factory require provide(token, factory).
 //
 // Options:
 //   autoProvided: true — factory invoked once at root scope.
@@ -626,7 +626,7 @@ export function inject(_token: any): any {
 // 12. PROVIDE
 //
 // Shorthand — provide(token): uses the token's default factory.
-// Object    — provide({ token, factory }): overrides factory.
+// Explicit  — provide(tokenOrClass, factory): overrides or supplies factory.
 //
 // For multi tokens, factory returns a single item (T),
 // not the full array — each provide() call adds one entry.
@@ -647,8 +647,11 @@ type ExplicitProviderToken<T> =
   | AbstractCtor<T>;
 
 export function provide<T>(token: DefaultProviderToken<T>): Provider;
-export function provide<T>(config: { token: ExplicitProviderToken<T>; factory: () => T }): Provider;
+export function provide<T>(
+  token: ExplicitProviderToken<T>,
+  factory: () => T,
+): Provider;
 
-export function provide(_config: any): any {
+export function provide(_token: any, _factory?: any): any {
   return {} as any;
 }
