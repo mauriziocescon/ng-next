@@ -7,7 +7,7 @@ import {
   inject as injectStrict,
 } from '../types/ng-types';
 
-/// Token with factory (component-scoped)
+// Token with factory (component-scoped)
 const counterToken = injectionToken({
   debugName: 'counterToken',
   factory: () => {
@@ -40,6 +40,7 @@ const configToken = injectionToken<{ apiUrl: string }>({
 
 // Unknown token without factory
 const unknownTypeToken = injectionToken<unknown>();
+const MODAL_DATA = new InjectionToken<unknown>('');
 
 class Store {
   x: string;
@@ -48,13 +49,13 @@ class Store {
   }
 }
 
-const MODAL_DATA = new InjectionToken<unknown>('');
+class Store2 extends Store {}
 
 class C<T extends number> {}
 abstract class AC<T extends string> {}
 
-const x = injectStrict(C);
-const y = injectStrict(AC);
+// const x = injectStrict(C); // ✅
+// const y = injectStrict(AC); // ✅
 
 @Component({
   selector: `Comp`,
@@ -67,6 +68,7 @@ const y = injectStrict(AC);
     // provide(configToken),  // ✅ compile error: configToken has no TOKEN_HAS_FACTORY
     provide(unknownTypeToken, () => ''),
     provide(Store, () => new Store('provide')),
+    provide(Store2, () => injectStrict(Store)),
   ],
   template: `
     counter: {{ counter.value() }}
@@ -81,6 +83,8 @@ const y = injectStrict(AC);
     unknown: {{ unknown | json }}
     <hr />
     Store: {{ store | json }}
+    <hr />
+    Store2: {{ store2 | json }}
   `,
 })
 export class Comp {
@@ -93,16 +97,16 @@ export class Comp {
   plugins = injectStrict(pluginToken);
   config = injectStrict(configToken);
 
-  // c = newInject<string>(counterToken); // ✅ compile error
+  // c = injectStrict<string>(counterToken); // ✅ compile error
   unknown = <string>injectStrict(unknownTypeToken); // ✅ unknonw
+  // a = inject<string>(MODAL_DATA); // ❌ new InjectionToken
+  // b = injectStrict<string>(MODAL_DATA); // ❌ new InjectionToken
+  // c = <string>injectStrict(MODAL_DATA); // ❌ new InjectionToken
 
   store = injectStrict(Store);
+  store2 = injectStrict(Store2);
 
-  // a = inject<string>(MODAL_DATA);
-  // b = newInject<string>(MODAL_DATA);
-  // c = <string>newInject(MODAL_DATA);
-
-  App = injectStrict(App);
+  app = injectStrict(App);
 
   method() {
     const el = this.elRef.nativeElement; // ✅ HTMLButtonElement
@@ -117,4 +121,6 @@ export class Comp {
     <Comp />
   `,
 })
-export class App {}
+export class App {
+  test = signal('');
+}
