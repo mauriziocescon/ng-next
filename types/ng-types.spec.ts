@@ -300,7 +300,7 @@ const Counter = component({
   setup: () => tmpl,
   providers: ({ c }) => {
     const _cInput: InputSignal<number> = c;
-    return [provide({ token: Store, factory: () => new Store() })];
+    return [provide(Store, () => new Store())];
   },
 });
 
@@ -1010,9 +1010,9 @@ const _arrayValueTokenType: InjectableToken<string[]> = arrayValueToken;
 const arrayValueWithFactory = injectionToken({ factory: () => ['a', 'b', 'c'] });
 const _arrayValueWithFactoryType: InjectableToken<string[]> = arrayValueWithFactory;
 
-// provide({ token, factory }) for array-valued non-multi token: factory returns the full array
-const _provideArrayValue = provide({ token: arrayValueToken, factory: () => ['x', 'y'] });
-const _provideArrayValueWithFactory = provide({ token: arrayValueWithFactory, factory: () => ['z'] });
+// provide(token, factory) for array-valued non-multi token: factory returns the full array
+const _provideArrayValue = provide(arrayValueToken, () => ['x', 'y']);
+const _provideArrayValueWithFactory = provide(arrayValueWithFactory, () => ['z']);
 
 // Multi token is NOT assignable to InjectableToken — the two hierarchies are
 // structurally incompatible.
@@ -1086,54 +1086,54 @@ provide(noFactoryToken);
 // @ts-expect-error provide(token) shorthand requires token with factory
 provide(multiNoFactoryToken);
 
-// Object form — works with both InjectableToken (base) and ProvidableToken
-const _providersObjectForm = [
-  provide({ token: noFactoryToken, factory: () => 'explicit' }),
-  provide({ token: multiNoFactoryToken, factory: () => 42 }),
-  provide({ token: withFactoryToken, factory: () => ({ value: signal(0).asReadonly(), increase: () => {} }) }),
-  provide({ token: Store, factory: () => new Store() }),
+// Explicit factory form — works with both InjectableToken (base) and ProvidableToken
+const _providersExplicitFactory = [
+  provide(noFactoryToken, () => 'explicit'),
+  provide(multiNoFactoryToken, () => 42),
+  provide(withFactoryToken, () => ({ value: signal(0).asReadonly(), increase: () => {} })),
+  provide(Store, () => new Store()),
 ];
 
 // Multi provide factory returns a single item, not an array.
 // @ts-expect-error factory for multi token must return number, not number[]
-provide({ token: multiToken, factory: () => [1, 2, 3] });
+provide(multiToken, () => [1, 2, 3]);
 
 // Array-valued non-multi token: factory returns the full array (not unwrapped)
 // @ts-expect-error factory for non-multi string[] token must return string[], not string
-provide({ token: arrayValueToken, factory: () => 'single' });
+provide(arrayValueToken, () => 'single');
 
 // Class token: factory must return an instance of the class
 // @ts-expect-error factory returns boolean, not Store
-provide({ token: Store, factory: () => true });
+provide(Store, () => true);
 
 // @ts-expect-error factory returns string, not Store
-provide({ token: Store, factory: () => 'not a store' });
+provide(Store, () => 'not a store');
 
 // Abstract class token: factory must return an instance of the abstract class
-const _provideAbstract = provide({ token: AbstractService, factory: () => new ConcreteService() });
+const _provideAbstract = provide(AbstractService, () => new ConcreteService());
 
 // @ts-expect-error factory returns string, not AbstractService
-provide({ token: AbstractService, factory: () => 'wrong' });
+provide(AbstractService, () => 'wrong');
 
 // Shorthand with auto-provided multi token (ProvidableMultiToken)
 const _provideRootMultiShorthand = provide(rootMultiToken);
 
-// Object form with auto-provided token (override factory at component level)
-const _provideRootTokenOverride = provide({ token: rootToken, factory: () => ({ value: signal(0).asReadonly(), decrease: () => {} }) });
+// Explicit factory form with auto-provided token (override factory at component level)
+const _provideRootTokenOverride = provide(rootToken, () => ({ value: signal(0).asReadonly(), decrease: () => {} }));
 
-// Object form with ProvidableMultiToken (override factory)
-const _provideMultiTokenOverride = provide({ token: multiToken, factory: () => 99 });
+// Explicit factory form with ProvidableMultiToken (override factory)
+const _provideMultiTokenOverride = provide(multiToken, () => 99);
 
 // Negative: wrong factory return type for single token
 // @ts-expect-error factory returns number, not string
-provide({ token: noFactoryToken, factory: () => 123 });
+provide(noFactoryToken, () => 123);
 
 // Negative: wrong factory return type for multi token with factory
 // @ts-expect-error factory returns string, not number
-provide({ token: multiToken, factory: () => 'wrong' });
+provide(multiToken, () => 'wrong');
 
 // Negative: provide(Class) shorthand — classes are not ProvidableToken
-// @ts-expect-error provide(Class) shorthand is not allowed, must use object form
+// @ts-expect-error provide(Class) shorthand is not allowed, must use explicit factory form
 provide(Store);
 
 // ────────────────────────────────────────────────────────────────

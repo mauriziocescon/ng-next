@@ -48,7 +48,7 @@ declare const TOKEN_HAS_FACTORY: unique symbol;
  * A nominally-typed single-value DI token.
  *
  * Use `injectStrict(token)` to retrieve the value — returns `T`.
- * Use `provide({ token, factory })` to register a provider.
+ * Use `provide(token, factory)` to register a provider.
  *
  * @see {@link injectionToken} to create one.
  */
@@ -155,22 +155,22 @@ export function injectionToken<T>(config: InjectionTokenWithFactoryConfig<T>): P
 
 /**
  * Creates a multi-value DI token without a factory.
- * Must be provided explicitly via `provide({ token, factory })`.
+ * Must be provided explicitly via `provide(token, factory)`.
  *
  * @example
  * const HOOKS = injectionToken<Hook>({ debugName: 'HOOKS', multi: true });
- * // provide({ token: HOOKS, factory: () => myHook })  ← contributes one Hook
+ * // provide(HOOKS, () => myHook)  ← contributes one Hook
  */
 export function injectionToken<T>(config: InjectionTokenMultiConfig): InjectableMultiToken<T>;
 
 /**
  * Creates a DI token without a factory.
- * Must be provided explicitly via `provide({ token, factory })`.
+ * Must be provided explicitly via `provide(token, factory)`.
  *
  * @example
  * const CONFIG = injectionToken<AppConfig>({ debugName: 'CONFIG' });
  * // provide(CONFIG)         ← compile error
- * // provide({ token: CONFIG, factory: () => ({...}) })  ← OK
+ * // provide(CONFIG, () => ({...}))  ← OK
  */
 export function injectionToken<T>(config?: InjectionTokenBaseConfig): InjectableToken<T>;
 
@@ -245,31 +245,27 @@ export function provide<T>(token: DefaultProviderToken<T>): Provider;
  * For multi tokens, the factory returns one `T` item.
  *
  * @example
- * provide({ token: configToken, factory: () => ({ apiUrl: '/api' }) })
- * provide({ token: pluginToken, factory: () => ({ name: 'custom' }) })
- * provide({ token: Store, factory: () => new Store() })
+ * provide(configToken, () => ({ apiUrl: '/api' }))
+ * provide(pluginToken, () => ({ name: 'custom' }))
+ * provide(Store, () => new Store())
  */
-export function provide<T>(config: { token: ExplicitProviderToken<T>; factory: () => T }): Provider;
+export function provide<T>(
+  token: ExplicitProviderToken<T>,
+  factory: () => T,
+): Provider;
 
 // ─── provide() implementation ───────────────────────────────────
 
-export function provide(tokenOrConfig: any): Provider {
-  // Object form: { token, factory }
-  if (tokenOrConfig && typeof tokenOrConfig === 'object' && 'token' in tokenOrConfig) {
-    const { token, factory } = tokenOrConfig;
-    const multi = !!(token as any).__multi;
-    return { provide: token, useFactory: factory, multi };
-  }
+export function provide(token: any, explicitFactory?: () => unknown): Provider {
+  const factory = explicitFactory ?? (token as any).__factory;
 
-  // Shorthand form: provide(token) — token must have __factory
-  const token = tokenOrConfig;
-  const factory = (token as any).__factory;
   if (!factory) {
     throw new Error(
       `provide() shorthand requires a token created with a factory. ` +
-        `Use provide({ token, factory }) instead.`,
+        `Use provide(token, factory) instead.`,
     );
   }
+
   const multi = !!(token as any).__multi;
   return { provide: token, useFactory: factory, multi };
 }
@@ -338,7 +334,7 @@ When `autoProvided: true`, we pass `{ providedIn: 'root', factory }` to the `Inj
 
 ### `provide()` → standard `Provider`
 
-`provide(token)` returns `{ provide: token, useFactory: factory, multi: true/false }`. This is a standard `FactoryProvider` that Angular's `processProvider` handles natively. No patching needed. The object form `provide({ token: Store, factory: () => new Store() })` works identically for class tokens.
+`provide(token)` returns `{ provide: token, useFactory: factory, multi: true/false }`. This is a standard `FactoryProvider` that Angular's `processProvider` handles natively. No patching needed. The explicit factory form `provide(Store, () => new Store())` works for class tokens.
 
 ### Multi at runtime
 
@@ -424,9 +420,9 @@ class Store {
   providers: [
     provide(counterToken),                                    // uses built-in factory
     provide(pluginToken),                                     // multi: contributes one entry
-    provide({ token: pluginToken, factory: () => ({ name: 'custom' }) }), // multi: another entry
-    provide({ token: configToken, factory: () => ({ apiUrl: '/api' }) }), // explicit factory
-    provide({ token: Store, factory: () => new Store() }),    // class token with factory
+    provide(pluginToken, () => ({ name: 'custom' })),         // multi: another entry
+    provide(configToken, () => ({ apiUrl: '/api' })),         // explicit factory
+    provide(Store, () => new Store()),                        // class token with factory
     // provide(configToken),  // ← compile error: configToken has no TOKEN_HAS_FACTORY
   ],
   template: `...`,

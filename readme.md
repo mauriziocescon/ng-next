@@ -368,7 +368,7 @@ export const Counter = component({
    * Only inputs are provided
    */
   providers: ({ c }) => [
-    provide({ token: CounterStore, factory: () => new CounterStore(c) }),
+    provide(CounterStore, () => new CounterStore(c)),
   ],
 });
 ```
@@ -759,7 +759,7 @@ const rootToken = injectionToken({
 });
 
 /**
- * Token without factory: must use provide({ token, factory })
+ * Token without factory: must use provide(token, factory)
  * with an explicit factory. provide(otherCompToken) shorthand
  * is a compile-time error.
  */
@@ -807,14 +807,14 @@ export const Counter = component({
     // multi with factory: shorthand works
     provide(multiToken),
     provide(multiToken),
-    provide({ token: multiToken, factory: () => 10 }),
-    provide({ token: multiToken, factory: () => initialValue() }),
+    provide(multiToken, () => 10),
+    provide(multiToken, () => initialValue()),
 
-    // token without factory: must use object form
-    provide({ token: otherCompToken, factory: () => '' }),
+    // token without factory: must use explicit factory form
+    provide(otherCompToken, () => ''),
     
     // class
-    provide({ token: Store, factory: () => new Store() }),
+    provide(Store, () => new Store()),
   ],
 });
 ```
