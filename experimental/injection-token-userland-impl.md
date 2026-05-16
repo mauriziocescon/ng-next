@@ -14,7 +14,7 @@
 | `provide()` shorthand | Returns a standard `{ provide, useFactory, multi? }` object |
 | Multi at token level | Compile-time brand + `provide()` emits `multi: true` on the provider |
 | `debugName` convention | Passed as the `_desc` string to `InjectionToken` constructor |
-| `injectToken()` for classes | Delegates to Angular's `inject()` with a class constructor token |
+| `injectStrict()` for classes | Delegates to Angular's `inject()` with a class constructor token |
 
 ### What requires Angular-side changes
 
@@ -47,7 +47,7 @@ declare const TOKEN_HAS_FACTORY: unique symbol;
 /**
  * A nominally-typed single-value DI token.
  *
- * Use `injectToken(token)` to retrieve the value — returns `T`.
+ * Use `injectStrict(token)` to retrieve the value — returns `T`.
  * Use `provide({ token, factory })` to register a provider.
  *
  * @see {@link injectionToken} to create one.
@@ -60,7 +60,7 @@ export interface InjectableToken<T> extends InjectionToken<T> {
  * A nominally-typed multi-value DI token.
  *
  * Each `provide()` call contributes one `T` item.
- * `injectToken(token)` returns `T[]`.
+ * `injectStrict(token)` returns `T[]`.
  *
  * @see {@link injectionToken} to create one.
  */
@@ -274,7 +274,7 @@ export function provide(tokenOrConfig: any): Provider {
   return { provide: token, useFactory: factory, multi };
 }
 
-// ─── Typed inject() wrapper ─────────────────────────────────────
+// ─── Strict inject() wrapper ────────────────────────────────────
 
 /**
  * Injects a multi-value token. Returns `T[]`.
@@ -283,16 +283,16 @@ export function provide(tokenOrConfig: any): Provider {
  * @returns The collected array of all provided values.
  *
  * @example
- * const plugins = injectToken(pluginToken); // Plugin[]
+ * const plugins = injectStrict(pluginToken); // Plugin[]
  */
-export function injectToken<T>(token: InjectableMultiToken<T>): T[];
-/** @see {@link injectToken} */
-export function injectToken<T>(
+export function injectStrict<T>(token: InjectableMultiToken<T>): T[];
+/** @see {@link injectStrict} */
+export function injectStrict<T>(
   token: InjectableMultiToken<T>,
   options: InjectOptions & { optional?: false },
 ): T[];
-/** @see {@link injectToken} — returns `null` if not provided and `optional: true`. */
-export function injectToken<T>(
+/** @see {@link injectStrict} — returns `null` if not provided and `optional: true`. */
+export function injectStrict<T>(
   token: InjectableMultiToken<T>,
   options: InjectOptions,
 ): T[] | null;
@@ -304,22 +304,22 @@ export function injectToken<T>(
  * @returns The provided value or class instance.
  *
  * @example
- * const counter = injectToken(counterToken); // { value: Signal<number>; ... }
- * const store = injectToken(Store);          // Store
+ * const counter = injectStrict(counterToken); // { value: Signal<number>; ... }
+ * const store = injectStrict(Store);          // Store
  */
-export function injectToken<T>(token: InjectableToken<T> | (abstract new (...args: any[]) => T)): T;
-/** @see {@link injectToken} */
-export function injectToken<T>(
+export function injectStrict<T>(token: InjectableToken<T> | (abstract new (...args: any[]) => T)): T;
+/** @see {@link injectStrict} */
+export function injectStrict<T>(
   token: InjectableToken<T> | (abstract new (...args: any[]) => T),
   options: InjectOptions & { optional?: false },
 ): T;
-/** @see {@link injectToken} — returns `null` if not provided and `optional: true`. */
-export function injectToken<T>(
+/** @see {@link injectStrict} — returns `null` if not provided and `optional: true`. */
+export function injectStrict<T>(
   token: InjectableToken<T> | (abstract new (...args: any[]) => T),
   options: InjectOptions,
 ): T | null;
 
-export function injectToken(token: any, options?: InjectOptions): any {
+export function injectStrict(token: any, options?: InjectOptions): any {
   return ngInject(token, options as any);
 }
 ```
@@ -357,11 +357,11 @@ The `TOKEN_VALUE`, `TOKEN_MULTI`, and `TOKEN_HAS_FACTORY` symbols are `declare`-
 
 ### 1. `inject()` generic override cannot be blocked
 
-Angular's `inject<T>(token: ProviderToken<T>): T` allows `inject<string>(numberToken)`. This is a TypeScript-level issue that can only be fixed by Angular removing the explicit generic parameter from `inject()`. The userland `injectToken()` wrapper avoids this by not exposing a generic parameter that can be overridden.
+Angular's `inject<T>(token: ProviderToken<T>): T` allows `inject<string>(numberToken)`. This is a TypeScript-level issue that can only be fixed by Angular removing the explicit generic parameter from `inject()`. The userland `injectStrict()` wrapper avoids this by not exposing a generic parameter that can be overridden.
 
-### 2. `injectToken()` vs `inject()`
+### 2. `injectStrict()` vs `inject()`
 
-The userland version exports `injectToken()` as a typed wrapper. Developers must use it instead of Angular's `inject()` to get the multi-token `T[]` return type. This is the main ergonomic cost.
+The userland version exports `injectStrict()` as a stricter typed wrapper. Developers must use it instead of Angular's `inject()` to get the generic-override protection. This is the main ergonomic cost.
 
 **Alternative**: if the branded tokens extend `InjectionToken<T[]>` for multi (which they do — `InjectableMultiToken<T> extends InjectionToken<T[]>`), then Angular's native `inject()` already returns `T[]`. The wrapper is only needed to *prevent* the generic override footgun.
 
@@ -383,7 +383,7 @@ The implementation uses only the public `InjectionToken` constructor and Angular
 
 ```ts
 import { Component } from '@angular/core';
-import { injectionToken, provide, injectToken } from './injection-token';
+import { injectionToken, provide, injectStrict } from './injection-token';
 import { signal } from '@angular/core';
 
 // Token with factory (component-scoped)
@@ -432,11 +432,11 @@ class Store {
   template: `...`,
 })
 export class MyComponent {
-  counter = injectToken(counterToken);       // inferred: { value: Signal<number>; increment: () => void }
-  logger = injectToken(loggerToken);         // inferred: { log: (msg: string) => void }
-  plugins = injectToken(pluginToken);        // inferred: { name: string }[]
-  config = injectToken(configToken);         // inferred: { apiUrl: string }
-  store = injectToken(Store);                // inferred: Store
+  counter = injectStrict(counterToken);      // inferred: { value: Signal<number>; increment: () => void }
+  logger = injectStrict(loggerToken);        // inferred: { log: (msg: string) => void }
+  plugins = injectStrict(pluginToken);       // inferred: { name: string }[]
+  config = injectStrict(configToken);        // inferred: { apiUrl: string }
+  store = injectStrict(Store);               // inferred: Store
 }
 ```
 
@@ -471,7 +471,7 @@ This creates a **breaking change** in Angular's public API surface. Here's the a
 
 **Feasibility:** Requires Angular team buy-in. The overloads are additive (existing `ProviderToken<T>` still works), but removing the generic override is breaking.
 
-### Option B: Userland `injectToken()` wrapper (this draft)
+### Option B: Userland `injectStrict()` wrapper (this draft)
 
 **Pros:**
 - Zero breaking changes
@@ -479,7 +479,7 @@ This creates a **breaking change** in Angular's public API surface. Here's the a
 - Opt-in per-project
 
 **Cons:**
-- Two inject functions in the codebase (`inject` for classes, `injectToken` for branded tokens)
+- Two inject functions in the codebase (`inject` and `injectStrict`)
 - Developers must remember which to use
 - IDE auto-imports may suggest the wrong one
 
@@ -503,7 +503,7 @@ declare module '@angular/core' {
 
 ### Recommendation
 
-**For userland delivery: Option B** (`injectToken()` wrapper). It's the only approach that works today without Angular changes.
+**For userland delivery: Option B** (`injectStrict()` wrapper). It's the only approach that works today without Angular changes.
 
 **For eventual Angular integration: Option A**, but with a migration path:
 1. Add the new overloads to `inject()` (non-breaking — they're more specific)

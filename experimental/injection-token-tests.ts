@@ -4,7 +4,7 @@ import { JsonPipe } from '@angular/common';
 import {
   provide,
   injectionToken,
-  inject as typedInject,
+  inject as injectStrict,
 } from '../types/ng-types';
 
 /// Token with factory (component-scoped)
@@ -53,8 +53,8 @@ const MODAL_DATA = new InjectionToken<unknown>('');
 class C<T extends number> {}
 abstract class AC<T extends string> {}
 
-const x = typedInject(C);
-const y = typedInject(AC);
+const x = injectStrict(C);
+const y = injectStrict(AC);
 
 @Component({
   selector: `Comp`,
@@ -86,23 +86,23 @@ const y = typedInject(AC);
 export class Comp {
   Date = Date;
 
-  elRef = typedInject(ElementRef<HTMLButtonElement>);
+  elRef = injectStrict(ElementRef<HTMLButtonElement>);
 
-  counter = typedInject(counterToken);
-  logger = typedInject(loggerToken);
-  plugins = typedInject(pluginToken);
-  config = typedInject(configToken);
+  counter = injectStrict(counterToken);
+  logger = injectStrict(loggerToken);
+  plugins = injectStrict(pluginToken);
+  config = injectStrict(configToken);
 
   // c = newInject<string>(counterToken); // ✅ compile error
-  unknown = <string>typedInject(unknownTypeToken); // ✅ unknonw
+  unknown = <string>injectStrict(unknownTypeToken); // ✅ unknonw
 
-  store = typedInject(Store);
+  store = injectStrict(Store);
 
   // a = inject<string>(MODAL_DATA);
   // b = newInject<string>(MODAL_DATA);
   // c = <string>newInject(MODAL_DATA);
 
-  App = typedInject(App);
+  App = injectStrict(App);
 
   method() {
     const el = this.elRef.nativeElement; // ✅ HTMLButtonElement
