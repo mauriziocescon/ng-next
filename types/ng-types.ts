@@ -522,7 +522,7 @@ export function refMany(_type?: any): any {
 // 10. INJECTION TOKEN
 //
 // Token contract:
-//   InjectionTokenContract<Injects, Provides>
+//   DiTokenContract<Injects, Provides>
 //     - Injects  is the value returned by inject(token)
 //     - Provides is the value contributed by provide(token, factory)
 //
@@ -544,60 +544,60 @@ declare const TOKEN_PROVIDES: unique symbol;
 declare const TOKEN_MULTI: unique symbol;
 declare const TOKEN_WITH_FACTORY: unique symbol;
 
-interface InjectionTokenContract<Injects, Provides> {
+interface DiTokenContract<Injects, Provides> {
   readonly [TOKEN_INJECTS]: Injects;
   readonly [TOKEN_PROVIDES]: Provides;
 }
 
 // Base token — inject() returns T, provide factory returns T.
-export interface InjectableToken<T> extends InjectionTokenContract<T, T> {}
+export interface DiToken<T> extends DiTokenContract<T, T> {}
 
 // Multi token — inject() returns T[], provide factory returns one T item.
-export interface InjectableMultiToken<T>
-  extends InjectionTokenContract<T[], T> {
+export interface DiMultiToken<T>
+  extends DiTokenContract<T[], T> {
   readonly [TOKEN_MULTI]: T;
 }
 
 // Internal — NOT exported. Single token with factory (shorthand-eligible).
-interface ProvidableToken<T> extends InjectableToken<T> {
+interface DiTokenWithFactory<T> extends DiToken<T> {
   readonly [TOKEN_WITH_FACTORY]: true;
 }
 
 // Internal — NOT exported. Multi token with factory (shorthand-eligible).
-interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
+interface DiMultiTokenWithFactory<T> extends DiMultiToken<T> {
   readonly [TOKEN_WITH_FACTORY]: true;
 }
 
 // Config: multi token with factory. Shorthand-eligible.
-interface InjectionTokenMultiWithFactory<T> {
+interface DiMultiTokenWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
 }
 
 // Config: single token with factory (autoProvided accepted).
-interface InjectionTokenWithFactory<T> {
+interface DiTokenWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
   autoProvided?: boolean;
 }
 
 // Config: multi token without factory (explicit type parameter required).
-interface InjectionTokenMultiBase {
+interface DiMultiTokenBaseConfig {
   debugName?: string;
 }
 
 // Config: single token without factory (explicit type parameter required).
-interface InjectionTokenBase {
+interface DiTokenBaseConfig {
   debugName?: string;
   autoProvided?: false;
 }
 
 export function injectionToken<T>(
-  config: InjectionTokenWithFactory<T>,
-): ProvidableToken<T>;
+  config: DiTokenWithFactoryConfig<T>,
+): DiTokenWithFactory<T>;
 export function injectionToken<T>(
-  config?: InjectionTokenBase,
-): InjectableToken<T>;
+  config?: DiTokenBaseConfig,
+): DiToken<T>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
@@ -605,11 +605,11 @@ export function injectionToken(_config?: any): any {
 
 export namespace injectionToken {
   export declare function multi<T>(
-    config: InjectionTokenMultiWithFactory<T>,
-  ): ProvidableMultiToken<T>;
+    config: DiMultiTokenWithFactoryConfig<T>,
+  ): DiMultiTokenWithFactory<T>;
   export declare function multi<T>(
-    config?: InjectionTokenMultiBase,
-  ): InjectableMultiToken<T>;
+    config?: DiMultiTokenBaseConfig,
+  ): DiMultiToken<T>;
 }
 
 (injectionToken as any).multi = (_config?: any) => ({} as any);
@@ -628,7 +628,7 @@ type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 type StrictInjectionToken =
   | ComponentInstance<any, any, any>
   | DirectiveInstance<any, any, any>
-  | InjectionTokenContract<any, any>
+  | DiTokenContract<any, any>
   | AbstractCtor<any>;
 
 type InjectResult<T> =
@@ -636,7 +636,7 @@ type InjectResult<T> =
     ? E
     : T extends DirectiveInstance<any, any, infer E>
       ? E
-      : T extends InjectionTokenContract<infer V, any>
+      : T extends DiTokenContract<infer V, any>
         ? V
         : T extends AbstractCtor<infer V>
           ? V
@@ -667,25 +667,25 @@ export function inject(_token: any): any {
 // For multi tokens, factory returns a single item (T),
 // not the full array — each provide() call adds one entry.
 //
-// InjectableMultiToken<T>, InjectableToken<T>, and class tokens all
+// DiMultiToken<T>, DiToken<T>, and class tokens all
 // contribute a single T value when provided explicitly.
 // ────────────────────────────────────────────────────────────────
 
 type ProvideValue<T> =
-  T extends InjectionTokenContract<any, infer V>
+  T extends DiTokenContract<any, infer V>
     ? V
     : T extends AbstractCtor<infer V>
       ? V
       : never;
 
-type TokenWithFactory = InjectionTokenContract<any, any> & {
+type DiTokenWithAnyFactory = DiTokenContract<any, any> & {
   readonly [TOKEN_WITH_FACTORY]: true;
 };
 
-type DefaultProviderToken = TokenWithFactory;
+type DefaultProviderToken = DiTokenWithAnyFactory;
 
 type ExplicitProviderToken =
-  | InjectionTokenContract<any, any>
+  | DiTokenContract<any, any>
   | AbstractCtor<any>;
 
 export function provide<const T extends DefaultProviderToken>(

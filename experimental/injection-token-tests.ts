@@ -8,8 +8,8 @@ import {
 import { JsonPipe } from '@angular/common';
 
 import {
-  type InjectableMultiToken,
-  type InjectableToken,
+  type DiMultiToken,
+  type DiToken,
   provide,
   injectionToken,
   inject as injectStrict,
@@ -27,7 +27,7 @@ const counterToken = injectionToken({
   },
 });
 
-const _counterTokenType: InjectableToken<{
+const _counterTokenType: DiToken<{
   value: Signal<number>;
   increment: () => void;
 }> = counterToken;
@@ -39,7 +39,7 @@ const loggerToken = injectionToken({
   factory: () => ({ log: (msg: string) => msg }),
 });
 
-const _loggerTokenType: InjectableToken<{ log: (msg: string) => string }> =
+const _loggerTokenType: DiToken<{ log: (msg: string) => string }> =
   loggerToken;
 
 // Multi token
@@ -48,14 +48,14 @@ const pluginToken = injectionToken.multi({
   factory: () => ({ name: 'default' }),
 });
 
-const _pluginTokenType: InjectableMultiToken<{ name: string }> = pluginToken;
+const _pluginTokenType: DiMultiToken<{ name: string }> = pluginToken;
 
 // Token without factory
 const configToken = injectionToken<{ apiUrl: string }>({
   debugName: 'configToken',
 });
 
-const _configTokenType: InjectableToken<{ apiUrl: string }> = configToken;
+const _configTokenType: DiToken<{ apiUrl: string }> = configToken;
 
 // Unknown token without factory
 const unknownTypeToken = injectionToken<unknown>();

@@ -16,8 +16,8 @@ import {
   type ComponentBindingValue,
   type DerivationInstance,
   type DirectiveInstance,
-  type InjectableToken,
-  type InjectableMultiToken,
+  type DiToken,
+  type DiMultiToken,
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
@@ -917,12 +917,12 @@ const Parent = component({
 // 10. INJECTION TOKEN
 // ────────────────────────────────────────────────────────────────
 
-// Token without factory — returns InjectableToken
+// Token without factory — returns DiToken
 const noFactoryToken = injectionToken<string>();
 
-const _noFactoryTokenType: InjectableToken<string> = noFactoryToken;
+const _noFactoryTokenType: DiToken<string> = noFactoryToken;
 
-// Token with factory — returns InjectableToken (ProvidableToken is assignable)
+// Token with factory — returns DiToken (DiTokenWithFactory is assignable)
 const withFactoryToken = injectionToken({
   factory: () => {
     const counter = signal(0);
@@ -933,7 +933,7 @@ const withFactoryToken = injectionToken({
   },
 });
 
-const _withFactoryTokenType: InjectableToken<{
+const _withFactoryTokenType: DiToken<{
   value: Signal<number>;
   increase: () => void;
 }> = withFactoryToken;
@@ -950,58 +950,58 @@ const rootToken = injectionToken({
   },
 });
 
-const _rootTokenType: InjectableToken<{
+const _rootTokenType: DiToken<{
   value: Signal<number>;
   decrease: () => void;
 }> = rootToken;
 
-// Multi without factory — returns InjectableMultiToken<T>
+// Multi without factory — returns DiMultiToken<T>
 const multiNoFactoryToken = injectionToken.multi<number>();
 
-const _multiNoFactoryTokenType: InjectableMultiToken<number> =
+const _multiNoFactoryTokenType: DiMultiToken<number> =
   multiNoFactoryToken;
 
-// Multi with factory — returns InjectableMultiToken<T> (ProvidableMultiToken is assignable)
+// Multi with factory — returns DiMultiToken<T> (DiMultiTokenWithFactory is assignable)
 const multiToken = injectionToken.multi({
   factory: () => Math.random(),
 });
 
-const _multiTokenType: InjectableMultiToken<number> = multiToken;
+const _multiTokenType: DiMultiToken<number> = multiToken;
 
 // Explicit autoProvided: false — accepted on all non-auto-provided overloads
 const explicitFalseNoFactory = injectionToken<string>({ autoProvided: false });
-const _explicitFalseNoFactoryType: InjectableToken<string> =
+const _explicitFalseNoFactoryType: DiToken<string> =
   explicitFalseNoFactory;
 
 const explicitFalseWithFactory = injectionToken({
   autoProvided: false,
   factory: () => 99,
 });
-const _explicitFalseWithFactoryType: InjectableToken<number> =
+const _explicitFalseWithFactoryType: DiToken<number> =
   explicitFalseWithFactory;
 
 const namedMultiNoFactoryToken = injectionToken.multi<number>({
   debugName: 'namedMultiNoFactoryToken',
 });
-const _namedMultiNoFactoryTokenType: InjectableMultiToken<number> =
+const _namedMultiNoFactoryTokenType: DiMultiToken<number> =
   namedMultiNoFactoryToken;
 
 const namedMultiWithFactory = injectionToken.multi({
   debugName: 'namedMultiWithFactory',
   factory: () => 'x',
 });
-const _namedMultiWithFactoryType: InjectableMultiToken<string> =
+const _namedMultiWithFactoryType: DiMultiToken<string> =
   namedMultiWithFactory;
 
 // Single token with array value type
 const arrayValueToken = injectionToken<string[]>({ debugName: 'tags' });
-const _arrayValueTokenType: InjectableToken<string[]> = arrayValueToken;
+const _arrayValueTokenType: DiToken<string[]> = arrayValueToken;
 
 // Single token with array value type and factory
 const arrayValueWithFactory = injectionToken({
   factory: () => ['a', 'b', 'c'],
 });
-const _arrayValueWithFactoryType: InjectableToken<string[]> =
+const _arrayValueWithFactoryType: DiToken<string[]> =
   arrayValueWithFactory;
 
 // provide(token, factory) for array-valued non-multi token: factory returns
@@ -1009,15 +1009,15 @@ const _arrayValueWithFactoryType: InjectableToken<string[]> =
 const _provideArrayValue = provide(arrayValueToken, () => ['x', 'y']);
 const _provideArrayValueWithFactory = provide(arrayValueWithFactory, () => ['z']);
 
-// Multi token is NOT assignable to InjectableToken — the two hierarchies are
+// Multi token is NOT assignable to DiToken — the two hierarchies are
 // structurally incompatible.
-// @ts-expect-error InjectableMultiToken is not assignable to InjectableToken
+// @ts-expect-error DiMultiToken is not assignable to DiToken
 const _multiNotAssignableToNonMulti: typeof arrayValueToken =
   multiNoFactoryToken;
 
 // Empty object config — equivalent to no-arg call
 const emptyConfigToken = injectionToken<string>({});
-const _emptyConfigTokenType: InjectableToken<string> = emptyConfigToken;
+const _emptyConfigTokenType: DiToken<string> = emptyConfigToken;
 
 // Unknown token preserves unknown as the inject result while allowing explicit casts.
 const unknownTypeToken = injectionToken<unknown>();
@@ -1073,7 +1073,7 @@ const _injectedNoExpose: void = inject(NoExpose);
 // inject(Directive) → expose type
 const _injectedTooltip: { toggle: () => void } = inject(tooltip);
 
-// inject(InjectableToken) → token type
+// inject(DiToken) → token type
 const _injectedWithFactory: { value: Signal<number>; increase: () => void } =
   inject(withFactoryToken);
 const _injectedNoFactory: string = inject(noFactoryToken);
@@ -1123,7 +1123,7 @@ const _injectedGenericAbstract: GenericAbstract<string> =
 // 12. PROVIDE
 // ────────────────────────────────────────────────────────────────
 
-// provide shorthand — only works with InjectableToken (with factory)
+// provide shorthand — only works with DiToken (with factory)
 const _providersShorthand = [
   provide(withFactoryToken),
   provide(multiToken),
@@ -1137,7 +1137,7 @@ provide(noFactoryToken);
 // @ts-expect-error provide(token) shorthand requires token with factory
 provide(multiNoFactoryToken);
 
-// Explicit factory form — works with both InjectableToken (base) and ProvidableToken
+// Explicit factory form — works with both DiToken (base) and DiTokenWithFactory
 const _providersExplicitFactory = [
   provide(noFactoryToken, () => 'explicit'),
   provide(multiNoFactoryToken, () => 42),
@@ -1175,7 +1175,7 @@ const _provideRootTokenOverride = provide(rootToken, () => ({
   decrease: () => {},
 }));
 
-// Explicit factory form with ProvidableMultiToken (override factory)
+// Explicit factory form with DiMultiTokenWithFactory (override factory)
 const _provideMultiTokenOverride = provide(multiToken, () => 99);
 
 // Negative: wrong factory return type for single token
@@ -1186,7 +1186,7 @@ provide(noFactoryToken, () => 123);
 // @ts-expect-error factory returns string, not number
 provide(multiToken, () => 'wrong');
 
-// Negative: provide(Class) shorthand — classes are not ProvidableToken
+// Negative: provide(Class) shorthand — classes are not DiTokenWithFactory
 // @ts-expect-error class shorthand is not allowed; use explicit factory form
 provide(Store);
 

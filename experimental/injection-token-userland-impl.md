@@ -55,7 +55,7 @@ declare const TOKEN_WITH_FACTORY: unique symbol;
  * Single token: injects T,   provides T.
  * Multi token:  injects T[], provides T.
  */
-interface InjectionTokenContract<Injects, Provides> {
+interface DiTokenContract<Injects, Provides> {
   readonly [TOKEN_INJECTS]: Injects;
   readonly [TOKEN_PROVIDES]: Provides;
 }
@@ -70,9 +70,9 @@ interface InjectionTokenContract<Injects, Provides> {
  *
  * @see {@link injectionToken} to create one.
  */
-export interface InjectableToken<T>
+export interface DiToken<T>
   extends InjectionToken<T>,
-    InjectionTokenContract<T, T> {}
+    DiTokenContract<T, T> {}
 
 /**
  * A nominally-typed multi-value DI token.
@@ -82,9 +82,9 @@ export interface InjectableToken<T>
  *
  * @see {@link injectionToken.multi} to create one.
  */
-export interface InjectableMultiToken<T>
+export interface DiMultiToken<T>
   extends InjectionToken<T[]>,
-    InjectionTokenContract<T[], T> {
+    DiTokenContract<T[], T> {
   readonly [TOKEN_MULTI]: T;
 }
 
@@ -96,7 +96,7 @@ export interface InjectableMultiToken<T>
  *
  * @see {@link injectionToken} with a `factory` option.
  */
-interface ProvidableToken<T> extends InjectableToken<T> {
+interface DiTokenWithFactory<T> extends DiToken<T> {
   readonly [TOKEN_WITH_FACTORY]: true;
   /** @internal stored factory for provide() shorthand */
   readonly __factory: () => T;
@@ -108,7 +108,7 @@ interface ProvidableToken<T> extends InjectableToken<T> {
  *
  * @see {@link injectionToken.multi} with a `factory` option.
  */
-interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
+interface DiMultiTokenWithFactory<T> extends DiMultiToken<T> {
   readonly [TOKEN_WITH_FACTORY]: true;
   /** @internal stored factory for provide() shorthand */
   readonly __factory: () => T;
@@ -116,22 +116,22 @@ interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
 
 // ─── Config interfaces ──────────────────────────────────────────
 
-interface InjectionTokenBaseConfig {
+interface DiTokenBaseConfig {
   debugName?: string;
   autoProvided?: false;
 }
 
-interface InjectionTokenWithFactoryConfig<T> {
+interface DiTokenWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
   autoProvided?: boolean;
 }
 
-interface InjectionTokenMultiConfig {
+interface DiMultiTokenBaseConfig {
   debugName?: string;
 }
 
-interface InjectionTokenMultiWithFactoryConfig<T> {
+interface DiMultiTokenWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
 }
@@ -151,7 +151,7 @@ interface InjectionTokenMultiWithFactoryConfig<T> {
  * });
  * // provide(COUNTER)  ← uses the built-in factory
  */
-export function injectionToken<T>(config: InjectionTokenWithFactoryConfig<T>): ProvidableToken<T>;
+export function injectionToken<T>(config: DiTokenWithFactoryConfig<T>): DiTokenWithFactory<T>;
 
 /**
  * Creates a DI token without a factory.
@@ -162,7 +162,7 @@ export function injectionToken<T>(config: InjectionTokenWithFactoryConfig<T>): P
  * // provide(CONFIG)         ← compile error
  * // provide(CONFIG, () => ({...}))  ← OK
  */
-export function injectionToken<T>(config?: InjectionTokenBaseConfig): InjectableToken<T>;
+export function injectionToken<T>(config?: DiTokenBaseConfig): DiToken<T>;
 
 // ─── injectionToken() implementation ────────────────────────────
 
@@ -183,8 +183,8 @@ export namespace injectionToken {
    * // provide(PLUGINS)  ← contributes one entry using the built-in factory
    */
   export function multi<T>(
-    config: InjectionTokenMultiWithFactoryConfig<T>,
-  ): ProvidableMultiToken<T>;
+    config: DiMultiTokenWithFactoryConfig<T>,
+  ): DiMultiTokenWithFactory<T>;
 
   /**
    * Creates a multi-value DI token without a factory.
@@ -194,7 +194,7 @@ export namespace injectionToken {
    * const HOOKS = injectionToken.multi<Hook>({ debugName: 'HOOKS' });
    * // provide(HOOKS, () => myHook)  ← contributes one Hook
    */
-  export function multi<T>(config?: InjectionTokenMultiConfig): InjectableMultiToken<T>;
+  export function multi<T>(config?: DiMultiTokenBaseConfig): DiMultiToken<T>;
   export function multi<T>(config?: any): any {
     return createInjectionToken(config, true);
   }
@@ -246,27 +246,27 @@ function createInjectionToken<T>(config: any, multi: boolean): any {
 type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 
 type StrictInjectionToken =
-  | InjectionTokenContract<any, any>
+  | DiTokenContract<any, any>
   | AbstractCtor<any>;
 
 type InjectResult<T> =
-  T extends InjectionTokenContract<infer V, any> ? V :
+  T extends DiTokenContract<infer V, any> ? V :
   T extends AbstractCtor<infer V> ? V :
   never;
 
 type ProvideValue<T> =
-  T extends InjectionTokenContract<any, infer V> ? V :
+  T extends DiTokenContract<any, infer V> ? V :
   T extends AbstractCtor<infer V> ? V :
   never;
 
-type TokenWithFactory = InjectionTokenContract<any, any> & {
+type DiTokenWithAnyFactory = DiTokenContract<any, any> & {
   readonly [TOKEN_WITH_FACTORY]: true;
 };
 
-type DefaultProviderToken = TokenWithFactory;
+type DefaultProviderToken = DiTokenWithAnyFactory;
 
 type ExplicitProviderToken =
-  | InjectionTokenContract<any, any>
+  | DiTokenContract<any, any>
   | AbstractCtor<any>;
 
 // ─── provide() overloads ────────────────────────────────────────
@@ -368,8 +368,8 @@ Multi is a **provider-level** flag in Angular's DI. The proposed API makes the t
 ### Token contract and branded types — zero runtime cost
 
 The `TOKEN_INJECTS`, `TOKEN_PROVIDES`, `TOKEN_MULTI`, and `TOKEN_WITH_FACTORY` symbols are `declare`-only — they never exist at runtime. TypeScript uses them for structural incompatibility (nominal typing) and token-derived API results. This means:
-- `InjectableToken<number>` is not assignable to `InjectableToken<string>`
-- `InjectableMultiToken<T>` is not assignable to `InjectableToken<T[]>` (they're separate hierarchies)
+- `DiToken<number>` is not assignable to `DiToken<string>`
+- `DiMultiToken<T>` is not assignable to `DiToken<T[]>` (they're separate hierarchies)
 - `injectStrict(token)` returns the contract's `Injects` type
 - `provide(token, factory)` requires the factory to return the contract's `Provides` type
 - `provide(token)` only compiles if the token has `TOKEN_WITH_FACTORY`
@@ -570,4 +570,4 @@ declare module '@angular/core' {
 2. Deprecate the explicit generic parameter `inject<T>()` via a lint rule
 3. Eventually remove it in a major version
 
-The key insight is that `InjectableMultiToken<T>` carries two type channels: it extends `InjectionToken<T[]>` for Angular compatibility, while the internal token contract records that `provide()` contributes one `T` item. The token-derived overloads are primarily about **preventing misuse** (generic override, mixing multi/non-multi, wrong provider factory values), not about enabling new runtime behavior.
+The key insight is that `DiMultiToken<T>` carries two type channels: it extends `InjectionToken<T[]>` for Angular compatibility, while the internal token contract records that `provide()` contributes one `T` item. The token-derived overloads are primarily about **preventing misuse** (generic override, mixing multi/non-multi, wrong provider factory values), not about enabling new runtime behavior.
