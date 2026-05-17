@@ -13,6 +13,7 @@
 | `autoProvided` | For single tokens only, passes `{ providedIn: 'root', factory }` to the `InjectionToken` constructor |
 | `provide()` shorthand | Returns a standard `{ provide, useFactory, multi? }` object |
 | Multi at token level | `injectionToken.multi(...)` returns a branded multi token; `provide()` emits `multi: true` on the provider |
+| Token-derived `inject()`/`provide()` typing | A token contract stores both the injected value type and the provider contribution type |
 | `debugName` convention | Passed as the `_desc` string to `InjectionToken` constructor |
 | `injectStrict()` for classes | Delegates to Angular's `inject()` with a class constructor token |
 
@@ -38,9 +39,26 @@ import {
 
 // ─── Branded symbols (compile-time only) ────────────────────────
 
-declare const TOKEN_VALUE: unique symbol;
+declare const TOKEN_INJECTS: unique symbol;
+declare const TOKEN_PROVIDES: unique symbol;
 declare const TOKEN_MULTI: unique symbol;
-declare const TOKEN_HAS_FACTORY: unique symbol;
+declare const TOKEN_WITH_FACTORY: unique symbol;
+
+// ─── Token contract ─────────────────────────────────────────────
+
+/**
+ * Internal compile-time contract for token-derived APIs.
+ *
+ * `Injects` is the value returned by `injectStrict(token)`.
+ * `Provides` is the value contributed by `provide(token, factory)`.
+ *
+ * Single token: injects T,   provides T.
+ * Multi token:  injects T[], provides T.
+ */
+interface InjectionTokenContract<Injects, Provides> {
+  readonly [TOKEN_INJECTS]: Injects;
+  readonly [TOKEN_PROVIDES]: Provides;
+}
 
 // ─── Public token interfaces ────────────────────────────────────
 
@@ -52,9 +70,9 @@ declare const TOKEN_HAS_FACTORY: unique symbol;
  *
  * @see {@link injectionToken} to create one.
  */
-export interface InjectableToken<T> extends InjectionToken<T> {
-  readonly [TOKEN_VALUE]: T;
-}
+export interface InjectableToken<T>
+  extends InjectionToken<T>,
+    InjectionTokenContract<T, T> {}
 
 /**
  * A nominally-typed multi-value DI token.
@@ -64,9 +82,13 @@ export interface InjectableToken<T> extends InjectionToken<T> {
  *
  * @see {@link injectionToken.multi} to create one.
  */
-export interface InjectableMultiToken<T> extends InjectionToken<T[]> {
+export interface InjectableMultiToken<T>
+  extends InjectionToken<T[]>,
+    InjectionTokenContract<T[], T> {
   readonly [TOKEN_MULTI]: T;
 }
+
+// ─── Internal shorthand-eligible token interfaces ───────────────
 
 /**
  * A single-value token created with a factory.
@@ -74,8 +96,8 @@ export interface InjectableMultiToken<T> extends InjectionToken<T[]> {
  *
  * @see {@link injectionToken} with a `factory` option.
  */
-export interface ProvidableToken<T> extends InjectableToken<T> {
-  readonly [TOKEN_HAS_FACTORY]: true;
+interface ProvidableToken<T> extends InjectableToken<T> {
+  readonly [TOKEN_WITH_FACTORY]: true;
   /** @internal stored factory for provide() shorthand */
   readonly __factory: () => T;
 }
@@ -86,8 +108,8 @@ export interface ProvidableToken<T> extends InjectableToken<T> {
  *
  * @see {@link injectionToken.multi} with a `factory` option.
  */
-export interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
-  readonly [TOKEN_HAS_FACTORY]: true;
+interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
+  readonly [TOKEN_WITH_FACTORY]: true;
   /** @internal stored factory for provide() shorthand */
   readonly __factory: () => T;
 }
@@ -224,29 +246,27 @@ function createInjectionToken<T>(config: any, multi: boolean): any {
 type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 
 type StrictInjectionToken =
-  | InjectableMultiToken<any>
-  | InjectableToken<any>
+  | InjectionTokenContract<any, any>
   | AbstractCtor<any>;
 
 type InjectResult<T> =
-  T extends InjectableMultiToken<infer V> ? V[] :
-  T extends InjectableToken<infer V> ? V :
+  T extends InjectionTokenContract<infer V, any> ? V :
   T extends AbstractCtor<infer V> ? V :
   never;
 
 type ProvideValue<T> =
-  T extends InjectableMultiToken<infer V> ? V :
-  T extends InjectableToken<infer V> ? V :
+  T extends InjectionTokenContract<any, infer V> ? V :
   T extends AbstractCtor<infer V> ? V :
   never;
 
-type DefaultProviderToken =
-  | ProvidableMultiToken<any>
-  | ProvidableToken<any>;
+type TokenWithFactory = InjectionTokenContract<any, any> & {
+  readonly [TOKEN_WITH_FACTORY]: true;
+};
+
+type DefaultProviderToken = TokenWithFactory;
 
 type ExplicitProviderToken =
-  | InjectableMultiToken<any>
-  | InjectableToken<any>
+  | InjectionTokenContract<any, any>
   | AbstractCtor<any>;
 
 // ─── provide() overloads ────────────────────────────────────────
@@ -345,12 +365,14 @@ When `autoProvided: true` is used on a single-value token, we pass `{ providedIn
 
 Multi is a **provider-level** flag in Angular's DI. The proposed API makes the token's cardinality explicit with `injectionToken.multi(...)`; `provide()` reads the token's multi metadata and emits `{ multi: true }` on each provider entry automatically.
 
-### Branded types — zero runtime cost
+### Token contract and branded types — zero runtime cost
 
-The `TOKEN_VALUE`, `TOKEN_MULTI`, and `TOKEN_HAS_FACTORY` symbols are `declare`-only — they never exist at runtime. TypeScript uses them for structural incompatibility (nominal typing). This means:
+The `TOKEN_INJECTS`, `TOKEN_PROVIDES`, `TOKEN_MULTI`, and `TOKEN_WITH_FACTORY` symbols are `declare`-only — they never exist at runtime. TypeScript uses them for structural incompatibility (nominal typing) and token-derived API results. This means:
 - `InjectableToken<number>` is not assignable to `InjectableToken<string>`
 - `InjectableMultiToken<T>` is not assignable to `InjectableToken<T[]>` (they're separate hierarchies)
-- `provide(token)` only compiles if the token has `TOKEN_HAS_FACTORY`
+- `injectStrict(token)` returns the contract's `Injects` type
+- `provide(token, factory)` requires the factory to return the contract's `Provides` type
+- `provide(token)` only compiles if the token has `TOKEN_WITH_FACTORY`
 
 ---
 
@@ -364,7 +386,7 @@ Angular's `inject<T>(token: ProviderToken<T>): T` allows `inject<string>(numberT
 
 The userland version exports `injectStrict()` as a stricter typed wrapper. Developers must use it instead of Angular's `inject()` to get the generic-override protection. This is the main ergonomic cost. `injectStrict<string>(token)` is rejected because `string` is not a valid token type.
 
-**Alternative**: if the branded tokens extend `InjectionToken<T[]>` for multi (which they do — `InjectableMultiToken<T> extends InjectionToken<T[]>`), then Angular's native `inject()` already returns `T[]`. The wrapper is only needed to *prevent* the generic override footgun.
+**Alternative**: because the branded multi tokens also extend `InjectionToken<T[]>`, Angular's native `inject()` already returns `T[]` for them. The wrapper is still needed to *prevent* the generic override footgun and to make `provide()` factories use the token contract's `Provides` type.
 
 ### 3. `__factory` and `__multi` are runtime properties
 
@@ -419,6 +441,14 @@ const pluginToken = injectionToken.multi({
 // Token without factory
 const configToken = injectionToken<{ apiUrl: string }>({ debugName: 'configToken' });
 
+// Single token with array value type
+const tagsToken = injectionToken<string[]>({ debugName: 'tags' });
+
+// Multi token without factory
+const orderedPluginToken = injectionToken.multi<{ order: number }>({
+  debugName: 'orderedPluginToken',
+});
+
 // Plain class
 class Store {
   items = signal<string[]>([]);
@@ -430,8 +460,10 @@ class Store {
     provide(pluginToken),                                     // multi: contributes one entry
     provide(pluginToken, () => ({ name: 'custom' })),         // multi: another entry
     provide(configToken, () => ({ apiUrl: '/api' })),         // explicit factory
+    provide(tagsToken, () => ['a', 'b']),                     // array-valued single token
+    provide(orderedPluginToken, () => ({ order: 1 })),        // multi token without factory
     provide(Store, () => new Store()),                        // class token with factory
-    // provide(configToken),  // ← compile error: configToken has no TOKEN_HAS_FACTORY
+    // provide(configToken),  // ← compile error: configToken has no TOKEN_WITH_FACTORY
   ],
   template: `...`,
 })
@@ -440,6 +472,9 @@ export class MyComponent {
   logger = injectStrict(loggerToken);          // inferred: { log: (msg: string) => void }
   plugins = injectStrict(pluginToken);         // inferred: { name: string }[]
   config = injectStrict(configToken);          // inferred: { apiUrl: string }
+  maybeConfig = injectStrict(configToken, { optional: true }); // inferred: { apiUrl: string } | null
+  tags = injectStrict(tagsToken);              // inferred: string[]
+  ordered = injectStrict(orderedPluginToken);  // inferred: { order: number }[]
   store = injectStrict(Store);                 // inferred: Store
 }
 ```
@@ -535,4 +570,4 @@ declare module '@angular/core' {
 2. Deprecate the explicit generic parameter `inject<T>()` via a lint rule
 3. Eventually remove it in a major version
 
-The key insight is that `InjectableMultiToken<T> extends InjectionToken<T[]>`, so passing a multi token to today's `inject()` already returns `T[]` correctly. The token-derived overloads are primarily about **preventing misuse** (generic override, mixing multi/non-multi), not about enabling new runtime behavior.
+The key insight is that `InjectableMultiToken<T>` carries two type channels: it extends `InjectionToken<T[]>` for Angular compatibility, while the internal token contract records that `provide()` contributes one `T` item. The token-derived overloads are primarily about **preventing misuse** (generic override, mixing multi/non-multi, wrong provider factory values), not about enabling new runtime behavior.

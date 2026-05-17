@@ -958,7 +958,8 @@ const _rootTokenType: InjectableToken<{
 // Multi without factory — returns InjectableMultiToken<T>
 const multiNoFactoryToken = injectionToken.multi<number>();
 
-const _multiNoFactoryTokenType: InjectableMultiToken<number> = multiNoFactoryToken;
+const _multiNoFactoryTokenType: InjectableMultiToken<number> =
+  multiNoFactoryToken;
 
 // Multi with factory — returns InjectableMultiToken<T> (ProvidableMultiToken is assignable)
 const multiToken = injectionToken.multi({
@@ -969,38 +970,50 @@ const _multiTokenType: InjectableMultiToken<number> = multiToken;
 
 // Explicit autoProvided: false — accepted on all non-auto-provided overloads
 const explicitFalseNoFactory = injectionToken<string>({ autoProvided: false });
-const _explicitFalseNoFactoryType: InjectableToken<string> = explicitFalseNoFactory;
+const _explicitFalseNoFactoryType: InjectableToken<string> =
+  explicitFalseNoFactory;
 
-const explicitFalseWithFactory = injectionToken({ autoProvided: false, factory: () => 99 });
-const _explicitFalseWithFactoryType: InjectableToken<number> = explicitFalseWithFactory;
+const explicitFalseWithFactory = injectionToken({
+  autoProvided: false,
+  factory: () => 99,
+});
+const _explicitFalseWithFactoryType: InjectableToken<number> =
+  explicitFalseWithFactory;
 
 const namedMultiNoFactoryToken = injectionToken.multi<number>({
   debugName: 'namedMultiNoFactoryToken',
 });
-const _namedMultiNoFactoryTokenType: InjectableMultiToken<number> = namedMultiNoFactoryToken;
+const _namedMultiNoFactoryTokenType: InjectableMultiToken<number> =
+  namedMultiNoFactoryToken;
 
 const namedMultiWithFactory = injectionToken.multi({
   debugName: 'namedMultiWithFactory',
   factory: () => 'x',
 });
-const _namedMultiWithFactoryType: InjectableMultiToken<string> = namedMultiWithFactory;
+const _namedMultiWithFactoryType: InjectableMultiToken<string> =
+  namedMultiWithFactory;
 
 // Single token with array value type
 const arrayValueToken = injectionToken<string[]>({ debugName: 'tags' });
 const _arrayValueTokenType: InjectableToken<string[]> = arrayValueToken;
 
 // Single token with array value type and factory
-const arrayValueWithFactory = injectionToken({ factory: () => ['a', 'b', 'c'] });
-const _arrayValueWithFactoryType: InjectableToken<string[]> = arrayValueWithFactory;
+const arrayValueWithFactory = injectionToken({
+  factory: () => ['a', 'b', 'c'],
+});
+const _arrayValueWithFactoryType: InjectableToken<string[]> =
+  arrayValueWithFactory;
 
-// provide(token, factory) for array-valued non-multi token: factory returns the full array
+// provide(token, factory) for array-valued non-multi token: factory returns
+// the full array.
 const _provideArrayValue = provide(arrayValueToken, () => ['x', 'y']);
 const _provideArrayValueWithFactory = provide(arrayValueWithFactory, () => ['z']);
 
 // Multi token is NOT assignable to InjectableToken — the two hierarchies are
 // structurally incompatible.
 // @ts-expect-error InjectableMultiToken is not assignable to InjectableToken
-const _multiNotAssignableToNonMulti: typeof arrayValueToken = multiNoFactoryToken;
+const _multiNotAssignableToNonMulti: typeof arrayValueToken =
+  multiNoFactoryToken;
 
 // Empty object config — equivalent to no-arg call
 const emptyConfigToken = injectionToken<string>({});
@@ -1013,11 +1026,16 @@ const _unknownCast = <string>inject(unknownTypeToken);
 
 // Negative: autoProvided: true without factory — compile-time error
 // @ts-expect-error autoProvided: true requires a factory
-const _negAutoProvidedNoFactory = injectionToken<string>({ autoProvided: true });
+const _negAutoProvidedNoFactory = injectionToken<string>({
+  autoProvided: true,
+});
 
 // Negative: multi is no longer a config flag on injectionToken(...)
-// @ts-expect-error use injectionToken.multi(...) for multi tokens
-const _negOldMultiWithFactory = injectionToken({ multi: true, factory: () => 1 });
+const _negOldMultiWithFactory = injectionToken({
+  // @ts-expect-error use injectionToken.multi(...) for multi tokens
+  multi: true,
+  factory: () => 1,
+});
 
 // @ts-expect-error use injectionToken.multi(...) for multi tokens
 const _negOldMultiNoFactory = injectionToken<number>({ multi: true });
@@ -1025,14 +1043,22 @@ const _negOldMultiNoFactory = injectionToken<number>({ multi: true });
 // @ts-expect-error multi: false is no longer accepted; omit the option
 const _negOldMultiFalseNoFactory = injectionToken<string>({ multi: false });
 
-// @ts-expect-error multi: false is no longer accepted; omit the option
-const _negOldMultiFalseWithFactory = injectionToken({ multi: false, factory: () => 42 });
+const _negOldMultiFalseWithFactory = injectionToken({
+  // @ts-expect-error multi: false is no longer accepted; omit the option
+  multi: false,
+  factory: () => 42,
+});
 
-// @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
-const _negMultiAutoProvidedFalse = injectionToken.multi<number>({ autoProvided: false });
+const _negMultiAutoProvidedFalse = injectionToken.multi<number>({
+  // @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
+  autoProvided: false,
+});
 
-// @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
-const _negMultiAutoProvidedTrue = injectionToken.multi({ autoProvided: true, factory: () => 1 });
+const _negMultiAutoProvidedTrue = injectionToken.multi({
+  // @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
+  autoProvided: true,
+  factory: () => 1,
+});
 
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
@@ -1071,18 +1097,27 @@ inject<string>(multiToken);
 const _injectedStore: Store = inject(Store);
 
 // inject(abstract class) → class instance
-abstract class AbstractService { abstract run(): void; }
-class ConcreteService extends AbstractService { run() {} }
+abstract class AbstractService {
+  abstract run(): void;
+}
+class ConcreteService extends AbstractService {
+  run() {}
+}
 
 const _injectedAbstract: AbstractService = inject(AbstractService);
 
 // inject(generic class) → class instance
-class GenericClass<T extends number> { value!: T; }
+class GenericClass<T extends number> {
+  value!: T;
+}
 const _injectedGeneric: GenericClass<number> = inject(GenericClass);
 
 // inject(generic abstract class) → class instance
-abstract class GenericAbstract<T extends string> { abstract get(): T; }
-const _injectedGenericAbstract: GenericAbstract<string> = inject(GenericAbstract);
+abstract class GenericAbstract<T extends string> {
+  abstract get(): T;
+}
+const _injectedGenericAbstract: GenericAbstract<string> =
+  inject(GenericAbstract);
 
 // ────────────────────────────────────────────────────────────────
 // 12. PROVIDE
@@ -1106,7 +1141,10 @@ provide(multiNoFactoryToken);
 const _providersExplicitFactory = [
   provide(noFactoryToken, () => 'explicit'),
   provide(multiNoFactoryToken, () => 42),
-  provide(withFactoryToken, () => ({ value: signal(0).asReadonly(), increase: () => {} })),
+  provide(withFactoryToken, () => ({
+    value: signal(0).asReadonly(),
+    increase: () => {},
+  })),
   provide(Store, () => new Store()),
 ];
 
@@ -1114,8 +1152,8 @@ const _providersExplicitFactory = [
 // @ts-expect-error factory for multi token must return number, not number[]
 provide(multiToken, () => [1, 2, 3]);
 
-// Array-valued non-multi token: factory returns the full array (not unwrapped)
-// @ts-expect-error factory for non-multi string[] token must return string[], not string
+// Array-valued non-multi token: factory returns the full array.
+// @ts-expect-error factory for non-multi string[] token must return string[]
 provide(arrayValueToken, () => 'single');
 
 // Class token: factory must return an instance of the class
@@ -1131,8 +1169,11 @@ const _provideAbstract = provide(AbstractService, () => new ConcreteService());
 // @ts-expect-error factory returns string, not AbstractService
 provide(AbstractService, () => 'wrong');
 
-// Explicit factory form with auto-provided token (override factory at component level)
-const _provideRootTokenOverride = provide(rootToken, () => ({ value: signal(0).asReadonly(), decrease: () => {} }));
+// Explicit factory form with auto-provided token.
+const _provideRootTokenOverride = provide(rootToken, () => ({
+  value: signal(0).asReadonly(),
+  decrease: () => {},
+}));
 
 // Explicit factory form with ProvidableMultiToken (override factory)
 const _provideMultiTokenOverride = provide(multiToken, () => 99);
@@ -1146,7 +1187,7 @@ provide(noFactoryToken, () => 123);
 provide(multiToken, () => 'wrong');
 
 // Negative: provide(Class) shorthand — classes are not ProvidableToken
-// @ts-expect-error provide(Class) shorthand is not allowed, must use explicit factory form
+// @ts-expect-error class shorthand is not allowed; use explicit factory form
 provide(Store);
 
 // ────────────────────────────────────────────────────────────────

@@ -592,8 +592,12 @@ interface InjectionTokenBase {
   autoProvided?: false;
 }
 
-export function injectionToken<T>(config: InjectionTokenWithFactory<T>): ProvidableToken<T>;
-export function injectionToken<T>(config?: InjectionTokenBase): InjectableToken<T>;
+export function injectionToken<T>(
+  config: InjectionTokenWithFactory<T>,
+): ProvidableToken<T>;
+export function injectionToken<T>(
+  config?: InjectionTokenBase,
+): InjectableToken<T>;
 
 export function injectionToken(_config?: any): any {
   return {} as any;
@@ -609,6 +613,15 @@ export namespace injectionToken {
 }
 
 (injectionToken as any).multi = (_config?: any) => ({} as any);
+
+// ────────────────────────────────────────────────────────────────
+// 11. INJECT
+//
+// inject(Component)  → ExposeOf<Component>
+// inject(Directive)  → ExposeOf<Directive>
+// inject(Token)      → T
+// inject(Class)      → instance
+// ────────────────────────────────────────────────────────────────
 
 type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 
@@ -628,30 +641,6 @@ type InjectResult<T> =
         : T extends AbstractCtor<infer V>
           ? V
           : never;
-
-type ProvideValue<T> =
-  T extends InjectionTokenContract<any, infer V>
-    ? V
-    : T extends AbstractCtor<infer V>
-      ? V
-      : never;
-
-type TokenWithFactory = InjectionTokenContract<any, any> & {
-  readonly [TOKEN_WITH_FACTORY]: true;
-};
-
-type ExplicitProviderToken =
-  | InjectionTokenContract<any, any>
-  | AbstractCtor<any>;
-
-// ────────────────────────────────────────────────────────────────
-// 11. INJECT
-//
-// inject(Component)  → ExposeOf<Component>
-// inject(Directive)  → ExposeOf<Directive>
-// inject(Token)      → T
-// inject(Class)      → instance
-// ────────────────────────────────────────────────────────────────
 
 export function inject<const T extends StrictInjectionToken>(
   token: T,
@@ -682,7 +671,22 @@ export function inject(_token: any): any {
 // contribute a single T value when provided explicitly.
 // ────────────────────────────────────────────────────────────────
 
+type ProvideValue<T> =
+  T extends InjectionTokenContract<any, infer V>
+    ? V
+    : T extends AbstractCtor<infer V>
+      ? V
+      : never;
+
+type TokenWithFactory = InjectionTokenContract<any, any> & {
+  readonly [TOKEN_WITH_FACTORY]: true;
+};
+
 type DefaultProviderToken = TokenWithFactory;
+
+type ExplicitProviderToken =
+  | InjectionTokenContract<any, any>
+  | AbstractCtor<any>;
 
 export function provide<const T extends DefaultProviderToken>(
   token: T,
