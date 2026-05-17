@@ -32,10 +32,11 @@
 // injection-token.ts — drop-in userland library
 
 import {
+  HostAttributeToken,
   InjectionToken,
-  Provider,
+  type InjectOptions,
+  type Provider,
   inject as ngInject,
-  InjectOptions,
 } from '@angular/core';
 
 // ─── Branded symbols (compile-time only) ────────────────────────
@@ -327,6 +328,11 @@ export function provide(token: any, explicitFactory?: () => unknown): Provider {
  * The generic represents the token type, not the injected value type, so
  * `injectStrict<string>(token)` is rejected.
  *
+ * Optional injection is intentionally modeled with literal option shapes only.
+ * A broadly typed `InjectOptions` object is rejected because accepting it would
+ * require a compatibility overload that reintroduces Angular's value-generic
+ * escape hatch.
+ *
  * @example
  * const counter = injectStrict(counterToken); // { value: Signal<number>; ... }
  * const plugins = injectStrict(pluginToken); // Plugin[]
@@ -345,6 +351,23 @@ export function injectStrict<const T extends StrictInjectionToken>(
   token: T,
   options: InjectOptions & { optional: true },
 ): InjectResult<T> | null;
+/**
+ * Injects a static attribute from the host node.
+ *
+ * This mirrors Angular's HostAttributeToken overloads and is separate from
+ * strict DI-token injection.
+ */
+export function injectStrict(token: HostAttributeToken): string;
+/** Injects a static host attribute, returning `null` when optional and absent. */
+export function injectStrict(
+  token: HostAttributeToken,
+  options: { optional: true },
+): string | null;
+/** Injects a required static host attribute. */
+export function injectStrict(
+  token: HostAttributeToken,
+  options: { optional: false },
+): string;
 
 export function injectStrict(token: any, options?: InjectOptions): any {
   return ngInject(token, options as any);
@@ -396,6 +419,8 @@ Angular's `inject<T>(token: ProviderToken<T>): T` allows `inject<string>(numberT
 ### 2. `injectStrict()` vs `inject()`
 
 The userland version exports `injectStrict()` as a stricter typed wrapper. Developers must use it instead of Angular's `inject()` to get the generic-override protection. This is the main ergonomic cost. `injectStrict<string>(token)` is rejected because `string` is not a valid token type.
+
+To preserve that guarantee, dynamic options objects typed as `InjectOptions` are not accepted by `injectStrict()`. Call sites must pass literal/static option shapes such as `{ optional: true }` or `{ optional: false }`, or use Angular's native `inject()` when they intentionally need dynamic `InjectOptions` compatibility.
 
 **Alternative**: because the branded multi tokens also extend `InjectionToken<T[]>`, Angular's native `inject()` already returns `T[]` for them. The wrapper is still needed to *prevent* the generic override footgun and to make `provide()` factories use the token contract's `Provides` type.
 
@@ -522,9 +547,19 @@ export function inject<const T extends StrictInjectionToken>(
   token: T,
   options: InjectOptions & { optional: true },
 ): InjectResult<T> | null;
+
+export function inject(token: HostAttributeToken): string;
+export function inject(
+  token: HostAttributeToken,
+  options: { optional: true },
+): string | null;
+export function inject(
+  token: HostAttributeToken,
+  options: { optional: false },
+): string;
 ```
 
-The generic is the token type, not the injected value type. This preserves optional injection support while rejecting value overrides such as `inject<string>(counterToken)`. For Angular's native `inject()`, changing the public generic behavior would still be a framework-level API decision. Here's the analysis:
+The generic is the token type, not the injected value type. This preserves optional injection support while rejecting value overrides such as `inject<string>(counterToken)`. To keep that guarantee, the overload set intentionally does not include Angular's broad `inject<T>(token: ProviderToken<T>, options: InjectOptions): T | null` compatibility overload. For Angular's native `inject()`, changing the public generic behavior would still be a framework-level API decision. Here's the analysis:
 
 ### Option A: Modify Angular's `inject()` (framework-level change)
 
