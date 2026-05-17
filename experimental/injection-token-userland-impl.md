@@ -16,6 +16,7 @@
 | Token-derived `inject()`/`provide()` typing | A token contract stores both the injected value type and the provider contribution type |
 | `debugName` convention | Passed as the `_desc` string to `InjectionToken` constructor |
 | `injectStrict()` for classes | Delegates to Angular's `inject()` with a class constructor token |
+| Legacy `InjectionToken<T>` support | Works for `injectStrict(token)` and `provide(token, factory)` explicit providers |
 
 ### What requires Angular-side changes
 
@@ -247,15 +248,18 @@ type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 
 type StrictInjectionToken =
   | DiTokenContract<any, any>
+  | InjectionToken<any>
   | AbstractCtor<any>;
 
 type InjectResult<T> =
   T extends DiTokenContract<infer V, any> ? V :
+  T extends InjectionToken<infer V> ? V :
   T extends AbstractCtor<infer V> ? V :
   never;
 
 type ProvideValue<T> =
   T extends DiTokenContract<any, infer V> ? V :
+  T extends InjectionToken<infer V> ? V :
   T extends AbstractCtor<infer V> ? V :
   never;
 
@@ -267,6 +271,7 @@ type DefaultProviderToken = DiTokenWithAnyFactory;
 
 type ExplicitProviderToken =
   | DiTokenContract<any, any>
+  | InjectionToken<any>
   | AbstractCtor<any>;
 
 // ─── provide() overloads ────────────────────────────────────────
@@ -290,6 +295,7 @@ export function provide<const T extends DefaultProviderToken>(token: T): Provide
  * @example
  * provide(configToken, () => ({ apiUrl: '/api' }))
  * provide(pluginToken, () => ({ name: 'custom' }))
+ * provide(legacyToken, () => 10)
  * provide(Store, () => new Store())
  */
 export function provide<const T extends ExplicitProviderToken>(
@@ -359,7 +365,7 @@ When `autoProvided: true` is used on a single-value token, we pass `{ providedIn
 
 ### `provide()` → standard `Provider`
 
-`provide(token)` returns `{ provide: token, useFactory: factory, multi: true/false }`. This is a standard `FactoryProvider` that Angular's `processProvider` handles natively. No patching needed. The explicit factory form `provide(Store, () => new Store())` works for class tokens.
+`provide(token)` returns `{ provide: token, useFactory: factory, multi: true/false }`. This is a standard `FactoryProvider` that Angular's `processProvider` handles natively. No patching needed. The explicit factory form works for `DiToken`, legacy `InjectionToken`, and class tokens.
 
 ### Multi at runtime
 
@@ -374,6 +380,11 @@ The `TOKEN_INJECTS`, `TOKEN_PROVIDES`, `TOKEN_MULTI`, and `TOKEN_WITH_FACTORY` s
 - `provide(token, factory)` requires the factory to return the contract's `Provides` type
 - `provide(token)` only compiles if the token has `TOKEN_WITH_FACTORY`
 
+Legacy Angular `InjectionToken<T>` values are supported only in explicit forms:
+- `injectStrict(legacyToken)` returns `T`
+- `provide(legacyToken, factory)` requires the factory to return `T`
+- `provide(legacyToken)` remains rejected because legacy tokens do not carry `TOKEN_WITH_FACTORY`
+
 ---
 
 ## Limitations & Trade-offs
@@ -387,6 +398,8 @@ Angular's `inject<T>(token: ProviderToken<T>): T` allows `inject<string>(numberT
 The userland version exports `injectStrict()` as a stricter typed wrapper. Developers must use it instead of Angular's `inject()` to get the generic-override protection. This is the main ergonomic cost. `injectStrict<string>(token)` is rejected because `string` is not a valid token type.
 
 **Alternative**: because the branded multi tokens also extend `InjectionToken<T[]>`, Angular's native `inject()` already returns `T[]` for them. The wrapper is still needed to *prevent* the generic override footgun and to make `provide()` factories use the token contract's `Provides` type.
+
+Legacy `InjectionToken<T>` values can be accepted by the wrapper for compatibility, but they do not gain the nominal `DiToken`/`DiMultiToken` separation. Multi legacy tokens are only typed correctly if they are declared as `InjectionToken<T[]>`.
 
 ### 3. `__factory` and `__multi` are runtime properties
 
@@ -409,7 +422,7 @@ The implementation uses only the public `InjectionToken` constructor and Angular
 ## Usage Example
 
 ```ts
-import { Component } from '@angular/core';
+import { Component, InjectionToken } from '@angular/core';
 import { injectionToken, provide, injectStrict } from './injection-token';
 import { signal } from '@angular/core';
 
@@ -449,6 +462,9 @@ const orderedPluginToken = injectionToken.multi<{ order: number }>({
   debugName: 'orderedPluginToken',
 });
 
+// Legacy Angular token: supported for explicit providers and injection.
+const legacyToken = new InjectionToken<number>('legacyToken');
+
 // Plain class
 class Store {
   items = signal<string[]>([]);
@@ -462,8 +478,10 @@ class Store {
     provide(configToken, () => ({ apiUrl: '/api' })),         // explicit factory
     provide(tagsToken, () => ['a', 'b']),                     // array-valued single token
     provide(orderedPluginToken, () => ({ order: 1 })),        // multi token without factory
+    provide(legacyToken, () => 10),                           // legacy InjectionToken<T>
     provide(Store, () => new Store()),                        // class token with factory
     // provide(configToken),  // ← compile error: configToken has no TOKEN_WITH_FACTORY
+    // provide(legacyToken),  // ← compile error: legacy token has no TOKEN_WITH_FACTORY
   ],
   template: `...`,
 })
@@ -475,6 +493,7 @@ export class MyComponent {
   maybeConfig = injectStrict(configToken, { optional: true }); // inferred: { apiUrl: string } | null
   tags = injectStrict(tagsToken);              // inferred: string[]
   ordered = injectStrict(orderedPluginToken);  // inferred: { order: number }[]
+  legacy = injectStrict(legacyToken);          // inferred: number
   store = injectStrict(Store);                 // inferred: Store
 }
 ```
