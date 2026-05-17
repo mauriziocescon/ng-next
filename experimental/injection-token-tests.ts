@@ -23,7 +23,7 @@ const counterToken = injectionToken({
 const loggerToken = injectionToken({
   debugName: 'loggerToken',
   autoProvided: true,
-  factory: () => ({ log: (msg: string) => console.log(msg) }),
+  factory: () => ({ log: (msg: string) => msg }),
 });
 
 // Multi token
