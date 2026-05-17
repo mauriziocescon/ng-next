@@ -521,15 +521,13 @@ export function refMany(_type?: any): any {
 // ────────────────────────────────────────────────────────────────
 // 10. INJECTION TOKEN
 //
-// Token shapes:
-//   InjectableToken<T>      — inject() returns T.
-//   InjectableMultiToken<T> — inject() returns T[], each provide()
-//                             contributes one T item.
+// Token contract:
+//   InjectionTokenContract<Injects, Provides>
+//     - Injects  is the value returned by inject(token)
+//     - Provides is the value contributed by provide(token, factory)
 //
-// Factory & shorthand:
-//   ProvidableToken<T>      — has factory, provide(token) works.
-//   ProvidableMultiToken<T> — has factory, provide(token) works.
-//   Tokens without factory require provide(token, factory).
+// Single token: injects T,   provides T.
+// Multi token:  injects T[], provides T.
 //
 // API shape:
 //   injectionToken(...)       — creates a single-value token.
@@ -541,30 +539,33 @@ export function refMany(_type?: any): any {
 //                        root scope.
 // ────────────────────────────────────────────────────────────────
 
-declare const TOKEN_VALUE: unique symbol;
+declare const TOKEN_INJECTS: unique symbol;
+declare const TOKEN_PROVIDES: unique symbol;
 declare const TOKEN_MULTI: unique symbol;
-declare const TOKEN_HAS_FACTORY: unique symbol;
+declare const TOKEN_WITH_FACTORY: unique symbol;
 
-type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
-
-// Base token — inject() returns T
-export interface InjectableToken<T> {
-  readonly [TOKEN_VALUE]: T;
+interface InjectionTokenContract<Injects, Provides> {
+  readonly [TOKEN_INJECTS]: Injects;
+  readonly [TOKEN_PROVIDES]: Provides;
 }
 
-// Multi token — inject() returns T[], provide factory returns a single T.
-export interface InjectableMultiToken<T> {
+// Base token — inject() returns T, provide factory returns T.
+export interface InjectableToken<T> extends InjectionTokenContract<T, T> {}
+
+// Multi token — inject() returns T[], provide factory returns one T item.
+export interface InjectableMultiToken<T>
+  extends InjectionTokenContract<T[], T> {
   readonly [TOKEN_MULTI]: T;
 }
 
 // Internal — NOT exported. Single token with factory (shorthand-eligible).
 interface ProvidableToken<T> extends InjectableToken<T> {
-  readonly [TOKEN_HAS_FACTORY]: true;
+  readonly [TOKEN_WITH_FACTORY]: true;
 }
 
 // Internal — NOT exported. Multi token with factory (shorthand-eligible).
 interface ProvidableMultiToken<T> extends InjectableMultiToken<T> {
-  readonly [TOKEN_HAS_FACTORY]: true;
+  readonly [TOKEN_WITH_FACTORY]: true;
 }
 
 // Config: multi token with factory. Shorthand-eligible.
@@ -609,11 +610,12 @@ export namespace injectionToken {
 
 (injectionToken as any).multi = (_config?: any) => ({} as any);
 
+type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
+
 type StrictInjectionToken =
   | ComponentInstance<any, any, any>
   | DirectiveInstance<any, any, any>
-  | InjectableMultiToken<any>
-  | InjectableToken<any>
+  | InjectionTokenContract<any, any>
   | AbstractCtor<any>;
 
 type InjectResult<T> =
@@ -621,22 +623,26 @@ type InjectResult<T> =
     ? E
     : T extends DirectiveInstance<any, any, infer E>
       ? E
-      : T extends InjectableMultiToken<infer V>
-        ? V[]
-        : T extends InjectableToken<infer V>
+      : T extends InjectionTokenContract<infer V, any>
+        ? V
+        : T extends AbstractCtor<infer V>
           ? V
-          : T extends AbstractCtor<infer V>
-            ? V
-            : never;
+          : never;
 
 type ProvideValue<T> =
-  T extends InjectableMultiToken<infer V>
+  T extends InjectionTokenContract<any, infer V>
     ? V
-    : T extends InjectableToken<infer V>
+    : T extends AbstractCtor<infer V>
       ? V
-      : T extends AbstractCtor<infer V>
-        ? V
-        : never;
+      : never;
+
+type TokenWithFactory = InjectionTokenContract<any, any> & {
+  readonly [TOKEN_WITH_FACTORY]: true;
+};
+
+type ExplicitProviderToken =
+  | InjectionTokenContract<any, any>
+  | AbstractCtor<any>;
 
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
@@ -676,14 +682,7 @@ export function inject(_token: any): any {
 // contribute a single T value when provided explicitly.
 // ────────────────────────────────────────────────────────────────
 
-type DefaultProviderToken =
-  | ProvidableMultiToken<any>
-  | ProvidableToken<any>;
-
-type ExplicitProviderToken =
-  | InjectableMultiToken<any>
-  | InjectableToken<any>
-  | AbstractCtor<any>;
+type DefaultProviderToken = TokenWithFactory;
 
 export function provide<const T extends DefaultProviderToken>(
   token: T,
