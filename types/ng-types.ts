@@ -1,4 +1,5 @@
 import {
+  type InjectOptions,
   type InputSignal,
   type ModelSignal,
   type OutputEmitterRef,
@@ -544,6 +545,8 @@ declare const TOKEN_VALUE: unique symbol;
 declare const TOKEN_MULTI: unique symbol;
 declare const TOKEN_HAS_FACTORY: unique symbol;
 
+type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
+
 // Base token — inject() returns T
 export interface InjectableToken<T> {
   readonly [TOKEN_VALUE]: T;
@@ -606,6 +609,35 @@ export namespace injectionToken {
 
 (injectionToken as any).multi = (_config?: any) => ({} as any);
 
+type StrictInjectionToken =
+  | ComponentInstance<any, any, any>
+  | DirectiveInstance<any, any, any>
+  | InjectableMultiToken<any>
+  | InjectableToken<any>
+  | AbstractCtor<any>;
+
+type InjectResult<T> =
+  T extends ComponentInstance<any, infer E, any>
+    ? E
+    : T extends DirectiveInstance<any, any, infer E>
+      ? E
+      : T extends InjectableMultiToken<infer V>
+        ? V[]
+        : T extends InjectableToken<infer V>
+          ? V
+          : T extends AbstractCtor<infer V>
+            ? V
+            : never;
+
+type ProvideValue<T> =
+  T extends InjectableMultiToken<infer V>
+    ? V
+    : T extends InjectableToken<infer V>
+      ? V
+      : T extends AbstractCtor<infer V>
+        ? V
+        : never;
+
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
 //
@@ -615,15 +647,17 @@ export namespace injectionToken {
 // inject(Class)      → instance
 // ────────────────────────────────────────────────────────────────
 
-export function inject<B, E, S extends HTMLElement>(
-  token: ComponentInstance<B, E, S>,
-): ExposeOf<ComponentInstance<B, E, S>>;
-export function inject<H extends HTMLElement, B, E>(
-  token: DirectiveInstance<H, B, E>,
-): ExposeOf<DirectiveInstance<H, B, E>>;
-export function inject<T>(token: abstract new (...args: any[]) => T): T;
-export function inject<T>(token: InjectableMultiToken<T>): T[];
-export function inject<T>(token: InjectableToken<T>): T;
+export function inject<const T extends StrictInjectionToken>(
+  token: T,
+): InjectResult<T>;
+export function inject<const T extends StrictInjectionToken>(
+  token: T,
+  options: InjectOptions & { optional?: false },
+): InjectResult<T>;
+export function inject<const T extends StrictInjectionToken>(
+  token: T,
+  options: InjectOptions & { optional: true },
+): InjectResult<T> | null;
 
 export function inject(_token: any): any {
   return {} as any;
@@ -642,21 +676,21 @@ export function inject(_token: any): any {
 // contribute a single T value when provided explicitly.
 // ────────────────────────────────────────────────────────────────
 
-type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
+type DefaultProviderToken =
+  | ProvidableMultiToken<any>
+  | ProvidableToken<any>;
 
-type DefaultProviderToken<T> =
-  | ProvidableMultiToken<T>
-  | ProvidableToken<T>;
+type ExplicitProviderToken =
+  | InjectableMultiToken<any>
+  | InjectableToken<any>
+  | AbstractCtor<any>;
 
-type ExplicitProviderToken<T> =
-  | InjectableMultiToken<T>
-  | InjectableToken<T>
-  | AbstractCtor<T>;
-
-export function provide<T>(token: DefaultProviderToken<T>): Provider;
-export function provide<T>(
-  token: ExplicitProviderToken<T>,
-  factory: () => T,
+export function provide<const T extends DefaultProviderToken>(
+  token: T,
+): Provider;
+export function provide<const T extends ExplicitProviderToken>(
+  token: T,
+  factory: () => ProvideValue<T>,
 ): Provider;
 
 export function provide(_token: any, _factory?: any): any {

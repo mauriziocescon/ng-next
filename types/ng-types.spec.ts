@@ -1006,6 +1006,11 @@ const _multiNotAssignableToNonMulti: typeof arrayValueToken = multiNoFactoryToke
 const emptyConfigToken = injectionToken<string>({});
 const _emptyConfigTokenType: InjectableToken<string> = emptyConfigToken;
 
+// Unknown token preserves unknown as the inject result while allowing explicit casts.
+const unknownTypeToken = injectionToken<unknown>();
+const _unknownValue: unknown = inject(unknownTypeToken);
+const _unknownCast = <string>inject(unknownTypeToken);
+
 // Negative: autoProvided: true without factory — compile-time error
 // @ts-expect-error autoProvided: true requires a factory
 const _negAutoProvidedNoFactory = injectionToken<string>({ autoProvided: true });
@@ -1048,6 +1053,19 @@ const _injectedWithFactory: { value: Signal<number>; increase: () => void } =
 const _injectedNoFactory: string = inject(noFactoryToken);
 const _injectedMulti: number[] = inject(multiToken);
 const _injectedMultiNoFactory: number[] = inject(multiNoFactoryToken);
+const _optionalInjectedNoFactory: string | null = inject(noFactoryToken, {
+  optional: true,
+});
+const _requiredInjectedNoFactory: string = inject(noFactoryToken, {
+  optional: false,
+});
+const _defaultRequiredInjectedNoFactory: string = inject(noFactoryToken, {});
+
+// @ts-expect-error generic is token type, not value type
+inject<string>(withFactoryToken);
+
+// @ts-expect-error generic is token type, not value type
+inject<string>(multiToken);
 
 // inject(Class) → class instance
 const _injectedStore: Store = inject(Store);

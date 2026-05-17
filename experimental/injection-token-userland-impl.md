@@ -20,7 +20,7 @@
 
 | Feature | Why |
 |---------|-----|
-| Preventing `inject<string>(numberToken)` generic override | Cannot be fixed in userland. Requires Angular to remove or constrain the generic parameter on `inject()`. |
+| Preventing `inject<string>(numberToken)` on Angular's native `inject()` | Cannot be fixed in userland. Requires Angular to remove or constrain the generic parameter on `inject()`. The userland `injectStrict()` wrapper avoids the issue with token-derived generics. |
 
 ---
 
@@ -223,14 +223,31 @@ function createInjectionToken<T>(config: any, multi: boolean): any {
 
 type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 
-type DefaultProviderToken<T> =
-  | ProvidableMultiToken<T>
-  | ProvidableToken<T>;
+type StrictInjectionToken =
+  | InjectableMultiToken<any>
+  | InjectableToken<any>
+  | AbstractCtor<any>;
 
-type ExplicitProviderToken<T> =
-  | InjectableMultiToken<T>
-  | InjectableToken<T>
-  | AbstractCtor<T>;
+type InjectResult<T> =
+  T extends InjectableMultiToken<infer V> ? V[] :
+  T extends InjectableToken<infer V> ? V :
+  T extends AbstractCtor<infer V> ? V :
+  never;
+
+type ProvideValue<T> =
+  T extends InjectableMultiToken<infer V> ? V :
+  T extends InjectableToken<infer V> ? V :
+  T extends AbstractCtor<infer V> ? V :
+  never;
+
+type DefaultProviderToken =
+  | ProvidableMultiToken<any>
+  | ProvidableToken<any>;
+
+type ExplicitProviderToken =
+  | InjectableMultiToken<any>
+  | InjectableToken<any>
+  | AbstractCtor<any>;
 
 // ─── provide() overloads ────────────────────────────────────────
 
@@ -243,7 +260,7 @@ type ExplicitProviderToken<T> =
  * providers: [provide(counterToken)]
  * providers: [provide(pluginToken), provide(pluginToken)]  // two entries
  */
-export function provide<T>(token: DefaultProviderToken<T>): Provider;
+export function provide<const T extends DefaultProviderToken>(token: T): Provider;
 
 /**
  * Provides a token or class with an explicit factory.
@@ -255,9 +272,9 @@ export function provide<T>(token: DefaultProviderToken<T>): Provider;
  * provide(pluginToken, () => ({ name: 'custom' }))
  * provide(Store, () => new Store())
  */
-export function provide<T>(
-  token: ExplicitProviderToken<T>,
-  factory: () => T,
+export function provide<const T extends ExplicitProviderToken>(
+  token: T,
+  factory: () => ProvideValue<T>,
 ): Provider;
 
 // ─── provide() implementation ───────────────────────────────────
@@ -279,47 +296,29 @@ export function provide(token: any, explicitFactory?: () => unknown): Provider {
 // ─── Strict inject() wrapper ────────────────────────────────────
 
 /**
- * Injects a multi-value token. Returns `T[]`.
+ * Injects a strict token or class instance.
  *
- * @param token An `InjectableMultiToken<T>` — each registered provider contributes one `T`.
- * @returns The collected array of all provided values.
- *
- * @example
- * const plugins = injectStrict(pluginToken); // Plugin[]
- */
-export function injectStrict<T>(token: InjectableMultiToken<T>): T[];
-/** @see {@link injectStrict} */
-export function injectStrict<T>(
-  token: InjectableMultiToken<T>,
-  options: InjectOptions & { optional?: false },
-): T[];
-/** @see {@link injectStrict} — returns `null` if not provided and `optional: true`. */
-export function injectStrict<T>(
-  token: InjectableMultiToken<T>,
-  options: InjectOptions,
-): T[] | null;
-
-/**
- * Injects a single-value token or a class instance.
- *
- * @param token An `InjectableToken<T>` or a class constructor (concrete or abstract).
- * @returns The provided value or class instance.
+ * The generic represents the token type, not the injected value type, so
+ * `injectStrict<string>(token)` is rejected.
  *
  * @example
  * const counter = injectStrict(counterToken); // { value: Signal<number>; ... }
+ * const plugins = injectStrict(pluginToken); // Plugin[]
  * const store = injectStrict(Store);          // Store
  */
-export function injectStrict<T>(token: InjectableToken<T> | (abstract new (...args: any[]) => T)): T;
+export function injectStrict<const T extends StrictInjectionToken>(
+  token: T,
+): InjectResult<T>;
 /** @see {@link injectStrict} */
-export function injectStrict<T>(
-  token: InjectableToken<T> | (abstract new (...args: any[]) => T),
+export function injectStrict<const T extends StrictInjectionToken>(
+  token: T,
   options: InjectOptions & { optional?: false },
-): T;
+): InjectResult<T>;
 /** @see {@link injectStrict} — returns `null` if not provided and `optional: true`. */
-export function injectStrict<T>(
-  token: InjectableToken<T> | (abstract new (...args: any[]) => T),
-  options: InjectOptions,
-): T | null;
+export function injectStrict<const T extends StrictInjectionToken>(
+  token: T,
+  options: InjectOptions & { optional: true },
+): InjectResult<T> | null;
 
 export function injectStrict(token: any, options?: InjectOptions): any {
   return ngInject(token, options as any);
@@ -357,13 +356,13 @@ The `TOKEN_VALUE`, `TOKEN_MULTI`, and `TOKEN_HAS_FACTORY` symbols are `declare`-
 
 ## Limitations & Trade-offs
 
-### 1. `inject()` generic override cannot be blocked
+### 1. Native `inject()` generic override cannot be blocked
 
-Angular's `inject<T>(token: ProviderToken<T>): T` allows `inject<string>(numberToken)`. This is a TypeScript-level issue that can only be fixed by Angular removing the explicit generic parameter from `inject()`. The userland `injectStrict()` wrapper avoids this by not exposing a generic parameter that can be overridden.
+Angular's `inject<T>(token: ProviderToken<T>): T` allows `inject<string>(numberToken)`. This is a TypeScript-level issue that can only be fixed by Angular removing the explicit generic parameter from `inject()`. The userland `injectStrict()` wrapper avoids this by making its generic represent the token type, not the injected value type.
 
 ### 2. `injectStrict()` vs `inject()`
 
-The userland version exports `injectStrict()` as a stricter typed wrapper. Developers must use it instead of Angular's `inject()` to get the generic-override protection. This is the main ergonomic cost.
+The userland version exports `injectStrict()` as a stricter typed wrapper. Developers must use it instead of Angular's `inject()` to get the generic-override protection. This is the main ergonomic cost. `injectStrict<string>(token)` is rejected because `string` is not a valid token type.
 
 **Alternative**: if the branded tokens extend `InjectionToken<T[]>` for multi (which they do — `InjectableMultiToken<T> extends InjectionToken<T[]>`), then Angular's native `inject()` already returns `T[]`. The wrapper is only needed to *prevent* the generic override footgun.
 
@@ -375,7 +374,11 @@ These are non-standard properties on the token instance. They're prefixed with `
 const tokenMeta = new WeakMap<InjectionToken<any>, { factory?: () => any; isMulti?: boolean }>();
 ```
 
-### 4. No private API dependency
+### 4. Userland feasibility
+
+`autoProvided` is userland-feasible for single tokens because it maps to `providedIn: 'root'`. `injectionToken.multi(...)` is userland-feasible because it is provider metadata plus `provide()` emitting `multi: true`. `autoProvided + multi` is intentionally unsupported.
+
+### 5. No private API dependency
 
 The implementation uses only the public `InjectionToken` constructor and Angular's `inject()` function. The `providedIn: 'root'` behavior that powers `autoProvided` is documented and stable public API.
 
@@ -449,14 +452,25 @@ See the dedicated section at the end of this document.
 
 ### The core tension
 
-Your proposal adds overloads to Angular's `inject()`:
+Your proposal can model strict injection with token-derived overloads:
 
 ```ts
-export function inject<T>(token: InjectableMultiToken<T>): T[];
-export function inject<T>(token: InjectableToken<T>): T;
+export function inject<const T extends StrictInjectionToken>(
+  token: T,
+): InjectResult<T>;
+
+export function inject<const T extends StrictInjectionToken>(
+  token: T,
+  options: InjectOptions & { optional?: false },
+): InjectResult<T>;
+
+export function inject<const T extends StrictInjectionToken>(
+  token: T,
+  options: InjectOptions & { optional: true },
+): InjectResult<T> | null;
 ```
 
-This creates a **breaking change** in Angular's public API surface. Here's the analysis:
+The generic is the token type, not the injected value type. This preserves optional injection support while rejecting value overrides such as `inject<string>(counterToken)`. For Angular's native `inject()`, changing the public generic behavior would still be a framework-level API decision. Here's the analysis:
 
 ### Option A: Modify Angular's `inject()` (framework-level change)
 
@@ -464,11 +478,12 @@ This creates a **breaking change** in Angular's public API surface. Here's the a
 - Single `inject()` function — no cognitive split
 - Multi tokens automatically return `T[]`
 - Can remove the exploitable generic parameter
+- Optional injection returns `InjectResult<T> | null`
 
 **Cons:**
 - Breaking change to a core public API
 - Every existing `InjectionToken<T>` would need to be compatible with the new overloads
-- Overload resolution order is fragile — `InjectableMultiToken<T>` must precede `InjectableToken<T>` or multi tokens fall through
+- Existing call sites that rely on value-generic override behavior would need migration
 
 **Feasibility:** Requires Angular team buy-in. The overloads are additive (existing `ProviderToken<T>` still works), but removing the generic override is breaking.
 
@@ -489,8 +504,17 @@ This creates a **breaking change** in Angular's public API surface. Here's the a
 ```ts
 // In your library's type augmentation file:
 declare module '@angular/core' {
-  export function inject<T>(token: InjectableMultiToken<T>): T[];
-  export function inject<T>(token: InjectableToken<T>): T;
+  export function inject<const T extends StrictInjectionToken>(
+    token: T,
+  ): InjectResult<T>;
+  export function inject<const T extends StrictInjectionToken>(
+    token: T,
+    options: InjectOptions & { optional?: false },
+  ): InjectResult<T>;
+  export function inject<const T extends StrictInjectionToken>(
+    token: T,
+    options: InjectOptions & { optional: true },
+  ): InjectResult<T> | null;
 }
 ```
 
@@ -507,8 +531,8 @@ declare module '@angular/core' {
 **For userland delivery: Option B** (`injectStrict()` wrapper). It's the only approach that works today without Angular changes.
 
 **For eventual Angular integration: Option A**, but with a migration path:
-1. Add the new overloads to `inject()` (non-breaking — they're more specific)
+1. Add token-derived overloads with optional injection support to `inject()`
 2. Deprecate the explicit generic parameter `inject<T>()` via a lint rule
 3. Eventually remove it in a major version
 
-The key insight is that `InjectableMultiToken<T> extends InjectionToken<T[]>`, so passing a multi token to today's `inject()` already returns `T[]` correctly. The overloads are primarily about **preventing misuse** (generic override, mixing multi/non-multi), not about enabling new runtime behavior.
+The key insight is that `InjectableMultiToken<T> extends InjectionToken<T[]>`, so passing a multi token to today's `inject()` already returns `T[]` correctly. The token-derived overloads are primarily about **preventing misuse** (generic override, mixing multi/non-multi), not about enabling new runtime behavior.

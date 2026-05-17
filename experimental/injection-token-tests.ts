@@ -96,8 +96,8 @@ export class Comp {
   plugins = injectStrict(pluginToken);
   config = injectStrict(configToken);
 
-  // c = injectStrict<string>(counterToken); // ✅ compile error
-  unknown = <string>injectStrict(unknownTypeToken); // ✅ unknonw
+  // c = injectStrict<string>(counterToken); // ✅ compile error: generic is token type, not value type
+  unknown = <string>injectStrict(unknownTypeToken); // ✅ unknown
   // a = inject<string>(MODAL_DATA); // ❌ new InjectionToken
   // b = injectStrict<string>(MODAL_DATA); // ❌ new InjectionToken
   // c = <string>injectStrict(MODAL_DATA); // ❌ new InjectionToken
