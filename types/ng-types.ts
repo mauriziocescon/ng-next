@@ -521,22 +521,24 @@ export function refMany(_type?: any): any {
 // ────────────────────────────────────────────────────────────────
 // 10. INJECTION TOKEN
 //
-// Token contract:
-//   DiTokenContract<Injects, Provides>
-//     - Injects  is the value returned by inject(token)
-//     - Provides is the value contributed by provide(token, factory)
+// Branded DI tokens whose value types are derived from the token itself.
 //
-// Single token: injects T,   provides T.
-// Multi token:  injects T[], provides T.
+// DiTokenContract<Injects, Provides> is the internal source of
+// truth for both injection and provider factory typing:
+//   - Injects  is the value returned by inject(token)
+//   - Provides is the value contributed by provide(token, factory)
 //
-// API shape:
-//   injectionToken(...)       — creates a single-value token.
-//   injectionToken.multi(...) — creates a multi-value token.
+// Single-value token:
+//   DiToken<T> injects T and explicit providers contribute T.
 //
-// Options:
-//   autoProvided: true — only available on single-value tokens with
-//                        a factory. The factory is invoked once at
-//                        root scope.
+// Multi-value token:
+//   DiMultiToken<T> injects T[] and each provider contributes one T.
+//
+// Factory-bearing tokens are eligible for the provide(token)
+// shorthand. Tokens without a factory must use provide(token, factory).
+//
+// autoProvided: true is only valid for single-value tokens with a
+// factory. It registers that factory once at root scope.
 // ────────────────────────────────────────────────────────────────
 
 declare const TOKEN_INJECTS: unique symbol;
@@ -558,12 +560,12 @@ export interface DiMultiToken<T>
   readonly [TOKEN_MULTI]: T;
 }
 
-// Internal — NOT exported. Single token with factory (shorthand-eligible).
+// Single token with factory (shorthand-eligible).
 interface DiTokenWithFactory<T> extends DiToken<T> {
   readonly [TOKEN_WITH_FACTORY]: true;
 }
 
-// Internal — NOT exported. Multi token with factory (shorthand-eligible).
+// Multi token with factory (shorthand-eligible).
 interface DiMultiTokenWithFactory<T> extends DiMultiToken<T> {
   readonly [TOKEN_WITH_FACTORY]: true;
 }
@@ -617,10 +619,19 @@ export namespace injectionToken {
 // ────────────────────────────────────────────────────────────────
 // 11. INJECT
 //
-// inject(Component)  → ExposeOf<Component>
-// inject(Directive)  → ExposeOf<Directive>
-// inject(Token)      → T
-// inject(Class)      → instance
+// Strict token-derived injection. The generic parameter is the token
+// type, not the injected value type, so inject<string>(token) is
+// rejected.
+//
+// Result mapping:
+//   inject(Component) → component expose type
+//   inject(Directive) → directive expose type
+//   inject(DiToken)   → contract Injects type
+//   inject(Class)     → class instance
+//
+// Optional injection follows Angular's native shape:
+//   optional: true returns InjectResult<T> | null.
+//   optional false/omitted returns InjectResult<T>.
 // ────────────────────────────────────────────────────────────────
 
 type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
@@ -661,14 +672,22 @@ export function inject(_token: any): any {
 // ────────────────────────────────────────────────────────────────
 // 12. PROVIDE
 //
-// Shorthand — provide(token): uses the token's default factory.
-// Explicit  — provide(tokenOrClass, factory): overrides or supplies factory.
+// Provider factory helper with token-derived return typing.
 //
-// For multi tokens, factory returns a single item (T),
-// not the full array — each provide() call adds one entry.
+// Shorthand form:
+//   provide(tokenWithFactory)
+//   Uses the factory declared by injectionToken({ factory }) or
+//   injectionToken.multi({ factory }). Factory-less tokens and classes
+//   are intentionally rejected.
 //
-// DiMultiToken<T>, DiToken<T>, and class tokens all
-// contribute a single T value when provided explicitly.
+// Explicit form:
+//   provide(tokenOrClass, factory)
+//   Supplies or overrides the provider factory.
+//
+// The factory return type is the token contract's Provides type:
+//   DiToken<T>      providers return T.
+//   DiMultiToken<T> providers return one T item, not T[].
+//   Class tokens    providers return an instance assignable to the class.
 // ────────────────────────────────────────────────────────────────
 
 type ProvideValue<T> =

@@ -27,20 +27,12 @@ const counterToken = injectionToken({
   },
 });
 
-const _counterTokenType: DiToken<{
-  value: Signal<number>;
-  increment: () => void;
-}> = counterToken;
-
 // Auto-provided (root-scoped)
 const loggerToken = injectionToken({
   debugName: 'loggerToken',
   autoProvided: true,
   factory: () => ({ log: (msg: string) => msg }),
 });
-
-const _loggerTokenType: DiToken<{ log: (msg: string) => string }> =
-  loggerToken;
 
 // Multi token
 const pluginToken = injectionToken.multi({
