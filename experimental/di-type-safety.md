@@ -2,7 +2,7 @@
 
 ## Summary
 
-Angular's DI system has several type-safety gaps that the compiler does not catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns. This document catalogues the current limitations and motivates the introduciton of new APIS.
+Angular's DI system has several type-safety gaps that the compiler does not catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns. This document catalogues the current limitations and motivates the introduction of new APIs.
 
 ## Current limitations
 
