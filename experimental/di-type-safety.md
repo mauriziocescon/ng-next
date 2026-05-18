@@ -1,18 +1,12 @@
-# feat: Improve DI type safety (inject, InjectionToken, multi tokens)
-
-## Description
+# Message 1
 
 Hey!
 
-I assume there's no disagreement Angular's DI system has several type-safety gaps that the compiler does not catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns.
-
-The purpose of this ticket is to catalogue the current limitations and motivate the introduction of new APIs. Based on my current understanding, all the problems could be patched userland-side by introducing new, modern APIs — with one big exception: `inject`. In this case, there seems to be no way to bypass the problem (inject is already a modern API) or extend it with something like `inject.strict`.
-
-## Problems
+I took the liberty of summarizing some tickets around type-safety gaps that the compiler does not currently catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns. In my opinion, they are strictly correlated. I hope you don't mind.
 
 ### 1. Generic class tokens lose their type parameter on injection
 
-When injecting a class with a generic type parameter, the explicit generic on `inject<T>()` works but the inferred form does not preserve the specialization:
+When injecting a class with a generic type parameter, the explicit generic on `inject<T>()` works, but the inferred form does not preserve the specialization:
 
 ```ts
 import { Component, ElementRef, inject } from '@angular/core';
@@ -30,13 +24,13 @@ export class App {
 }
 ```
 
-The issue is that `ProviderToken` (and the underlying `AbstractType`/`Type` interfaces) erases the generic parameter during inference — `ElementRef<HTMLElement>` is widened to `ElementRef<any>`.
+The issue is that `ProviderToken` erases the generic parameter during inference — `ElementRef<HTMLElement>` is widened to `ElementRef<any>`.
 
-> **Note:** this issue boils down to the coding pattern that `inject` is using, but it is not specific to `inject`: queries are affected as well.
+> **Note:** this issue boils down to the coding pattern that `inject` uses, but it is not specific to `inject`: queries are affected as well.
 
 **Related issues:** `https://github.com/angular/angular/issues/53894`, `https://github.com/angular/angular/issues/48126`
 
-### 2. `InjectionToken` type safety gaps
+### 2. `InjectionToken` type-safety gaps
 
 `InjectionToken` allows several unsafe patterns that the compiler does not catch:
 
@@ -91,13 +85,13 @@ export class App {
 Problems:
 - `multi` is not part of the token's type — nothing prevents mixing `multi: true` and `multi: false` for the same token (caught only at runtime).
 - `inject()` returns `T` instead of `T[]` — the array shape is invisible to the type system.
-- Factory return type is not checked against the token's declared type.
+- The factory return type is not checked against the token's declared type.
 
 **Related issues:** `https://github.com/angular/angular/issues/28778`, `https://github.com/angular/angular/issues/51675`, `https://github.com/angular/angular/issues/55555`
 
 ### 4. Default factory not usable as a shorthand provider
 
-A token declared with a `factory` cannot be passed directly into a component's `providers` array. The factory only applies when the token is `providedIn: 'root'`:
+A token declared with a `factory` cannot be passed directly into a component's `providers` array. The factory applies only when the token uses `providedIn: 'root'`:
 
 ```ts
 import { Component, inject, InjectionToken } from '@angular/core';
@@ -118,31 +112,169 @@ export class App {
 }
 ```
 
-Workaround — must repeat the factory:
-
-```ts
-@Component({
-  selector: 'App',
-  imports: [JsonPipe],
-  providers: [{ provide: token, useFactory: () => 0 }],
-  template: `{{ t | json }}`,
-})
-export class App {
-  t = inject(token);
-}
-```
-
 **Related issues:** `https://github.com/angular/angular/issues/49807`
 
-### 5. Inconsistent debugging name convention
+### 5. Inconsistent debugging-name convention
 
 `InjectionToken` takes a positional `desc` string, while signal-based APIs (`signal`, `computed`, `linkedSignal`) use an optional `debugName` property that the compiler sets automatically.
 
 **Related issues:** `https://github.com/angular/angular/issues/58845`
 
-## Possible solution
+# Message 2
 
-Following the recent introduction of `@Service` decorator and considering all the issues are related to types, I've played with types and come up with a userland holistic solution that addresses problems 2–5 without any Angular-internal changes. Problem 1 (`ProviderToken` generic erasure) requires a framework-level fix to the `ProviderToken` type definition.
+Following the recent introduction of the `@Service` decorator, and considering that all the issues are type-related, I've experimented with code and come up with a userland holistic solution that hopefully addresses all the problems. I left out queries.
+
+Working demo: https://stackblitz.com/edit/stackblitz-starters-l8rydbu9 (thanks for the feedback @enea)
+
+```ts
+import { injectionToken, provide, injectStrict } from './injection-token';
+
+// Token with factory
+const counterToken = injectionToken({
+  debugName: 'counterToken',
+  factory: () => {
+    const count = signal(0);
+    return {
+      value: count.asReadonly(),
+      increment: () => count.update((v) => v + 1),
+    };
+  },
+});
+
+// Auto-provided (root)
+const loggerToken = injectionToken({
+  debugName: 'loggerToken',
+  autoProvided: true,
+  factory: () => ({ log: (msg: string) => msg }),
+});
+
+// Multi token
+const pluginToken = injectionToken.multi({
+  debugName: 'pluginToken',
+  factory: () => ({ name: 'default' }),
+});
+
+// Token without factory
+const configToken = injectionToken<{ apiUrl: string }>({
+  debugName: 'configToken',
+});
+
+// Unknown token without factory
+const unknownTypeToken = injectionToken<unknown>();
+
+// legacy token
+const legacyToken = new InjectionToken<number>('legacyToken');
+
+// classes
+class Store {
+  x: string;
+  constructor(x?: string) {
+    this.x = x ?? 'store';
+  }
+}
+class Store2 extends Store {}
+
+@Injectable()
+class Store3 {
+  injectable = 'injectable';
+}
+
+class C<T extends number> {}
+// const x = injectStrict(C); // ✅
+
+abstract class AC<T extends string> {}
+// const y = injectStrict(AC); // ✅
+
+@Component({
+  selector: `Comp`,
+  imports: [JsonPipe],
+  providers: [
+    provide(counterToken),
+    provide(pluginToken),
+    provide(pluginToken, () => ({ name: 'custom' })),
+    provide(configToken, () => ({ apiUrl: '/api' })),
+    // provide(configToken),  // ✅ compile error: configToken has no TOKEN_HAS_FACTORY
+    provide(unknownTypeToken, () => ''),
+    provide(legacyToken, () => 10),
+    provide(Store, () => new Store('provide')),
+    provide(Store2, () => injectStrict(Store)),
+    provide(Store3, () => new Store3()),
+  ],
+  template: `
+    counter: {{ counter.value() }}
+    <button (click)="counter.increment()">+</button>
+    <hr />
+    
+    logger: {{ logger.log(Date.now().toString()) }}
+    <hr />
+    
+    plugins: {{ plugins | json }}
+    <hr />
+    
+    config: {{ config | json }}
+    <hr />
+    
+    unknown: {{ unknown | json }}
+    <hr />
+    
+    legacy: {{ legacyToken | json }}
+    <hr />
+    
+    Store: {{ store | json }}
+    <hr />
+    
+    Store2: {{ store2 | json }}
+    <hr />
+    
+    Store3: {{ store3 | json }}
+    <hr />
+    
+    variant: {{ variant | json }}
+  `,
+})
+export class Comp {
+  Date = Date;
+
+  elRef = injectStrict(ElementRef<HTMLButtonElement>);
+
+  counter = injectStrict(counterToken);
+  logger = injectStrict(loggerToken);
+  plugins = injectStrict(pluginToken);
+  config = injectStrict(configToken);
+
+  // c = injectStrict<string>(counterToken); // ✅ compile error
+  unknown = <string>injectStrict(unknownTypeToken); // ✅ cast string
+  legacyToken = injectStrict(legacyToken);
+
+  store = injectStrict(Store);
+  store2 = injectStrict(Store2);
+  store3 = injectStrict(Store3);
+
+  variant = injectStrict(new HostAttributeToken('variant'), {
+    optional: true,
+  });
+  app = injectStrict(App);
+
+  method() {
+    const el = this.elRef.nativeElement; // ✅ HTMLButtonElement
+  }
+}
+
+@Component({
+  selector: 'app-root',
+  imports: [Comp],
+  template: `
+    <h1>injectionToken + provide</h1>
+    <Comp variant="primary" />
+  `,
+})
+export class App {
+  test = signal('');
+}
+```
+
+<details>
+<summary><strong>Explanation</strong></summary>
 
 The solution introduces three new APIs:
 
@@ -194,7 +326,7 @@ providers: [
 ```
 
 Key properties:
-- **Shorthand** `provide(token)` only compiles if the token was created with a factory.
+- **Shorthand** `provide(token)` compiles only if the token was created with a factory.
 - **Factory return type** is checked against the token contract's `Provides` type.
 - **Multi flag** is emitted automatically for multi tokens — no manual `multi: true`.
 
@@ -216,10 +348,18 @@ Key properties:
 - Optional injection is supported via literal `{ optional: true }` shapes.
 - Legacy `InjectionToken<T>` values are accepted for backward compatibility.
 
-### What this does NOT fix
+</details>
 
-Problem 1 (generic class token erasure) cannot be really solved in userland. It requires Angular to update the `ProviderToken` / `AbstractType` / `Type` type definitions to preserve generic type arguments through inference.
 
-### Working example
+# Message 3
 
-Types and a working demo: `https://stackblitz.com/edit/stackblitz-starters-l8rydbu9`
+As I see it, the problem with any solution (userland or not) boils down to this ticket: while introducing new APIs or replacing old ones is considered acceptable (`provide`, `InjectionToken`), dealing with `inject` (and queries) seems to be far more complex because it is already a modern API. In practice, a medium-to-high-level breaking change is requested.
+
+Some questions for the team:
+- Would it be acceptable to go with some sort of `inject.strict` API together with `provide` / `injectionToken` or equivalent at core level? I mean `inject.strict` as an alternative to `inject`, with the idea of merging the two in the future.
+- I checked our code and we are using the `inject<...>` form quite a lot: it still seems to be a migratable pattern though. Tedious and long process, but valuable in the end. Am I missing something obvious?
+
+That said, there is no disagreement that designing APIs is difficult. It just sounds a bit strange that such type problems surface around one of Angular's most popular features: DI. 😅
+
+Thanks a lot!
+
