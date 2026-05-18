@@ -16,9 +16,6 @@ import { Component, ElementRef, inject } from '@angular/core';
   template: ``,
 })
 export class App {
-  // ✅ hostEl is ElementRef<HTMLElement>
-  hostElExplicit = inject<ElementRef<HTMLElement>>(ElementRef);
-
   // ❌ hostEl is ElementRef<any>, expecting ElementRef<HTMLElement>
   hostElInferred = inject(ElementRef<HTMLElement>);
 }
@@ -124,7 +121,7 @@ export class App {
 
 Following the recent introduction of the `@Service` decorator, and considering that all the issues are type-related, I've experimented with code and come up with a userland holistic solution that hopefully addresses all the problems. I left out queries.
 
-Working demo: https://stackblitz.com/edit/stackblitz-starters-l8rydbu9 (thanks for the feedback @enea)
+Working demo: https://stackblitz.com/edit/stackblitz-starters-l8rydbu9
 
 ```ts
 import { injectionToken, provide, injectStrict } from './injection-token';
