@@ -4,6 +4,7 @@ import {
   type OutputEmitterRef,
   type Signal,
   HostAttributeToken,
+  InjectionToken,
   afterNextRender,
   computed,
   input,
@@ -1131,6 +1132,16 @@ const _injectedAttrRequired: string = inject(
   { optional: false },
 );
 
+// inject(legacy InjectionToken<T>) → T
+const legacyToken = new InjectionToken<number>('legacyToken');
+const _injectedLegacy: number = inject(legacyToken);
+const _injectedLegacyOptional: number | null = inject(legacyToken, {
+  optional: true,
+});
+const _injectedLegacyRequired: number = inject(legacyToken, {
+  optional: false,
+});
+
 // ────────────────────────────────────────────────────────────────
 // 12. PROVIDE
 // ────────────────────────────────────────────────────────────────
@@ -1158,6 +1169,7 @@ const _providersExplicitFactory = [
     increase: () => {},
   })),
   provide(Store, () => new Store()),
+  provide(legacyToken, () => 10),
 ];
 
 // Multi provide factory returns a single item, not an array.
@@ -1201,6 +1213,14 @@ provide(multiToken, () => 'wrong');
 // Negative: provide(Class) shorthand — classes are not DiTokenWithFactory
 // @ts-expect-error class shorthand is not allowed; use explicit factory form
 provide(Store);
+
+// Negative: legacy InjectionToken shorthand — not DiTokenWithFactory
+// @ts-expect-error legacy token shorthand is not allowed; use explicit factory form
+provide(legacyToken);
+
+// Negative: wrong factory return type for legacy token
+// @ts-expect-error factory returns string, not number
+provide(legacyToken, () => 'wrong');
 
 // ────────────────────────────────────────────────────────────────
 // INTERFACE CONFORMANCE — satisfies on bindings and expose

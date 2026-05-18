@@ -1,5 +1,6 @@
 import {
   HostAttributeToken,
+  InjectionToken,
   type InjectOptions,
   type InputSignal,
   type ModelSignal,
@@ -641,6 +642,7 @@ type StrictInjectionToken =
   | ComponentInstance<any, any, any>
   | DirectiveInstance<any, any, any>
   | DiTokenContract<any, any>
+  | InjectionToken<any>
   | AbstractCtor<any>;
 
 type InjectResult<T> =
@@ -650,9 +652,11 @@ type InjectResult<T> =
       ? E
       : T extends DiTokenContract<infer V, any>
         ? V
-        : T extends AbstractCtor<infer V>
+        : T extends InjectionToken<infer V>
           ? V
-          : never;
+          : T extends AbstractCtor<infer V>
+            ? V
+            : never;
 
 export function inject<const T extends StrictInjectionToken>(
   token: T,
@@ -703,9 +707,11 @@ export function inject(_token: any): any {
 type ProvideValue<T> =
   T extends DiTokenContract<any, infer V>
     ? V
-    : T extends AbstractCtor<infer V>
+    : T extends InjectionToken<infer V>
       ? V
-      : never;
+      : T extends AbstractCtor<infer V>
+        ? V
+        : never;
 
 type DiTokenWithAnyFactory = DiTokenContract<any, any> & {
   readonly [TOKEN_WITH_FACTORY]: true;
@@ -715,6 +721,7 @@ type DefaultProviderToken = DiTokenWithAnyFactory;
 
 type ExplicitProviderToken =
   | DiTokenContract<any, any>
+  | InjectionToken<any>
   | AbstractCtor<any>;
 
 export function provide<const T extends DefaultProviderToken>(
