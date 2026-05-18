@@ -350,13 +350,13 @@ Key properties:
 
 # Message 3
 
-As I see it, the problem with any solution (userland or not) boils down to this ticket: while introducing new APIs or replacing old ones is considered acceptable (`provide`, `InjectionToken`), dealing with `inject` (and queries) seems to be far more complex because it is already a modern API. In practice, a medium-to-high-level breaking change is requested.
+As I see it, any userland solution must address the type safety issues highlighted in this ticket. While introducing new APIs or replacing legacy ones is generally acceptable (e.g., `provide`, `InjectionToken`), replacing `inject` (and queries) is far more complex because it is already a modern API. In practice, a medium-to-high-level breaking change is required.
 
 Some questions for the team:
-- Would it be acceptable to go with some sort of `inject.strict` API together with `provide` / `injectionToken` or equivalent at core level? I mean `inject.strict` as an alternative to `inject`, with the idea of merging the two in the future.
-- I checked our code and we are using the `inject<...>` form quite a lot: it still seems to be a migratable pattern though. Tedious and long process, but valuable in the end. Am I missing something obvious?
+1. Would it be acceptable to go with some sort of `inject.strict` API together with `provide` / `injectionToken` or equivalent at the core level? I mean `inject.strict` as an alternative to `inject`, with the idea of merging the two in the future.
+2. As an alternative to 1: a better `inject` with strict types in addition to `inject.weak` (backward compatibility).
+3. I checked our code and we are using the `inject<...>` form quite a lot — it still seems to be a migratable pattern, though. A tedious and long process, but valuable in the end. Am I missing something obvious?
 
-That said, there is no disagreement that designing APIs is difficult. It just sounds a bit strange that such type problems surface around one of Angular's most popular features: DI. 😅
+That said, there is no disagreement that designing APIs is difficult. It just sounds a bit strange that such type-safety problems surface around one of Angular's most popular features: DI. 😅
 
 Thanks a lot!
-
