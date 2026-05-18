@@ -1,8 +1,12 @@
-# Dependency Injection: type-safety gaps and ergonomic improvements
+# feat: Improve DI type safety (inject, InjectionToken, multi tokens)
 
 ## Description
 
-Angular's DI system has several type-safety gaps that the compiler does not catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns. This issue catalogues the current limitations and motivates the introduction of new APIs.
+Hey!
+
+I assume there's no disagreement Angular's DI system has several type-safety gaps that the compiler does not catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns.
+
+The purpose of this ticket is to catalogue the current limitations and motivate the introduction of new APIs. Based on my current understanding, all the problems could be patched userland-side by introducing new, modern APIs — with one big exception: `inject`. In this case, there seems to be no way to bypass the problem (inject is already a modern API) or extend it with something like `inject.strict`.
 
 ## Problems
 
