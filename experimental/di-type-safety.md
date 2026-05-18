@@ -26,7 +26,7 @@ export class App {
 }
 ```
 
-The issue is that `ProviderToken` (and the underlying `AbstractType`/`Type` interfaces) erases the generic parameter during inference — `ElementRef<HTMLElement>` is widened to `ElementRef<any>`. Fixing this likely requires updating the `ProviderToken` type definition to preserve the concrete type argument through inference.
+The issue is that `ProviderToken` (and the underlying `AbstractType`/`Type` interfaces) erases the generic parameter during inference — `ElementRef<HTMLElement>` is widened to `ElementRef<any>`. 
 
 > **Note:** this issue boils down to the coding pattern that `inject` is using, but it is not specific to `inject`: queries are affected as well.
 
