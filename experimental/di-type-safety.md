@@ -136,6 +136,86 @@ export class App {
 
 **Related issues:** `https://github.com/angular/angular/issues/58845`
 
-## Suggested labels
+## Possible solution
 
-`area: core`, `core: di`, `feature`
+Following the recent introduction of `@Service` decorator and considering all the issues are related to types, I've played with types and come up with a userland holistic solution that addresses problems 2–5 without any Angular-internal changes. Problem 1 (`ProviderToken` generic erasure) requires a framework-level fix to the `ProviderToken` type definition.
+
+The solution introduces three new APIs:
+
+### `injectionToken()` — branded, nominal DI tokens
+
+Replaces `new InjectionToken(...)` with a factory function that returns nominally-typed tokens:
+
+```ts
+// Single token with factory (shorthand-eligible)
+const counterToken = injectionToken({
+  debugName: 'counterToken',
+  factory: () => signal(0),
+});
+
+// Single token without factory (explicit provider required)
+const configToken = injectionToken<{ apiUrl: string }>({ debugName: 'configToken' });
+
+// Auto-provided at root scope
+const loggerToken = injectionToken({
+  debugName: 'loggerToken',
+  autoProvided: true,
+  factory: () => ({ log: (msg: string) => console.log(msg) }),
+});
+
+// Multi token — inject() returns T[], each provide() contributes one T
+const pluginToken = injectionToken.multi({
+  debugName: 'pluginToken',
+  factory: () => ({ name: 'default' }),
+});
+```
+
+Key properties:
+- **Nominal typing** via `unique symbol` brands — `DiToken<number>` is not assignable to `DiToken<string>`, and `DiMultiToken<T>` is not assignable to `DiToken<T[]>`.
+- **Multi encoded at the token level** — `inject(multiToken)` returns `T[]`; `provide(multiToken, factory)` requires the factory to return one `T` item. Mixing `multi: true` / `multi: false` for the same token is structurally impossible.
+- **`debugName` convention** — aligns with signal-based APIs.
+
+### `provide()` — type-safe provider helper
+
+Replaces raw `{ provide, useFactory, multi }` objects:
+
+```ts
+providers: [
+  provide(counterToken),                          // shorthand: uses built-in factory
+  provide(pluginToken),                           // multi: contributes one entry
+  provide(pluginToken, () => ({ name: 'custom' })), // multi: another entry
+  provide(configToken, () => ({ apiUrl: '/api' })), // explicit factory
+  provide(Store, () => new Store()),              // class token
+]
+```
+
+Key properties:
+- **Shorthand** `provide(token)` only compiles if the token was created with a factory.
+- **Factory return type** is checked against the token contract's `Provides` type.
+- **Multi flag** is emitted automatically for multi tokens — no manual `multi: true`.
+
+### `injectStrict()` — generic-override-proof injection
+
+A wrapper around Angular's `inject()` whose generic parameter is the *token type*, not the *value type*:
+
+```ts
+const counter = injectStrict(counterToken);        // { value: Signal<number>; ... }
+const plugins = injectStrict(pluginToken);         // { name: string }[]
+const config  = injectStrict(configToken);         // { apiUrl: string }
+const maybe   = injectStrict(configToken, { optional: true }); // { apiUrl: string } | null
+const store   = injectStrict(Store);               // Store
+const attr    = injectStrict(new HostAttributeToken('role'));   // string
+```
+
+Key properties:
+- `injectStrict<string>(counterToken)` is a compile error — the generic must be a valid token type.
+- Optional injection is supported via literal `{ optional: true }` shapes.
+- Legacy `InjectionToken<T>` values are accepted for backward compatibility.
+
+### What this does NOT fix
+
+Problem 1 (generic class token erasure) cannot be really solved in userland. It requires Angular to update the `ProviderToken` / `AbstractType` / `Type` type definitions to preserve generic type arguments through inference.
+
+### Working example
+
+Types and a working demo: `https://stackblitz.com/edit/stackblitz-starters-l8rydbu9`
