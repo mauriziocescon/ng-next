@@ -1,10 +1,10 @@
 # Dependency Injection: type-safety gaps and ergonomic improvements
 
-## Summary
+## Description
 
-Angular's DI system has several type-safety gaps that the compiler does not catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns. This document catalogues the current limitations and motivates the introduction of new APIs.
+Angular's DI system has several type-safety gaps that the compiler does not catch — spanning `inject()`, `InjectionToken`, `ProviderToken`, and multi-provider patterns. This issue catalogues the current limitations and motivates the introduction of new APIs.
 
-## Current limitations
+## Problems
 
 ### 1. Generic class tokens lose their type parameter on injection
 
@@ -26,11 +26,11 @@ export class App {
 }
 ```
 
-The issue is that `ProviderToken` (and the underlying `AbstractType`/`Type` interfaces) erases the generic parameter during inference — `ElementRef<HTMLElement>` is widened to `ElementRef<any>`. 
+The issue is that `ProviderToken` (and the underlying `AbstractType`/`Type` interfaces) erases the generic parameter during inference — `ElementRef<HTMLElement>` is widened to `ElementRef<any>`.
 
 > **Note:** this issue boils down to the coding pattern that `inject` is using, but it is not specific to `inject`: queries are affected as well.
 
-Ref: `https://github.com/angular/angular/issues/53894`, `https://github.com/angular/angular/issues/48126`
+**Related issues:** `https://github.com/angular/angular/issues/53894`, `https://github.com/angular/angular/issues/48126`
 
 ### 2. `InjectionToken` type safety gaps
 
@@ -59,7 +59,7 @@ export class App {
 }
 ```
 
-Ref: `https://github.com/angular/angular/issues/46815`, `https://github.com/angular/angular/issues/33883`, `https://github.com/angular/angular/issues/55555`
+**Related issues:** `https://github.com/angular/angular/issues/46815`, `https://github.com/angular/angular/issues/33883`, `https://github.com/angular/angular/issues/55555`
 
 ### 3. Multi-token support
 
@@ -89,7 +89,7 @@ Problems:
 - `inject()` returns `T` instead of `T[]` — the array shape is invisible to the type system.
 - Factory return type is not checked against the token's declared type.
 
-Ref: `https://github.com/angular/angular/issues/28778`, `https://github.com/angular/angular/issues/51675`, `https://github.com/angular/angular/issues/55555`
+**Related issues:** `https://github.com/angular/angular/issues/28778`, `https://github.com/angular/angular/issues/51675`, `https://github.com/angular/angular/issues/55555`
 
 ### 4. Default factory not usable as a shorthand provider
 
@@ -128,10 +128,14 @@ export class App {
 }
 ```
 
-Ref: `https://github.com/angular/angular/issues/49807`
+**Related issues:** `https://github.com/angular/angular/issues/49807`
 
 ### 5. Inconsistent debugging name convention
 
-`InjectionToken` takes a positional `desc` string, while signal-based APIs (`signal`, `computed`, `linkedSignal`) use an optional `debugName` property that the compiler sets automatically:
+`InjectionToken` takes a positional `desc` string, while signal-based APIs (`signal`, `computed`, `linkedSignal`) use an optional `debugName` property that the compiler sets automatically.
 
-Ref: `https://github.com/angular/angular/issues/58845`
+**Related issues:** `https://github.com/angular/angular/issues/58845`
+
+## Suggested labels
+
+`area: core`, `core: di`, `feature`
