@@ -1,4 +1,5 @@
 import {
+  HostAttributeToken,
   type InjectOptions,
   type InputSignal,
   type ModelSignal,
@@ -664,6 +665,15 @@ export function inject<const T extends StrictInjectionToken>(
   token: T,
   options: InjectOptions & { optional: true },
 ): InjectResult<T> | null;
+export function inject(token: HostAttributeToken): string;
+export function inject(
+  token: HostAttributeToken,
+  options: { optional: true },
+): string | null;
+export function inject(
+  token: HostAttributeToken,
+  options: { optional: false },
+): string;
 
 export function inject(_token: any): any {
   return {} as any;

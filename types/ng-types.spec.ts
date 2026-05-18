@@ -3,6 +3,7 @@ import {
   type ModelSignal,
   type OutputEmitterRef,
   type Signal,
+  HostAttributeToken,
   afterNextRender,
   computed,
   input,
@@ -1118,6 +1119,17 @@ abstract class GenericAbstract<T extends string> {
 }
 const _injectedGenericAbstract: GenericAbstract<string> =
   inject(GenericAbstract);
+
+// inject(HostAttributeToken) → string
+const _injectedAttr: string = inject(new HostAttributeToken('role'));
+const _injectedAttrOptional: string | null = inject(
+  new HostAttributeToken('role'),
+  { optional: true },
+);
+const _injectedAttrRequired: string = inject(
+  new HostAttributeToken('role'),
+  { optional: false },
+);
 
 // ────────────────────────────────────────────────────────────────
 // 12. PROVIDE
