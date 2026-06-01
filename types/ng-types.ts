@@ -34,7 +34,19 @@ declare const FRAGMENT: unique symbol;
 declare const FRAGMENT_OPTIONAL: unique symbol;
 declare const FRAGMENT_REQUIRED: unique symbol;
 
-type FragmentArgs<T> = [T] extends [void] ? [] : T extends any[] ? T : [T];
+type IsTuple<T extends readonly unknown[]> = number extends T['length']
+  ? false
+  : true;
+
+// Tuple types declare the fragment's parameter list. Open array types are
+// treated as a single array payload, not as a variadic list of array items.
+type FragmentArgs<T> = [T] extends [void]
+  ? []
+  : T extends readonly unknown[]
+    ? IsTuple<T> extends true
+      ? [...T]
+      : [T]
+    : [T];
 
 export type OptionalFragmentBinding<T> = {
   (...args: FragmentArgs<T>): TemplateMarkup;
