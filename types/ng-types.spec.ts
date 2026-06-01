@@ -192,6 +192,82 @@ const RenderItem = component({
   },
 });
 
+// Void fragment: callable with no arguments only
+const RenderVoidFragment = component({
+  bindings: {
+    emptyTpl: fragment<void>(),
+  },
+  setup: ({ emptyTpl }) => {
+    const _args: Assert<IsEqual<Parameters<NonNullable<typeof emptyTpl>>, []>> =
+      true;
+    const _ok = emptyTpl?.();
+    // @ts-expect-error void fragment does not accept payload arguments
+    emptyTpl?.({ id: '1', desc: 'A' });
+    return tmpl;
+  },
+});
+
+// Tuple fragments define the fragment parameter list
+const RenderTupleFragment = component({
+  bindings: {
+    itemTpl: fragment.required<[Item]>(),
+    indexedItemTpl: fragment.required<[Item, number]>(),
+    readonlyItemTpl: fragment.required<readonly [Item]>(),
+  },
+  setup: ({ itemTpl, indexedItemTpl, readonlyItemTpl }) => {
+    const item: Item = { id: '1', desc: 'A' };
+    const _singleArgs: Assert<IsEqual<Parameters<typeof itemTpl>, [Item]>> =
+      true;
+    const _multiArgs: Assert<
+      IsEqual<Parameters<typeof indexedItemTpl>, [Item, number]>
+    > = true;
+    const _readonlyTupleArgs: Assert<
+      IsEqual<Parameters<typeof readonlyItemTpl>, [Item]>
+    > = true;
+
+    itemTpl(item);
+    indexedItemTpl(item, 0);
+    readonlyItemTpl(item);
+    // @ts-expect-error tuple fragment requires the declared argument
+    itemTpl();
+    // @ts-expect-error tuple fragment does not accept extra arguments
+    itemTpl(item, 0);
+    // @ts-expect-error tuple fragment enforces argument order
+    indexedItemTpl(0, item);
+    return tmpl;
+  },
+});
+
+// Open array fragments are a single array payload, not variadic item args
+const RenderArrayPayloadFragment = component({
+  bindings: {
+    rowsTpl: fragment.required<Item[]>(),
+    readonlyRowsTpl: fragment.required<readonly Item[]>(),
+  },
+  setup: ({ rowsTpl, readonlyRowsTpl }) => {
+    const item: Item = { id: '1', desc: 'A' };
+    const rows: Item[] = [item];
+    const readonlyRows: readonly Item[] = rows;
+    const _arrayArgs: Assert<IsEqual<Parameters<typeof rowsTpl>, [Item[]]>> =
+      true;
+    const _readonlyArrayArgs: Assert<
+      IsEqual<Parameters<typeof readonlyRowsTpl>, [readonly Item[]]>
+    > = true;
+
+    rowsTpl(rows);
+    readonlyRowsTpl(readonlyRows);
+    // @ts-expect-error open array fragment requires the whole array payload
+    rowsTpl(item);
+    // @ts-expect-error open array fragment is not variadic
+    rowsTpl(item, item);
+    // @ts-expect-error open array fragment still requires its payload
+    rowsTpl();
+    // @ts-expect-error readonly array payload still expects an array, not an item
+    readonlyRowsTpl(item);
+    return tmpl;
+  },
+});
+
 // ────────────────────────────────────────────────────────────────
 // 6. COMPONENT — bindings aliasing (TS destructuring in setup)
 //

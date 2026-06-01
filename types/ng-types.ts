@@ -34,7 +34,13 @@ declare const FRAGMENT: unique symbol;
 declare const FRAGMENT_OPTIONAL: unique symbol;
 declare const FRAGMENT_REQUIRED: unique symbol;
 
-type FragmentArgs<T> = [T] extends [void] ? [] : T extends any[] ? T : [T];
+type FragmentArgs<T> = [T] extends [void]
+  ? []
+  : T extends readonly unknown[]
+    ? number extends T['length']
+      ? [T]
+      : [...T]
+    : [T];
 
 export type OptionalFragmentBinding<T> = {
   (...args: FragmentArgs<T>): TemplateMarkup;
