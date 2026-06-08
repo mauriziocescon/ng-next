@@ -18,6 +18,8 @@ import {
   type ComponentBindingValue,
   type DerivationInstance,
   type DirectiveInstance,
+  type IntrinsicElementDescriptor,
+  type IntrinsicElementHost,
   type DiToken,
   type DiMultiToken,
   type OptionalFragmentBinding,
@@ -93,6 +95,35 @@ type OptIsReq =
     ? 'LEAK'
     : 'OK';
 const _optIsReq: OptIsReq = 'OK';
+
+// ────────────────────────────────────────────────────────────────
+// 5b. INTRINSIC ELEMENT HOST CONTRACT
+//
+// The Angular DSL parser keeps native tag names as template syntax, but the
+// type checker resolves them through an IntrinsicElements-like registry.
+// These tests model the part of that registry used by directive hosts,
+// @forward(), and native refs.
+// ────────────────────────────────────────────────────────────────
+
+interface TestIntrinsicElements {
+  div: IntrinsicElementDescriptor<HTMLDivElement>;
+  input: IntrinsicElementDescriptor<HTMLInputElement>;
+  button: IntrinsicElementDescriptor<HTMLButtonElement>;
+}
+
+type TestHost<K extends keyof TestIntrinsicElements> =
+  IntrinsicElementHost<TestIntrinsicElements[K]>;
+
+type _IntrinsicButtonHost = Assert<
+  IsEqual<TestHost<'button'>, HTMLButtonElement>
+>;
+type _IntrinsicInputHost = Assert<
+  IsEqual<TestHost<'input'>, HTMLInputElement>
+>;
+
+// @ts-expect-error an input intrinsic host is not a button host
+const _negIntrinsicInputIsNotButton: HTMLButtonElement =
+  undefined as unknown as TestHost<'input'>;
 
 // ────────────────────────────────────────────────────────────────
 // 6. COMPONENT — basics

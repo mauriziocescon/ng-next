@@ -83,6 +83,11 @@ export interface ForwardMarkerNode extends BaseNode {
  */
 export interface ElementNode extends BaseNode {
   type: 'Element';
+  /**
+   * Raw tag name from the template. For native elements, the type checker
+   * resolves this name through the Angular DSL IntrinsicElements map.
+   * Component names resolve through lexical scope instead.
+   */
   name: string;
   forwardMarker?: ForwardMarkerNode;
   attributes: TextAttributeNode[];

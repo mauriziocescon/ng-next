@@ -19,7 +19,7 @@ Highlights:
 8. Dependency Injection Enhancements,
 9. Final considerations (`!important`) + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
-**Template syntax note**: the template syntax in the examples below resembles TSX syntactically but is Angular DSL — not JSX. It supports Angular control flow, directives, and custom bindings.
+**Template syntax note**: the template syntax in the examples below resembles TSX syntactically but is Angular DSL, not JSX. It supports Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
 
 <details>
   <summary><strong>Table of contents</strong></summary>
@@ -59,13 +59,18 @@ export const TextSearch = component({
     }
 
     /**
+     * Native elements are resolved through IntrinsicElements.
+     * This gives the compiler the element type plus valid DOM
+     * attributes, properties, and events.
+     *
      * - 1way: bind:property={var} (bind: can be omitted)
      * - 2way: model:property={var} (input / select / textarea)
      * - events: on:event_name={handler}
      *
-     * Cannot duplicate attribute names: only one (static or bound)
-     * ‼️ <span class="..." class="..." class={...}> ‼️
-     * ‼️ <span on:click={...} on:click={...}> ‼️
+     * Invalid native bindings are compile-time errors:
+     * ‼️ <input typ="text" /> // unknown attribute ‼️
+     * ‼️ <span class="..." class={...}> // duplicate static/bound ‼️
+     * ‼️ <span on:click={...} on:click={...}> // duplicate event ‼️
      *
      * Can use multiple class: and style:
      * ✅ <span class="..." class:some-class={...} class:some-other-class={...}> ✅
@@ -103,9 +108,10 @@ export const UserDetailConsumer = component({
     /**
      * ⚠️ Must provide all required inputs / models ⚠️
      *
-     * Cannot duplicate binding names: only one
-     * ‼️ <UserDetail user={...} user={...} model:user={...} /> ‼️
-     * ‼️ <UserDetail on:makeAdmin={...} on:makeAdmin={...} /> ‼️
+     * Invalid component bindings are compile-time errors:
+     * ‼️ <UserDetail role="admin" /> // unknown binding ‼️
+     * ‼️ <UserDetail user={...} user={...} model:user={...} /> // duplicate binding ‼️
+     * ‼️ <UserDetail on:makeAdmin={...} on:makeAdmin={...} />  // duplicate binding ‼️
      *
      * Shouldn't use 'on' prefix with input / model / output
      * ⚠️ <UserDetail onInput={...} model:onModel={...} on:onEvent={...} /> ⚠️
@@ -198,8 +204,9 @@ import { directive, ref, input, output, inject, DestroyRef, Renderer2, afterRend
 
 export const tooltip = directive({
   /**
-   * Host element constraint, resolved by the framework.
-   * Determines which elements this directive can be applied to.
+   * Host element constraint. When this directive is used on a
+   * native tag, the tag's IntrinsicElements entry supplies the
+   * concrete host type checked against this ref type.
    */
   host: ref<HTMLElement>(),
   bindings: {
@@ -672,7 +679,10 @@ const Sibling = component({
 
 export const Parent = component({
   setup: () => {
-    // Native element: type explicit → Signal<HTMLDivElement | undefined>
+    // Native element: type explicit -> Signal<HTMLDivElement | undefined>.
+    // The template compiler checks ref={el} against the tag type from
+    // IntrinsicElements, so <div ref={el}> is valid but <input ref={el}>
+    // is not.
     const el = ref<HTMLDivElement>();
     // Component: type inferred from expose → Signal<{ text: Signal<string> } | undefined>
     const child = ref(Child);
@@ -819,7 +829,7 @@ export const Counter = component({
 - `@let`: unchanged,
 - `bindings aliasing` at the setup level (ts destructuring),
 - `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
-- `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in — directives can only be applied to compatible elements,
+- `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
 - `template reference variables`: likely replaced by `ref`,
 - `queries`: likely replaced by `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
 - `component and directive injection`: the preferred interaction model is an explicit `ref` passed as an `input`. Nevertheless, with `ref`/`expose` in place, component and directive injection are safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of abuse `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`);

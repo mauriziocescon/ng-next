@@ -142,6 +142,22 @@ type TargetBindings<C extends ComponentInstance<unknown, unknown, any>> =
 type DirectiveForwardingHostOf<C extends ComponentInstance<any, any, any>> =
   C extends { readonly [DIRECTIVE_FORWARDING]: infer S } ? S : never;
 
+/**
+ * Documentation-only shape for the Angular DSL intrinsic element map.
+ *
+ * The real compiler/tooling owns the complete native tag registry. These
+ * helper types describe the contract used by template type checking:
+ * a native tag resolves to a concrete HTMLElement subtype, and that host
+ * type is then used for native bindings, directive compatibility,
+ * @forward() validation, and native refs.
+ */
+export interface IntrinsicElementDescriptor<H extends HTMLElement> {
+  readonly element: H;
+}
+
+export type IntrinsicElementHost<T> =
+  T extends IntrinsicElementDescriptor<infer H> ? H : never;
+
 type InputKeys<B> = {
   [K in keyof B]: B[K] extends ModelSignal<any>
     ? never
@@ -302,11 +318,10 @@ type SetupReturn<E> =
 // component.withDirectiveForwarding<S>(...) — directive passthrough:
 //   Declares that the component accepts directives on its tag.
 //   Directives are propagated to and instantiated on the internal
-//   element marked with @forward(). S constrains which directives
-//   are compatible: only those whose host is assignable from S
-//   are accepted. Conformance of @forward() to S is enforced
-//   through IntrinsicElements — the standard TypeScript mechanism
-//   for mapping HTML tag names to their types.
+//   element marked with @forward(). S is the forwarded host type:
+//   for native tags, the compiler resolves that type through
+//   IntrinsicElements (e.g. <button @forward()> -> HTMLButtonElement)
+//   and checks directive host compatibility against it.
 //
 // component.wrap(Target, ...) — wrapper mode:
 //   Target is passed as a value; C is inferred from it (consistent
