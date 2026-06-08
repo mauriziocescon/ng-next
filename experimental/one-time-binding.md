@@ -36,11 +36,9 @@ export const UserDetailConsumer = component({
      * once:user — evaluated once at creation, never updated.
      * email and makeAdmin remain reactive.
      *
-     * Cannot combine once: with model: on the same binding.
-     * ‼️ <UserDetail once:model:email={email} /> ‼️
-     *
-     * Cannot duplicate: once: and reactive on the same name.
-     * ‼️ <UserDetail once:user={...} user={...} /> ‼️
+     * Invalid once bindings are compile-time errors:
+     * ‼️ <UserDetail once:model:email={email} /> // model cannot be once ‼️
+     * ‼️ <UserDetail once:user={...} user={...} /> // duplicate binding ‼️
      */
     return (
       <UserDetail

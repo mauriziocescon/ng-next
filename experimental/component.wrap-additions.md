@@ -160,7 +160,7 @@ Compiler contract:
 2. The compiler `MUST` lower `@forward()` by unrolling only that key set.
 3. The compiler `MUST NOT` include `addBindings` keys in target forwarding.
 4. The compiler `MUST` keep existing explicit-binding precedence (React-style last wins).
-5. The compiler `SHOULD` preserve directive forwarding metadata inheritance by inheriting target forwarded element type in wrappers.
+5. The compiler `SHOULD` preserve directive forwarding metadata inheritance by inheriting the target forwarded host type in wrappers. For native forwarding targets, that host type comes from the Angular DSL `IntrinsicElements` map.
 6. The compiler `MUST` treat `@forward()` as marker-only: no forwarding object, property reads, or enumeration.
 7. In wrapper binding-forwarding context, the compiler `MUST` reject `@forward()` on non-component elements.
 
