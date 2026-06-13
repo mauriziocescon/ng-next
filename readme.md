@@ -40,7 +40,23 @@ Highlights:
 
 ## Component structure and bindings
 
-`setup` runs once in an injection context. All bindings are wired and available immediately; destructuring is optional:
+`setup` runs once in an injection context. All bindings are wired and available immediately; destructuring is optional.
+
+Native elements are resolved through `IntrinsicElements` — the compiler knows the element type plus valid DOM attributes, properties, and events:
+
+- 1-way: `bind:property={var}` (`bind:` can be omitted)
+- 2-way: `model:property={var}` (input / select / textarea)
+- events: `on:event_name={handler}`
+
+Invalid native bindings are compile-time errors:
+
+- ‼️ `<input typ="text" />` — unknown attribute ‼️
+- ‼️ `<span class="..." class={...}>` — duplicate static/bound ‼️
+- ‼️ `<span on:click={...} on:click={...}>` — duplicate event ‼️
+
+Multiple `class:` and `style:` on the same element are fine:
+
+- ✅ `<span class="..." class:some-class={...} class:some-other-class={...}>` ✅
 
 ```ts
 import { component, signal, linkedSignal, input, output } from '@angular/core';
@@ -58,23 +74,6 @@ export const TextSearch = component({
       valueChange.emit(text());
     }
 
-    /**
-     * Native elements are resolved through IntrinsicElements.
-     * This gives the compiler the element type plus valid DOM
-     * attributes, properties, and events.
-     *
-     * - 1way: bind:property={var} (bind: can be omitted)
-     * - 2way: model:property={var} (input / select / textarea)
-     * - events: on:event_name={handler}
-     *
-     * Invalid native bindings are compile-time errors:
-     * ‼️ <input typ="text" /> // unknown attribute ‼️
-     * ‼️ <span class="..." class={...}> // duplicate static/bound ‼️
-     * ‼️ <span on:click={...} on:click={...}> // duplicate event ‼️
-     *
-     * Can use multiple class: and style:
-     * ✅ <span class="..." class:some-class={...} class:some-other-class={...}> ✅
-     */
     return (
       <label class:danger={isDanger()}>Text:</label>
       <input type="text" model:value={text} on:input={textChange} />
@@ -92,7 +91,19 @@ export const TextSearch = component({
 });
 ```
 
-Any component can be used in the template; `bind:`, `model:`, and `on:` behave the same as for native elements:
+Any component can be used in the template; `bind:`, `model:`, and `on:` behave the same as for native elements.
+
+⚠️ Must provide all required inputs / models ⚠️
+
+Invalid component bindings are compile-time errors:
+
+- ‼️ `<UserDetail role="admin" />` — unknown binding ‼️
+- ‼️ `<UserDetail user={...} user={...} model:user={...} />` — duplicate binding ‼️
+- ‼️ `<UserDetail on:makeAdmin={...} on:makeAdmin={...} />` — duplicate binding ‼️
+
+Shouldn't use `on` prefix with input / model / output:
+
+- ⚠️ `<UserDetail onInput={...} model:onModel={...} on:onEvent={...} />` ⚠️
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -105,17 +116,6 @@ export const UserDetailConsumer = component({
 
     function makeAdmin() {/** ... **/}
 
-    /**
-     * ⚠️ Must provide all required inputs / models ⚠️
-     *
-     * Invalid component bindings are compile-time errors:
-     * ‼️ <UserDetail role="admin" /> // unknown binding ‼️
-     * ‼️ <UserDetail user={...} user={...} model:user={...} /> // duplicate binding ‼️
-     * ‼️ <UserDetail on:makeAdmin={...} on:makeAdmin={...} />  // duplicate binding ‼️
-     *
-     * Shouldn't use 'on' prefix with input / model / output
-     * ⚠️ <UserDetail onInput={...} model:onModel={...} on:onEvent={...} /> ⚠️
-     */
     return (
       <UserDetail
         user={user()}
@@ -233,22 +233,17 @@ export const tooltip = directive({
 
 `@derive` creates a template-scoped reactive computation, establishing an injection context before calling the derivation's `setup`. It follows the lifecycle of the enclosing view. Bindings are passed as named pairs `key={expr}`, not as a JS object literal.
 
+Only inputs are allowed (no outputs, no models — a derivation has no DOM surface). `setup` must return a `Signal<T>`.
+
 ```ts
 import { component, derivation, computed, inject, input } from '@angular/core';
 import { Item, PriceManager } from '@mylib/item';
 
 const simulation = derivation({
   bindings: {
-    /**
-     * Only inputs are allowed: a derivation has no DOM host,
-     * so there is no surface to emit outputs or sync models against
-     */
     item: input.required<Item>(),
     qty: input.required<number>(),
   },
-  /**
-   * setup always returns Signal<T> (e.g. computed)
-   */
   setup: ({ item, qty }) => {
     const priceManager = inject(PriceManager);
 
@@ -386,7 +381,7 @@ Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippe
 
 `@forward()` designates where forwarded directives and bindings land. In `component.withForwarding<S>(config)`, it targets an element for directive passthrough. In `component.withForwarding(Target, config)`, it forwards remaining bindings and directives to the wrapped component. The generic host type is only valid in the one-argument form; the two-argument form infers the forwarded host type from `Target`.
 
-Implicit children fragment — placement, lifecycle, and binding context:
+### Implicit children fragment
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -446,7 +441,7 @@ export const MenuItem = component({
 });
 ```
 
-Customizing components:
+### Customizing components
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -497,7 +492,7 @@ export const Menu = component({
 });
 ```
 
-Directives passed through a component and applied to an element:
+### Directive passthrough
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -569,7 +564,7 @@ export const Button = component.withForwarding<HTMLButtonElement>({
 });
 ```
 
-Wrapping components and forwarding inputs, outputs, models, fragments, and directives:
+### Wrapping components
 
 ```ts
 import { component, signal, input, computed } from '@angular/core';
@@ -723,18 +718,19 @@ Binding syntax: `ref={...}` on elements and components, `use:directive(...):ref=
 
 ## Dependency Injection Enhancements
 
-Improved ergonomics for types and tokens:
+Improved ergonomics for types and tokens.
+
+`injectionToken` creates a typed DI token. Four flavours:
+
+- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default; throws if missing from the injector tree.
+- **With factory + `autoProvided: true`** — factory invoked once at root scope; no explicit `provide` needed.
+- **Without factory** — must use `provide(token, factory)` with an explicit factory. The shorthand is a compile-time error.
+- **Multi** (`injectionToken.multi`) — each `provide` call contributes one item; `inject` returns the collected array.
 
 ```ts
 import { component, inject, provide, injectionToken, input, signal } from '@angular/core';
 
-/**
- * Not provided in root by default: throws if not provided
- * in the injector tree.
- *
- * factory = default factory used by the provide(compToken)
- * shorthand — not a fallback
- */
+// With factory (shorthand-eligible)
 const compToken = injectionToken({
   debugName: 'compToken',
   factory: () => {
@@ -752,10 +748,7 @@ const compToken = injectionToken({
   },
 });
 
-/**
- * Auto-provided: factory invoked once at root scope —
- * no need to provide it explicitly
- */
+// Auto-provided at root scope
 const rootToken = injectionToken({
   debugName: 'rootToken',
   autoProvided: true,
@@ -774,17 +767,10 @@ const rootToken = injectionToken({
   },
 });
 
-/**
- * Token without factory: must use provide(token, factory)
- * with an explicit factory. provide(otherCompToken) shorthand
- * is a compile-time error.
- */
+// Without factory — explicit provide(token, factory) required
 const otherCompToken = injectionToken<string>({ debugName: 'otherCompToken' });
 
-/**
- * Multi token with factory: provide(multiToken) shorthand uses
- * this factory — not a root default entry.
- */
+// Multi token with factory
 const multiToken = injectionToken.multi({
   debugName: 'multiToken',
   factory: () => Math.random(),
@@ -799,26 +785,19 @@ export const Counter = component({
   setup: () => {
     const rootCounter = inject(rootToken);
     const compCounter = inject(compToken);
-    const multi = inject(multiToken); // array of numbers
+    const multi = inject(multiToken); // number[]
     const store = inject(Store);
     /** ... **/
     return (...);
   },
   providers: ({ initialValue }) => [
-    // provide compToken using the default factory (shorthand)
-    provide(compToken),
-
-    // multi with factory: shorthand works
-    provide(multiToken),
-    provide(multiToken),
-    provide(multiToken, () => 10),
+    provide(compToken),                     // shorthand — uses token's factory
+    provide(multiToken),                    // shorthand
+    provide(multiToken),                    // multiple contributions
+    provide(multiToken, () => 10),          // explicit factory override
     provide(multiToken, () => initialValue()),
-
-    // token without factory: must use explicit factory form
-    provide(otherCompToken, () => ''),
-    
-    // class
-    provide(Store, () => new Store()),
+    provide(otherCompToken, () => ''),      // no factory on token — explicit required
+    provide(Store, () => new Store()),      // class
   ],
 });
 ```
