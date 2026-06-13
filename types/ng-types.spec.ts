@@ -168,7 +168,7 @@ const MinimalFullProviders = component({
 // OutputEmitterRef, FragmentBinding.
 // ────────────────────────────────────────────────────────────────
 
-const UserDetail = component.withDirectiveForwarding({
+const UserDetail = component.withForwarding({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -498,17 +498,17 @@ const voidExposeRef = ref(NoExpose);
 const _voidExposeCheck: Ref<undefined> = voidExposeRef;
 
 // ────────────────────────────────────────────────────────────────
-// 6. COMPONENT — withDirectiveForwarding
+// 6. COMPONENT — withForwarding, one-argument directive forwarding
 // ────────────────────────────────────────────────────────────────
 
-const ForwardingDefault = component.withDirectiveForwarding({
+const ForwardingDefault = component.withForwarding({
   setup: () => tmpl,
 });
 type _ForwardingDefaultType = Assert<
   IsEqual<typeof ForwardingDefault, ComponentInstance<{}, void, HTMLElement>>
 >;
 
-const ButtonForwarding = component.withDirectiveForwarding<HTMLButtonElement>({
+const ButtonForwarding = component.withForwarding<HTMLButtonElement>({
   setup: () => tmpl,
 });
 type _ButtonForwardingType = Assert<
@@ -519,11 +519,11 @@ type _ButtonForwardingType = Assert<
 >;
 
 // @ts-expect-error host must be an HTMLElement subtype
-const _NegInvalidHost = component.withDirectiveForwarding<string>({
+const _NegInvalidHost = component.withForwarding<string>({
   setup: () => tmpl,
 });
 
-const _NegForwardingMetadataInSetup = component.withDirectiveForwarding({
+const _NegForwardingMetadataInSetup = component.withForwarding({
   bindings: {
     label: input<string>(),
   },
@@ -534,21 +534,31 @@ const _NegForwardingMetadataInSetup = component.withDirectiveForwarding({
   },
 });
 
+// @ts-expect-error component instances are not valid forwarded DOM host types
+const _NegComponentAsForwardingHost = component.withForwarding<typeof UserDetail>({
+  setup: () => tmpl,
+});
+
+// @ts-expect-error directive instances are not valid forwarded DOM host types
+const _NegDirectiveAsForwardingHost = component.withForwarding<typeof tooltip>({
+  setup: () => tmpl,
+});
+
 // ────────────────────────────────────────────────────────────────
 // 6. COMPONENT — wrapper with selected bindings + forwarding marker
 //
-// Target passed as first arg; C is inferred from the value
-// (consistent with ref(Child), inject(Child), etc.).
+// In the two-argument form, Target is passed as first arg and C is
+// inferred from the value (consistent with ref(Child), inject(Child), etc.).
 // setup receives selected bindings only.
-// @forward() is a compile-time forwarding marker used in
-// wrapper templates.
+// @forward() is a compile-time forwarding marker used by
+// component.withForwarding(...) templates.
 //
 // @forward() has dual meaning:
 // - component elements: binding and directives forwarding (wrapper remainder)
 // - native elements: directive forwarding
 // ────────────────────────────────────────────────────────────────
 
-const UserDetailWrapper = component.wrap(UserDetail, {
+const UserDetailWrapper = component.withForwarding(UserDetail, {
   bindings: {
     user: input.required<User>(),
   },
@@ -559,7 +569,7 @@ const UserDetailWrapper = component.wrap(UserDetail, {
 });
 
 // setup first arg includes only selected keys
-const _NegSelectedOnly = component.wrap(UserDetail, {
+const _NegSelectedOnly = component.withForwarding(UserDetail, {
   bindings: { user: input.required<User>() },
   setup: ({
     user,
@@ -569,7 +579,7 @@ const _NegSelectedOnly = component.wrap(UserDetail, {
 });
 
 // bindings should NOT accept keys outside the target type
-const _NegExtra = component.wrap(UserDetail, {
+const _NegExtra = component.withForwarding(UserDetail, {
   // @ts-expect-error nonsense is not in target bindings
   bindings: {
     user: input.required<User>(),
@@ -579,7 +589,7 @@ const _NegExtra = component.wrap(UserDetail, {
 });
 
 // bindings should NOT accept wrong inner types
-const _NegWrongType = component.wrap(UserDetail, {
+const _NegWrongType = component.withForwarding(UserDetail, {
   // @ts-expect-error user input type should be User
   bindings: {
     user: input.required<string>(),
@@ -588,7 +598,7 @@ const _NegWrongType = component.wrap(UserDetail, {
 });
 
 // bindings should preserve target binding kind
-const _NegWrongKind = component.wrap(UserDetail, {
+const _NegWrongKind = component.withForwarding(UserDetail, {
   // @ts-expect-error makeAdmin is an output on target, not an input
   bindings: {
     makeAdmin: input<void>(),
@@ -604,7 +614,7 @@ const WideInput = component({
   setup: ({ value }) => tmpl,
 });
 
-const _NegNarrowedSubtype = component.wrap(WideInput, {
+const _NegNarrowedSubtype = component.withForwarding(WideInput, {
   // @ts-expect-error wrapper bindings must exactly match target binding type
   bindings: {
     value: input.required<string>(),
@@ -620,7 +630,7 @@ const NarrowInput = component({
   setup: ({ value }) => tmpl,
 });
 
-const _NegWidenedSupertype = component.wrap(NarrowInput, {
+const _NegWidenedSupertype = component.withForwarding(NarrowInput, {
   // @ts-expect-error wrapper bindings must exactly match target binding type
   bindings: {
     value: input.required<string | number>(),
@@ -642,7 +652,7 @@ const Base = component({
   setup: ({ item, selected, click }) => tmpl,
 });
 
-const ForwardAll = component.wrap(Base, {
+const ForwardAll = component.withForwarding(Base, {
   bindings: {},
   setup: (bindings) => {
     // @ts-expect-error empty selection should expose no setup keys
@@ -652,7 +662,7 @@ const ForwardAll = component.wrap(Base, {
 });
 
 // Wrapper providers should receive selected inputs only (Option A)
-const WrapperProviders = component.wrap(UserDetail, {
+const WrapperProviders = component.withForwarding(UserDetail, {
   bindings: {
     user: input.required<User>(),
   },
@@ -671,7 +681,7 @@ const WrapperProviders = component.wrap(UserDetail, {
 
 // Wrapper providers expose only selected INPUT bindings, even if selected
 // bindings include models/outputs.
-const WrapperProvidersSelectedKinds = component.wrap(Base, {
+const WrapperProvidersSelectedKinds = component.withForwarding(Base, {
   bindings: {
     item: input.required<Simple>(),
     selected: model<boolean>(),
@@ -688,7 +698,7 @@ const WrapperProvidersSelectedKinds = component.wrap(Base, {
   },
 });
 
-const ForwardingWrapper = component.wrap(ButtonForwarding, {
+const ForwardingWrapper = component.withForwarding(ButtonForwarding, {
   bindings: {},
   setup: () => tmpl,
 });
@@ -702,13 +712,37 @@ type _ForwardingWrapperPreservesHost = Assert<
 const NoForwardingTarget = component({
   setup: () => tmpl,
 });
-const NoForwardingWrapper = component.wrap(NoForwardingTarget, {
+const NoForwardingWrapper = component.withForwarding(NoForwardingTarget, {
   bindings: {},
   setup: () => tmpl,
 });
 type _NoForwardingWrapperKeepsNever = Assert<
   IsEqual<typeof NoForwardingWrapper, ComponentInstance<{}, void, never>>
 >;
+
+// @ts-expect-error two-argument withForwarding infers target from the value; explicit host generic is invalid
+const _NegWrapperExplicitHostGeneric = component.withForwarding<HTMLButtonElement>(
+  UserDetail,
+  {
+    bindings: {},
+    setup: () => tmpl,
+  },
+);
+
+// @ts-expect-error two-argument withForwarding infers target from the value; explicit component generic is invalid
+const _NegWrapperExplicitComponentGeneric = component.withForwarding<typeof UserDetail>(
+  UserDetail,
+  {
+    bindings: {},
+    setup: () => tmpl,
+  },
+);
+
+// @ts-expect-error wrapper mode is inference-only even if all generics are supplied
+const _NegWrapperExplicitFullGenerics = component.withForwarding<typeof UserDetail, {}>(UserDetail, {
+  bindings: {},
+  setup: () => tmpl,
+});
 
 // ────────────────────────────────────────────────────────────────
 // 6. COMPONENT — forward collision precedence (compiler contract)

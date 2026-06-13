@@ -315,7 +315,7 @@ type SetupReturn<E> =
 //   receives only inputs (not models or outputs) and runs before
 //   setup so DI is ready when setup executes.
 //
-// component.withDirectiveForwarding<S>(...) — directive passthrough:
+// component.withForwarding<S>(config) — directive passthrough:
 //   Declares that the component accepts directives on its tag.
 //   Directives are propagated to and instantiated on the internal
 //   element marked with @forward(). S is the forwarded host type:
@@ -323,7 +323,7 @@ type SetupReturn<E> =
 //   IntrinsicElements (e.g. <button @forward()> -> HTMLButtonElement)
 //   and checks directive host compatibility against it.
 //
-// component.wrap(Target, ...) — wrapper mode:
+// component.withForwarding(Target, config) — wrapper mode:
 //   Target is passed as a value; C is inferred from it (consistent
 //   with ref(Child), inject(Child), etc.). bindings are a strict
 //   subset of target bindings, preserving key, binding kind, and
@@ -331,9 +331,9 @@ type SetupReturn<E> =
 //   as first arg. Remaining bindings and directives are forwarded
 //   to the wrapped component via @forward().
 //
-// @forward() semantics (shared by directive passthrough and wrap):
+// @forward() semantics (shared by directive passthrough and wrapper):
 //   On elements: forwards directives to that element.
-//   On components (wrap): forwards remaining bindings and
+//   On components (wrapper): forwards remaining bindings and
 //   directives.
 //
 //   Compile-time marker — the compiler unrolls it into individual
@@ -371,9 +371,9 @@ export function component(config: any): any {
   return config;
 }
 
-// Wrapper namespace helper (target as first arg, C inferred from value)
+// Forwarding namespace helper
 export namespace component {
-  export declare function withDirectiveForwarding<
+  export declare function withForwarding<
     B extends Record<string, ComponentBindingValue>,
     E = void,
   >(
@@ -386,7 +386,7 @@ export namespace component {
     } & ReservedBindingsConstraint<B>,
   ): ComponentInstance<B, E, HTMLElement>;
 
-  export declare function withDirectiveForwarding<
+  export declare function withForwarding<
     S extends HTMLElement,
     B extends Record<string, ComponentBindingValue>,
     E = void,
@@ -400,7 +400,7 @@ export namespace component {
     } & ReservedBindingsConstraint<B>,
   ): ComponentInstance<B, E, S>;
 
-  export declare function withDirectiveForwarding<
+  export declare function withForwarding<
     S extends HTMLElement = HTMLElement,
     E = void,
   >(config: {
@@ -410,9 +410,14 @@ export namespace component {
     styleUrl?: string;
   }): ComponentInstance<{}, E, S>;
 
-  export declare function wrap<
-    C extends ComponentInstance<unknown, unknown, any>,
-    Sel extends Record<string, ComponentBindingValue>,
+  export declare function withForwarding<
+    ExplicitWrapperGenericsAreNotAllowed extends never = never,
+    C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
+      unknown,
+      unknown,
+      any
+    >,
+    Sel extends Record<string, ComponentBindingValue> = {},
     E = void,
   >(
     target: C,
@@ -428,8 +433,8 @@ export namespace component {
   ): ComponentInstance<TargetBindings<C>, E, DirectiveForwardingHostOf<C>>;
 }
 
-(component as any).wrap = (_target: any, config: any) => config;
-(component as any).withDirectiveForwarding = (config: any) => config;
+(component as any).withForwarding = (targetOrConfig: any, maybeConfig?: any) =>
+  maybeConfig ?? targetOrConfig;
 
 // ────────────────────────────────────────────────────────────────
 // 7. DIRECTIVE
