@@ -919,8 +919,8 @@ The class symbol is used directly as a tag — bindings follow the same `bind:` 
 import { component, signal } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatButton } from '@angular/material/button';
-import { MyCard } from '@mylib/card';
-import { MyList } from '@mylib/list';
+import { MyCard } from '@mylib/card'; // decorator-based component
+import { MyList } from '@mylib/list'; // decorator-based component
 
 // Basic usage — class symbol as a tag
 export const Settings = component({
@@ -983,7 +983,7 @@ import { component, signal } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatTooltip } from '@angular/material/tooltip';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { tooltip } from '@mylib/tooltip';
+import { tooltip } from '@mylib/tooltip'; // .ng directive
 
 export const DraggableCard = component({
   setup: () => {
