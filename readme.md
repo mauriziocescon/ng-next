@@ -36,6 +36,7 @@ Highlights:
 - [Final considerations](#final-considerations)
 - [Appendix: Co-located templates in Angular via `.ng` files](#appendix-co-located-templates-in-angular-via-ng-files)
 - [Appendix: Binding prefix and modifier reference](#appendix-binding-prefix-and-modifier-reference)
+- [Appendix: Integrating decorator-based components](#appendix-integrating-decorator-based-components)
 
 </details>
 
@@ -898,3 +899,100 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. |
 | `@forward()` | native elements (inside component template) | No | Marks the element as the forwarding target for directive passthrough and extra bindings. |
+
+
+---
+
+## Appendix: Integrating decorator-based components
+
+Existing decorator-based (`@Component`, `@Directive`, `@Pipe`) classes work in `.ng` files without wrappers or adapters.
+
+### Components
+
+The class symbol is used directly as a tag — bindings follow the same `bind:` / `model:` / `on:` rules:
+
+```ts
+import { component, signal } from '@angular/core';
+import { MatSlideToggle } from '@angular/material/slide-toggle';
+
+export const Settings = component({
+  setup: () => {
+    const darkMode = signal(false);
+
+    return (
+      <MatSlideToggle model:checked={darkMode}>
+        Dark mode
+      </MatSlideToggle>
+    );
+  },
+});
+```
+
+### Directives
+
+Directives are attached with `use:Class(...)` — inputs and outputs are listed explicitly inside the parentheses:
+
+```ts
+import { component, signal } from '@angular/core';
+import { MatTooltip } from '@angular/material/tooltip';
+import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
+
+export const DraggableCard = component({
+  setup: () => {
+    const tip = signal('Drag me');
+    const position = signal({ x: 0, y: 0 });
+
+    function onDragEnd(event: CdkDragEnd) {
+      position.set(event.source.getFreeDragPosition());
+    }
+
+    return (
+      <div
+        use:MatTooltip(matTooltip={tip()})
+        use:CdkDrag(on:cdkDragEnded={onDragEnd})>
+        Position: {position().x}, {position().y}
+      </div>
+    );
+  },
+});
+```
+
+### Pipes
+
+The template DSL has no pipe operator (`|`). Decorator-based pipes are consumed by wrapping them in a `derivation` — the pipe is instantiated with `new` inside `setup`, which runs in an injection context and can resolve constructor dependencies:
+
+```ts
+import { component, derivation, computed, inject, input, LOCALE_ID } from '@angular/core';
+import { DatePipe } from '@angular/common';
+
+const dateFmt = derivation({
+  bindings: {
+    value: input.required<Date>(),
+    format: input<string>('short'),
+  },
+  setup: ({ value, format }) => {
+    const pipe = new DatePipe(inject(LOCALE_ID));
+    return computed(() => pipe.transform(value(), format()));
+  },
+});
+
+export const EventList = component({
+  bindings: {
+    events: input.required<{ id: string; date: Date }[]>(),
+  },
+  setup: ({ events }) => (
+    @for (event of events(); track event.id) {
+      @derive formatted = dateFmt(value={event.date} format={'medium'});
+      <span>{formatted()}</span>
+    }
+  ),
+});
+```
+
+Rules:
+
+- Components → the class is used as a tag (`<ClassName ... />`).
+- Directives → attached via `use:ClassName(input={expr} on:output={handler})`.
+- Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
+- The same binding prefixes (`bind:`, `model:`, `on:`, `once:`, `:when`, `:ref`) apply.
+- Type checking uses the class's declared inputs/outputs — invalid bindings are compile-time errors.
