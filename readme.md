@@ -944,6 +944,27 @@ export const MyPage = component({
 });
 ```
 
+Where a decorator-based component expects an `ng-template` (via `@ContentChild(TemplateRef)` or a `TemplateRef` input), a `@fragment` takes its place:
+
+```ts
+import { component, signal } from '@angular/core';
+import { MyList } from '@mylib/list';
+
+export const MyPage = component({
+  setup: () => {
+    const items = signal([{ id: '1', name: 'Item 1' }, { id: '2', name: 'Item 2' }]);
+
+    return (
+      <MyList items={items()}>
+        @fragment itemTemplate(item: { id: string; name: string }) {
+          <span>{item.name}</span>
+        }
+      </MyList>
+    );
+  },
+});
+```
+
 ### Directives
 
 Directives are attached with `use:Class(...)` — inputs and outputs are listed explicitly inside the parentheses:
