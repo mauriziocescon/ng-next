@@ -1,6 +1,6 @@
 # Wrapper API Shaping (`addBindings` / `omitBindings`)
 
-This proposal evolves `component.wrap` so wrappers can expose a curated API while preserving current compile-time forwarding guarantees.
+This proposal evolves the two-argument `component.withForwarding(Target, config)` form so wrappers can expose a curated API while preserving current compile-time forwarding guarantees.
 
 > Status: proposal only. This document describes a possible evolution and is not implemented in `experimental/types.ts` yet.
 
@@ -14,7 +14,7 @@ Normative keywords in this document follow RFC-style meaning:
 
 ## Summary
 
-Today, `component.wrap(Target, ...)` mirrors target bindings (with optional overrides), and setup receives selected/effective bindings in `setup(bindings)`. In templates, `@forward()` forwards target-compatible bindings at compile time.
+Today, `component.withForwarding(Target, config)` mirrors target bindings (with optional overrides), and setup receives selected/effective bindings in `setup(bindings)`. In templates, `@forward()` forwards target-compatible bindings at compile time.
 
 This evolution adds two capabilities:
 
@@ -42,7 +42,7 @@ export const UserDetail = component({
   setup: ({ user, email, makeAdmin, children }) => (...),
 });
 
-export const EnterpriseUser = component.wrap(UserDetail, {
+export const EnterpriseUser = component.withForwarding(UserDetail, {
   omitBindings: {
     email: true,
     makeAdmin: true,
@@ -107,12 +107,12 @@ type ForwardableTargetBindings<
 > = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>>;
 ```
 
-`wrap` config sketch:
+`withForwarding(Target, config)` config sketch:
 
-This is a **proposed** extension of `component.wrap`, not the current signature in `experimental/types.ts`.
+This is a **proposed** extension of `component.withForwarding(Target, config)`, not the current signature in `experimental/types.ts`.
 
 ```ts
-export declare function wrap<
+export declare function withForwarding<
   C extends ComponentInstance<any, any, any>,
   Added extends Record<string, ComponentBindingValue> = {},
   OmitM extends OmitMap<TargetBindings<C>> = {},
@@ -145,7 +145,7 @@ Notes:
 Given:
 
 ```ts
-component.wrap(Target, {
+component.withForwarding(Target, {
   omitBindings: { x: true },
   addBindings: { y: input.required<number>() },
   setup: (bindings) => (
@@ -164,7 +164,7 @@ Compiler contract:
 6. The compiler `MUST` treat `@forward()` as marker-only: no forwarding object, property reads, or enumeration.
 7. In wrapper binding-forwarding context, the compiler `MUST` reject `@forward()` on non-component elements.
 
-No runtime forwarding object is required; the same strategy as current `component.wrap` is retained.
+No runtime forwarding object is required; the same strategy as current `component.withForwarding(Target, config)` is retained.
 
 ---
 
@@ -188,7 +188,7 @@ export const ThirdPartyGrid = component({
   setup: ({ rows, columns, density, debugMode, unsafeHtml, theme, rowClick }) => (...),
 });
 
-export const CorpGrid = component.wrap(ThirdPartyGrid, {
+export const CorpGrid = component.withForwarding(ThirdPartyGrid, {
   omitBindings: {
     debugMode: true,
     unsafeHtml: true,
@@ -220,7 +220,7 @@ export const UserDetail = component({
   setup: ({ user, email, makeAdmin }) => (...),
 });
 
-export const UserProfile = component.wrap(UserDetail, {
+export const UserProfile = component.withForwarding(UserDetail, {
   omitBindings: {
     email: true,
   },
@@ -245,7 +245,7 @@ export const UserDetail = component({
   setup: ({ user, email, makeAdmin }) => (...),
 });
 
-export const UserCard = component.wrap(UserDetail, {
+export const UserCard = component.withForwarding(UserDetail, {
   addBindings: {
     highlight: input<boolean>(false),
   },

@@ -384,7 +384,7 @@ export const Counter = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-`@forward()` designates where forwarded directives and bindings land. In `component.withDirectiveForwarding<S>(...)`, it targets an element for directive passthrough. In `component.wrap(Target, ...)`, it forwards remaining bindings and directives to the wrapped component.
+`@forward()` designates where forwarded directives and bindings land. In `component.withForwarding<S>(config)`, it targets an element for directive passthrough. In `component.withForwarding(Target, config)`, it forwards remaining bindings and directives to the wrapped component. The generic host type is only valid in the one-argument form; the two-argument form infers the forwarded host type from `Target`.
 
 Implicit children fragment — placement, lifecycle, and binding context:
 
@@ -538,7 +538,7 @@ export const ButtonConsumer = component({
 // -- button in @mylib/button --------------------
 import { component, input, output, computed, fragment } from '@angular/core';
 
-export const Button = component.withDirectiveForwarding<HTMLButtonElement>({
+export const Button = component.withForwarding<HTMLButtonElement>({
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -595,7 +595,7 @@ export const UserDetailConsumer = component({
 /**
  * Wrapper: selected bindings go to setup, remainder forwarded via @forward()
  */
-export const UserDetailWrapper = component.wrap(UserDetail, {
+export const UserDetailWrapper = component.withForwarding(UserDetail, {
   bindings: {
     user: input.required<User>(),
   },
@@ -619,7 +619,7 @@ export interface User {
   role: string;
 }
 
-export const UserDetail = component.withDirectiveForwarding<HTMLElement>({
+export const UserDetail = component.withForwarding<HTMLElement>({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
