@@ -928,6 +928,22 @@ export const Settings = component({
 });
 ```
 
+For named `ng-content` slots, use `ngProjectAs` on native elements — unknown element names are compile-time errors:
+
+```ts
+import { component } from '@angular/core';
+import { MyCard } from '@mylib/card';
+
+export const MyPage = component({
+  setup: () => (
+    <MyCard>
+      <div ngProjectAs="my-card-header">header</div>
+      <div ngProjectAs="my-card-content">content</div>
+    </MyCard>
+  ),
+});
+```
+
 ### Directives
 
 Directives are attached with `use:Class(...)` — inputs and outputs are listed explicitly inside the parentheses:
@@ -959,7 +975,7 @@ export const DraggableCard = component({
 
 ### Pipes
 
-The template DSL has no pipe operator (`|`). Decorator-based pipes are consumed by wrapping them in a `derivation` — the pipe is instantiated with `new` inside `setup`, which runs in an injection context and can resolve constructor dependencies:
+The template DSL has no pipe operator (`|`). Decorator-based pipes are consumed by wrapping them in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps):
 
 ```ts
 import { component, derivation, computed, inject, input, LOCALE_ID } from '@angular/core';
