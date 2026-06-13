@@ -24,9 +24,10 @@
     "typecheck": "tsc --noEmit --strict --target es2022 --moduleResolution bundler types/ng-types.spec.ts"
   },
   "devDependencies": {
-    "@angular/cli": "^22.0.0",
-    "@angular/common": "^22.0.0",
-    "@angular/core": "^22.0.0",
+    "@angular/cli": "^22.0.1",
+    "@angular/common": "^22.0.1",
+    "@angular/core": "^22.0.1",
+    "@angular/forms": "^22.0.1",
     "typescript": "^6.0.0",
     "web-codegen-scorer": "^0.0.70"
   }

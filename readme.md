@@ -327,7 +327,7 @@ export const UserDetailConsumer = component({
 
 ## Input-driven providers
 
-Inputs hoisted to the component level for use in provider initialization (`providers` receives only inputs — not models or outputs):
+Inputs hoisted to the component level for use in provider initialization (`providers` receives only inputs — not models or outputs). Provider factories run in an injection context — `inject()` works inside them:
 
 ```ts
 import { component, linkedSignal, input, WritableSignal, provide, inject } from '@angular/core';
@@ -690,9 +690,9 @@ Improved ergonomics for types and tokens.
 
 `injectionToken` creates a typed DI token. Four flavours:
 
-- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default; throws if missing from the injector tree.
-- **With factory + `autoProvided: true`** — factory invoked once at root scope; no explicit `provide` needed.
-- **Without factory** — must use `provide(token, factory)` with an explicit factory. The shorthand is a compile-time error.
+- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default; the factory is only invoked when a component explicitly lists `provide(token)` in its `providers`. Throws if missing from the injector tree.
+- **With factory + `autoProvided: true`** — factory registered unconditionally at root scope; no explicit `provide` needed.
+- **Without factory** — must use `provide(token, factory)` with an explicit factory. The `provide(token)` shorthand is a compile-time error.
 - **Multi** (`injectionToken.multi`) — each `provide` call contributes one item; `inject` returns the collected array.
 
 ```ts
