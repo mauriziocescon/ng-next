@@ -909,12 +909,21 @@ Existing decorator-based (`@Component`, `@Directive`, `@Pipe`) classes work in `
 
 ### Components
 
-The class symbol is used directly as a tag — bindings follow the same `bind:` / `model:` / `on:` rules:
+The class symbol is used directly as a tag — bindings follow the same `bind:` / `model:` / `on:` rules.
+
+- For named `ng-content` slots, `ngProjectAs` on native elements projects content into the correct slot — unknown element names are compile-time errors.
+- Where a decorator-based component expects an `ng-template` (via `@ContentChild(TemplateRef)` or a `TemplateRef` input), a `@fragment` takes its place.
+- For components with multiple element selectors (e.g. `button[mat-button], a[mat-button]`), the `:element` suffix disambiguates the host element — invalid element names are compile-time errors.
 
 ```ts
 import { component, signal } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
+import { MatButton } from '@angular/material/button';
+import { MyCard } from '@mylib/card';
+import { MyList } from '@mylib/list';
+import { tooltip } from '@mylib/tooltip';
 
+// Basic usage — class symbol as a tag
 export const Settings = component({
   setup: () => {
     const darkMode = signal(false);
@@ -926,14 +935,8 @@ export const Settings = component({
     );
   },
 });
-```
 
-For named `ng-content` slots, `ngProjectAs` on native elements projects content into the correct slot — unknown element names are compile-time errors:
-
-```ts
-import { component } from '@angular/core';
-import { MyCard } from '@mylib/card';
-
+// ngProjectAs for named ng-content slots
 export const MyPage = component({
   setup: () => (
     <MyCard>
@@ -942,15 +945,9 @@ export const MyPage = component({
     </MyCard>
   ),
 });
-```
 
-Where a decorator-based component expects an `ng-template` (via `@ContentChild(TemplateRef)` or a `TemplateRef` input), a `@fragment` takes its place:
-
-```ts
-import { component, signal } from '@angular/core';
-import { MyList } from '@mylib/list';
-
-export const MyPage = component({
+// @fragment replaces ng-template
+export const ListPage = component({
   setup: () => {
     const items = signal([{ id: '1', name: 'Item 1' }, { id: '2', name: 'Item 2' }]);
 
@@ -960,6 +957,26 @@ export const MyPage = component({
           <span>{item.name}</span>
         }
       </MyList>
+    );
+  },
+});
+
+// :element suffix for multi-selector components
+export const Nav = component({
+  setup: () => {
+    const hasPermissions = signal(false);
+
+    return (
+      <MatButton:a
+        href={'/admin'}
+        use:tooltip(message={'Cannot navigate'})
+        disabled={hasPermissions()}>
+          Admin
+      </MatButton:a>
+
+      <MatButton:button on:click={() => {}}>
+        Click
+      </MatButton:button>
     );
   },
 });
@@ -1029,6 +1046,9 @@ export const EventList = component({
 Rules:
 
 - Components → the class is used as a tag (`<ClassName ... />`).
+- `ngProjectAs` projects native elements into named `ng-content` slots.
+- `@fragment` replaces `ng-template` for components expecting a `TemplateRef`.
+- `:element` suffix disambiguates multi-selector components (`<MatButton:a>`).
 - Directives → attached via `use:ClassName(input={expr} on:output={handler})`.
 - Structural directives → not supported; `@if`, `@for`, `@switch`, and fragments replace them.
 - Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
