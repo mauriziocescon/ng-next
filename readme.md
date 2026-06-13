@@ -919,9 +919,9 @@ The class symbol is used directly as a tag — bindings follow the same `bind:` 
 import { component, signal } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatButton } from '@angular/material/button';
+import { MatTooltip } from '@angular/material/tooltip';
 import { MyCard } from '@mylib/card';
 import { MyList } from '@mylib/list';
-import { tooltip } from '@mylib/tooltip';
 
 // Basic usage — class symbol as a tag
 export const Settings = component({
@@ -969,7 +969,7 @@ export const Nav = component({
     return (
       <MatButton:a
         href={'/admin'}
-        use:tooltip(message={'Cannot navigate'})
+        use:MatTooltip(matTooltip={'Cannot navigate'})
         disabled={hasPermissions()}>
           Admin
       </MatButton:a>
