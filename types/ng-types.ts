@@ -322,6 +322,10 @@ type SetupReturn<E> =
 //   for native tags, the compiler resolves that type through
 //   IntrinsicElements (e.g. <button @forward()> -> HTMLButtonElement)
 //   and checks directive host compatibility against it.
+//   S is a public directive-compatibility contract and must be
+//   HTMLElement or a subtype. TypeScript validates the declared API
+//   shape; the template checker must validate that the actual native
+//   @forward() site is assignable to S.
 //
 // component.withForwarding(Target, config) — wrapper mode:
 //   Target is passed as a value; C is inferred from it (consistent

@@ -709,6 +709,20 @@ type _ForwardingWrapperPreservesHost = Assert<
   >
 >;
 
+const InputForwarding = component.withForwarding<HTMLInputElement>({
+  setup: () => tmpl,
+});
+const InputForwardingWrapper = component.withForwarding(InputForwarding, {
+  bindings: {},
+  setup: () => tmpl,
+});
+type _InputForwardingWrapperPreservesHost = Assert<
+  IsEqual<
+    typeof InputForwardingWrapper,
+    ComponentInstance<{}, void, HTMLInputElement>
+  >
+>;
+
 const NoForwardingTarget = component({
   setup: () => tmpl,
 });
@@ -923,6 +937,27 @@ type _ButtonForwardingAcceptsGenericDirective = Assert<
 const _negButtonForwardingRejectsInputDirective: DirectiveFitsForwardedElement<
   typeof ButtonForwarding,
   typeof inputOnly
+> = true;
+
+type _InputForwardingWrapperAcceptsInputDirective = Assert<
+  IsEqual<
+    DirectiveFitsForwardedElement<
+      typeof InputForwardingWrapper,
+      typeof inputOnly
+    >,
+    true
+  >
+>;
+type _InputForwardingWrapperAcceptsGenericDirective = Assert<
+  IsEqual<
+    DirectiveFitsForwardedElement<typeof InputForwardingWrapper, typeof tooltip>,
+    true
+  >
+>;
+// @ts-expect-error HTMLButtonElement host directive is incompatible with HTMLInputElement forwarded through wrapper
+const _negInputForwardingWrapperRejectsButtonDirective: DirectiveFitsForwardedElement<
+  typeof InputForwardingWrapper,
+  typeof buttonOnly
 > = true;
 
 // ────────────────────────────────────────────────────────────────
