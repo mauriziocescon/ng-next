@@ -919,7 +919,6 @@ The class symbol is used directly as a tag — bindings follow the same `bind:` 
 import { component, signal } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatButton } from '@angular/material/button';
-import { MatTooltip } from '@angular/material/tooltip';
 import { MyCard } from '@mylib/card';
 import { MyList } from '@mylib/list';
 
@@ -967,16 +966,9 @@ export const Nav = component({
     const hasPermissions = signal(false);
 
     return (
-      <MatButton:a
-        href={'/admin'}
-        use:MatTooltip(matTooltip={'Cannot navigate'})
-        disabled={hasPermissions()}>
-          Admin
+      <MatButton:a href={'/admin'} disabled={hasPermissions()}>
+        Admin
       </MatButton:a>
-
-      <MatButton:button on:click={() => {}}>
-        Click
-      </MatButton:button>
     );
   },
 });
@@ -988,8 +980,10 @@ Directives are attached with `use:Class(...)` — inputs and outputs are listed 
 
 ```ts
 import { component, signal } from '@angular/core';
+import { MatButton } from '@angular/material/button';
 import { MatTooltip } from '@angular/material/tooltip';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
+import { tooltip } from '@mylib/tooltip';
 
 export const DraggableCard = component({
   setup: () => {
@@ -1001,11 +995,25 @@ export const DraggableCard = component({
     }
 
     return (
+      // On native elements
       <div
         use:MatTooltip(matTooltip={tip()})
         use:CdkDrag(on:cdkDragEnded={onDragEnd})>
-        Position: {position().x}, {position().y}
+          Position: {position().x}, {position().y}
       </div>
+
+      // On decorator-based components
+      <MatButton:button
+        use:MatTooltip(matTooltip={'Click me'})
+        on:click={() => {}}>
+          Click
+      </MatButton:button>
+
+      <MatButton:a
+        href={'/admin'}
+        use:tooltip(message={'Click me'})>
+          Admin
+      </MatButton:a>
     );
   },
 });
