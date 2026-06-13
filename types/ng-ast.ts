@@ -653,6 +653,7 @@ export interface I18nMeta {
 
 export interface TemplateAstVisitor<T = void> {
   visitElement(element: ElementNode, context: T): void;
+  visitForwardMarker(marker: ForwardMarkerNode, context: T): void;
   visitText(text: TextNode, context: T): void;
   visitTextInterpolation(interpolation: TextInterpolationNode, context: T): void;
   visitLet(letNode: LetNode, context: T): void;
@@ -691,6 +692,7 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
     switch (node.type) {
       case 'Element':
         visitor.visitElement(node, context);
+        if (node.forwardMarker) visitor.visitForwardMarker(node.forwardMarker, context);
         for (const attr of node.attributes) visitor.visitTextAttribute(attr, context);
         for (const input of node.inputs) visitor.visitBoundAttribute(input, context);
         for (const output of node.outputs) visitor.visitBoundEvent(output, context);
