@@ -928,7 +928,7 @@ export const Settings = component({
 });
 ```
 
-For named `ng-content` slots, use `ngProjectAs` on native elements — unknown element names are compile-time errors:
+For named `ng-content` slots, `ngProjectAs` on native elements projects content into the correct slot — unknown element names are compile-time errors:
 
 ```ts
 import { component } from '@angular/core';
@@ -1009,6 +1009,7 @@ Rules:
 
 - Components → the class is used as a tag (`<ClassName ... />`).
 - Directives → attached via `use:ClassName(input={expr} on:output={handler})`.
+- Structural directives → not supported; `@if`, `@for`, `@switch`, and fragments replace them.
 - Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
 - The same binding prefixes (`bind:`, `model:`, `on:`, `once:`, `:when`, `:ref`) apply.
 - Type checking uses the class's declared inputs/outputs — invalid bindings are compile-time errors.
