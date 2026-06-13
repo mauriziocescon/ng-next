@@ -169,7 +169,9 @@ export const Counter = component({
 
 ## Element directives
 
-Change the appearance or behavior of DOM elements:
+Directives change the appearance or behavior of DOM elements. Apply them with `use:directive(...)` — any directive can be used directly in the template.
+
+The `host` property constrains which elements a directive can attach to. When applied to a native tag, the compiler checks the tag's `IntrinsicElements` type against the directive's `host` ref type.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -183,10 +185,6 @@ export const TextSearch = component({
     function valueChange() {/** ... **/}
     function doSomething() {/** ... **/}
 
-    /**
-     * Encapsulation of directive data: use:directive(...)
-     * Any directive can be used directly in the template
-     */
     return (
       <input
         type="text"
@@ -203,11 +201,6 @@ export const TextSearch = component({
 import { directive, ref, input, output, inject, DestroyRef, Renderer2, afterRenderEffect } from '@angular/core';
 
 export const tooltip = directive({
-  /**
-   * Host element constraint. When this directive is used on a
-   * native tag, the tag's IntrinsicElements entry supplies the
-   * concrete host type checked against this ref type.
-   */
   host: ref<HTMLElement>(),
   bindings: {
     message: input.required<string>(),
@@ -257,8 +250,6 @@ export const PriceSimulator = component({
   },
   setup: ({ items }) => {
     /**
-     * Any derivation can be used directly in the template via @derive
-     *
      * price shares the @for embedded view scope and is created once,
      * following its lifecycle. Same scope as @let, same lifetime as
      * a pure pipe. Each row owns an independent instance. Not accessible
@@ -366,9 +357,6 @@ export const Counter = component({
       <button on:click={() => store.increase()}>+</button>
     );
   },
-  /**
-   * Only inputs are provided
-   */
   providers: ({ c }) => [
     provide(CounterStore, () => new CounterStore(c)),
   ],
@@ -392,9 +380,7 @@ export const MenuConsumer = component({
     const first = signal('First');
     const second = signal('Second');
 
-    /**
-     * Markup inside a component tag implicitly becomes a children fragment
-     */
+    // Markup inside a component tag implicitly becomes a children fragment
     return (
       <Menu>
         <MenuItem>{first()}</MenuItem>
@@ -409,18 +395,13 @@ import { component, fragment } from '@angular/core';
 
 export const Menu = component({
   bindings: {
-    /**
-     * Provided by Angular from nested content (not bindable directly).
-     * This name is reserved by Angular.
-     */
+    // Provided by Angular from nested content (not bindable directly). Reserved name.
     children: fragment<void>(),
   },
   setup: ({ children }) => {
     /** ... **/
 
-    /**
-     * No ng-container needed; full form: @render(fragment(), { injector })
-     */
+    // No ng-container needed; full form: @render(fragment(), { injector })
     return (
       @if (children) {
         @render(children())
@@ -457,10 +438,7 @@ export const MenuConsumer = component({
   setup: () => {
     const items = signal<Item[]>(/** ... **/);
 
-    /**
-     * Inline @fragment is auto-passed as the matching fragment input.
-     * Equivalent explicit form: declare @fragment outside, pass as menuItem={menuItem}.
-     */
+    // Inline @fragment is auto-passed as the matching fragment input
     return (
       <Menu items={items()}>
         @fragment menuItem(item: Item) {
@@ -494,6 +472,8 @@ export const Menu = component({
 
 ### Directive passthrough
 
+Type safety: `Button` forwards to `HTMLButtonElement`, so only directives whose `host` is assignable from `HTMLButtonElement` are accepted (e.g. `host: ref<HTMLInputElement>()` → compile error). The same directive cannot be applied more than once to the same component / element.
+
 ```ts
 import { component, signal } from '@angular/core';
 import { Button } from '@mylib/button';
@@ -507,14 +487,6 @@ export const ButtonConsumer = component({
 
     function doSomething() {/** ... **/}
 
-    /**
-     * Type safety: Button forwards to HTMLButtonElement, so only
-     * directives whose host is assignable from HTMLButtonElement
-     * are accepted (e.g. host: ref<HTMLInputElement>() → compile error).
-     * 
-     * The same directive cannot be applied more than once
-     * to the same component / element.
-     */
     return (
       <Button
         type="button"
@@ -545,10 +517,7 @@ export const Button = component.withForwarding<HTMLButtonElement>({
   setup: ({ type, class: className, style, disabled, click, children }) => {
     const innerStyle = computed(() => `${style()}; color: red;`);
 
-    /**
-     * Directive forwarding: directives applied to <Button /> are propagated to
-     * and instantiated on the internal <button> (HTMLButtonElement) element.
-     */
+    // Directives applied to <Button /> are forwarded to this element
     return (
       <button
         @forward()
@@ -587,9 +556,7 @@ export const UserDetailConsumer = component({
   },
 });
 
-/**
- * Wrapper: selected bindings go to setup, remainder forwarded via @forward()
- */
+// Wrapper: selected bindings go to setup, remainder forwarded via @forward()
 export const UserDetailWrapper = component.withForwarding(UserDetail, {
   bindings: {
     user: input.required<User>(),
