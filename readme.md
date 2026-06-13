@@ -644,29 +644,40 @@ export const UserDetail = component.withForwarding<HTMLElement>({
 
 ## Expose and Template Refs
 
-`expose` is the public interface of `setup()` for refs. Components return it along with `template`; directives return it from `setup`.
+`expose` defines the public interface of a component or directive, accessible through `ref`. Only what is listed in `expose` is reachable from outside — everything else stays private.
 
-`ref(Type)` → `Signal<expose | undefined>`, `refMany(Type)` → `Signal<expose[]>`; without `expose`, they resolve to `Signal<undefined>` and `Signal<undefined[]>`. Elements and components are bound with `ref={...}`, or with `use:...:ref={...}` for directives, and can be read after `afterNextRender`.
+- `ref(Type)` → `Signal<expose | undefined>`
+- `refMany(Type)` → `Signal<expose[]>`
+- `ref<HTMLElement>()` → `Signal<HTMLElement | undefined>`
+
+Without `expose`, refs resolve to `Signal<undefined>`. Refs are readable after `afterNextRender`.
+
+Defining `expose` in a component:
 
 ```ts
-import { component, ref, refMany, signal, input, afterNextRender, Signal } from '@angular/core';
-import { ripple } from '@mylib/ripple';
-import { tooltip } from '@mylib/tooltip';
+import { component, signal } from '@angular/core';
 
 const Child = component({
   setup: () => {
     const text = signal('');
-    const _internal = signal(0); // not exposed
+    const _internal = signal(0);
 
     return {
       template: (...),
-      // expose: component's public interface — only these are accessible via ref
       expose: {
         text: text.asReadonly(),
       },
     };
   },
 });
+```
+
+Using refs — elements, components, and directives:
+
+```ts
+import { component, ref, refMany, signal, input, afterNextRender, Signal } from '@angular/core';
+import { ripple } from '@mylib/ripple';
+import { tooltip } from '@mylib/tooltip';
 
 const Sibling = component({
   bindings: {
@@ -679,20 +690,13 @@ const Sibling = component({
 
 export const Parent = component({
   setup: () => {
-    // Native element: type explicit -> Signal<HTMLDivElement | undefined>.
-    // The template compiler checks ref={el} against the tag type from
-    // IntrinsicElements, so <div ref={el}> is valid but <input ref={el}>
-    // is not.
     const el = ref<HTMLDivElement>();
-    // Component: type inferred from expose → Signal<{ text: Signal<string> } | undefined>
     const child = ref(Child);
-    // Directive: type inferred from setup() return → Signal<{ toggle: () => void } | undefined>
     const tlp = ref(tooltip);
-    // Multiple instances (e.g. inside @for) → Signal<{ text: Signal<string> }[]>
     const many = refMany(Child);
 
     afterNextRender(() => {
-      // refs resolve here
+      // all refs resolve here
     });
 
     return (
@@ -714,6 +718,8 @@ export const Parent = component({
   },
 });
 ```
+
+Binding syntax: `ref={...}` on elements and components, `use:directive(...):ref={...}` on directives.
 
 ## Dependency Injection Enhancements
 

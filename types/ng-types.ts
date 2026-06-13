@@ -530,6 +530,17 @@ export function derivation(config: any): any {
 //
 // Each has overloads for native elements, components, and
 // directives. The expose type is inferred from the target.
+//
+// Type resolution rules:
+//   - Native element (ref<H>()): the template compiler checks
+//     ref={x} against the tag's IntrinsicElements entry, so
+//     <div ref={el}> is valid only if el is Ref<HTMLDivElement>.
+//   - Component (ref(Comp)): resolves to Signal<expose | undefined>,
+//     where expose is inferred from the component's setup return.
+//   - Directive (ref(dir)): resolves to Signal<expose | undefined>,
+//     where expose is the directive's setup() return value.
+//   - refMany(Type): collects multiple instances (e.g. inside @for)
+//     into Signal<expose[]>.
 // ────────────────────────────────────────────────────────────────
 
 // Native element
