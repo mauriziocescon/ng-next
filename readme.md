@@ -865,6 +865,7 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `once:` | inputs only | No (per property) | Freezes the input value at creation time; never updated afterwards. `once:model:*` and `once:on:*` are compile-time errors. |
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
+| `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
 | `use:` | native elements, components (with forwarding) | Yes (different directives) | Attaches a directive. Same directive cannot appear twice on the same element. |
 | `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |

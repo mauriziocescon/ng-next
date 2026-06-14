@@ -107,6 +107,7 @@ H = I(tag)
 ∀ input ∈ node.inputs:       CHECK-NATIVE-INPUT(Γ, H, input)
 ∀ output ∈ node.outputs:     CHECK-NATIVE-OUTPUT(Γ, H, output)
 ∀ model ∈ node.models:       CHECK-NATIVE-MODEL(Γ, H, model)
+∀ anim ∈ node.animations:   CHECK-ANIMATE-BINDING(Γ, anim)
 ∀ dir ∈ node.directives:     CHECK-DIRECTIVE-USE(Γ, H, dir)
 ∀ ref ∈ node.references:     CHECK-NATIVE-REF(Γ, H, ref)
 NO-DUPLICATE-BINDINGS(node)
@@ -177,6 +178,38 @@ NO-STATIC-DYNAMIC-CLASH
 ─────────────────────────────────────────────────
 ∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}
   UNLESS name ∈ {"class", "style"}
+─────────────────────────────────────────────────
+```
+
+### 3.3 animate: Typing
+
+```
+ANIMATE-CLASS-BINDING
+─────────────────────────────────────────────────
+animate:phase={expr}   where phase ∈ {"enter", "leave"}
+Γ ⊢ expr : string | string[]
+─────────────────────────────────────────────────
+
+
+ANIMATE-EVENT-BINDING
+─────────────────────────────────────────────────
+on:animate:phase={handler}   where phase ∈ {"enter", "leave"}
+Γ ⊢ handler : (event: AnimationCallbackEvent) => void
+─────────────────────────────────────────────────
+
+where AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction }
+
+
+ANIMATE-CONSTRAINTS
+─────────────────────────────────────────────────
+animate: applies ONLY to native elements (not components)
+phase must be "enter" or "leave" — any other value is an error
+At most one animate:enter (class form) per element
+At most one animate:leave (class form) per element
+At most one on:animate:enter per element
+At most one on:animate:leave per element
+Both animate:enter and animate:leave can coexist on the same element
+Both class form and event form can coexist for the same phase on the same element
 ─────────────────────────────────────────────────
 ```
 
@@ -581,6 +614,7 @@ else:           x : Ref<E_D | undefined> ∈ Γ
 | `once:` | inputs only | No (per prop) | Input only. `once:model:*` / `once:on:*` → error |
 | `class:` | native | Yes | Conditional class |
 | `style:` | native | Yes | Conditional style |
+| `animate:` | native | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
 | `use:` | native, forwarding comp | Yes (diff dirs) | Same directive only once per element |
 | `:when` | `use:` directive | No (per dir) | Condition must be `boolean` |
 | `:ref` | `use:` directive | No (per dir) | Target must match directive expose |
@@ -614,6 +648,12 @@ else:           x : Ref<E_D | undefined> ∈ Γ
 | D019 | `model:` on native element that is not input/select/textarea | Error |
 | D020 | `on`-prefixed input/model/output binding name | Warning |
 | D021 | Multiple `@forward()` in same template | Error |
+| D022 | `animate:` used on component element (not native) | Error |
+| D023 | `animate:` with invalid phase (not `enter` or `leave`) | Error |
+| D024 | Duplicate `animate:enter` or `animate:leave` class binding on same element | Error |
+| D025 | Duplicate `on:animate:enter` or `on:animate:leave` event binding on same element | Error |
+| D026 | `animate:` expression type mismatch (not `string \| string[]`) | Error |
+| D027 | `on:animate:` handler type mismatch (not `(event: AnimationCallbackEvent) => void`) | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -881,6 +921,63 @@ const Broken = component.withForwarding<HTMLElement>({
 //        ~~~~~~~~~~ D021: Only one '@forward()' is allowed per component template.
   ),
 });
+```
+
+#### D022 — `animate:` on component element
+
+```ts
+const Card = component({
+  bindings: { title: input.required<string>() },
+  setup: ({ title }) => (<h2>{title()}</h2>),
+});
+
+// ❌ animate: is only valid on native elements
+<Card title={'hi'} animate:enter={'fade-in'} />
+//                  ~~~~~~~~~~~~~~ D022: 'animate:' can only be used on native elements, not component 'Card'.
+```
+
+#### D023 — Invalid animate phase
+
+```ts
+// ❌ "show" is not a valid phase
+<div animate:show={'fade-in'}>Content</div>
+//   ~~~~~~~~~~~~~ D023: Invalid animation phase 'show'. Only 'enter' and 'leave' are supported.
+```
+
+#### D024 — Duplicate animate class binding
+
+```ts
+// ❌ animate:enter bound twice
+<div animate:enter={'fade-in'} animate:enter={'slide-in'}>Content</div>
+//                             ~~~~~~~~~~~~~~ D024: Duplicate 'animate:enter' binding.
+```
+
+#### D025 — Duplicate animate event binding
+
+```ts
+// ❌ on:animate:leave bound twice
+<div on:animate:leave={fn1} on:animate:leave={fn2}>Content</div>
+//                          ~~~~~~~~~~~~~~~~~ D025: Duplicate 'on:animate:leave' binding.
+```
+
+#### D026 — Animate class type mismatch
+
+```ts
+const count = signal(42);
+
+// ❌ number is not a valid animate class value
+<div animate:enter={count()}>Content</div>
+//                  ~~~~~~~ D026: Type 'number' is not assignable to 'string | string[]'.
+```
+
+#### D027 — Animate event handler type mismatch
+
+```ts
+function wrongHandler(x: string) {}
+
+// ❌ handler signature doesn't match AnimationCallbackEvent
+<div on:animate:enter={wrongHandler}>Content</div>
+//                     ~~~~~~~~~~~~ D027: Type '(x: string) => void' is not assignable to '(event: AnimationCallbackEvent) => void'.
 ```
 
 ---

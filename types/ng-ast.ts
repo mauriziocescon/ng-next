@@ -94,6 +94,7 @@ export interface ElementNode extends BaseNode {
   inputs: BoundAttributeNode[];
   outputs: BoundEventNode[];
   models: BoundModelNode[];
+  animations: AnimateBindingNode[];
   directives: DirectiveBindingNode[];
   references: RefNode[];
   fragments: FragmentNode[];
@@ -151,6 +152,22 @@ export interface BoundModelNode extends BaseNode {
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
   i18n?: I18nMeta;
+}
+
+/**
+ * animate:enter / animate:leave binding.
+ * Class form: value is an expression resolving to string | string[].
+ * Event form: handler is an AnimationFunction ((event: AnimationCallbackEvent) => void).
+ */
+export interface AnimateBindingNode extends BaseNode {
+  type: 'AnimateBinding';
+  phase: 'enter' | 'leave';
+  kind: 'class' | 'event';
+  value?: AST;
+  handler?: AST;
+  keySpan?: SourceSpan;
+  valueSpan?: SourceSpan;
+  handlerSpan?: SourceSpan;
 }
 
 /**
@@ -673,6 +690,7 @@ export interface TemplateAstVisitor<T = void> {
   visitBoundAttribute(attr: BoundAttributeNode, context: T): void;
   visitBoundEvent(event: BoundEventNode, context: T): void;
   visitBoundModel(model: BoundModelNode, context: T): void;
+  visitAnimateBinding(animate: AnimateBindingNode, context: T): void;
   visitRef(ref: RefNode, context: T): void;
   visitDirectiveBinding(directive: DirectiveBindingNode, context: T): void;
   visitDirectiveInput(input: DirectiveInputNode, context: T): void;
@@ -697,6 +715,7 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
         for (const input of node.inputs) visitor.visitBoundAttribute(input, context);
         for (const output of node.outputs) visitor.visitBoundEvent(output, context);
         for (const model of node.models) visitor.visitBoundModel(model, context);
+        for (const anim of node.animations) visitor.visitAnimateBinding(anim, context);
         for (const ref of node.references) visitor.visitRef(ref, context);
         for (const dir of node.directives) {
           visitor.visitDirectiveBinding(dir, context);
