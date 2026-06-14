@@ -42,23 +42,13 @@ Highlights:
 
 ## Component structure and bindings
 
-`setup` runs once in an injection context. All bindings are wired and available immediately; destructuring is optional.
+`setup` runs once in an injection context. Bindings are immediately available; destructuring is optional.
 
-Native elements are resolved through `IntrinsicElements` — the compiler knows the element type plus valid DOM attributes, properties, and events:
+Native elements resolve through `IntrinsicElements` — the compiler knows valid attributes, properties, and events. Binding syntax:
 
 - 1-way: `bind:property={var}` (`bind:` can be omitted)
 - 2-way: `model:property={var}` (input / select / textarea)
 - events: `on:event_name={handler}`
-
-Invalid native bindings are compile-time errors:
-
-- ‼️ `<input typ="text" />` — unknown attribute ‼️
-- ‼️ `<span class="..." class={...}>` — duplicate static/bound ‼️
-- ‼️ `<span on:click={...} on:click={...}>` — duplicate event ‼️
-
-Multiple `class:` and `style:` on the same element are fine:
-
-- ✅ `<span class="..." class:some-class={...} class:some-other-class={...}>` ✅
 
 ```ts
 import { component, signal, linkedSignal, input, output } from '@angular/core';
@@ -93,19 +83,7 @@ export const TextSearch = component({
 });
 ```
 
-Any component can be used in the template; `bind:`, `model:`, and `on:` behave the same as for native elements.
-
-⚠️ Must provide all required inputs / models ⚠️
-
-Invalid component bindings are compile-time errors:
-
-- ‼️ `<UserDetail role="admin" />` — unknown binding ‼️
-- ‼️ `<UserDetail user={...} user={...} model:user={...} />` — duplicate binding ‼️
-- ‼️ `<UserDetail on:makeAdmin={...} on:makeAdmin={...} />` — duplicate binding ‼️
-
-Shouldn't use `on` prefix with input / model / output:
-
-- ⚠️ `<UserDetail onInput={...} model:onModel={...} on:onEvent={...} />` ⚠️
+Any component can be used in the template; `bind:`, `model:`, and `on:` behave the same as for native elements. All required inputs / models must be provided.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -144,7 +122,7 @@ export const UserDetail = component({
 });
 ```
 
-Lexical scoping resolves in this order: template → setup → functions, constants, enums, and interfaces imported in the file → global.
+Lexical scoping resolves: template → setup → file-level imports (functions, constants, enums, interfaces) → global.
 
 ```ts
 import { component } from '@angular/core';
@@ -899,6 +877,30 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. |
 | `@forward()` | native elements (inside component template) | No | Marks the element as the forwarding target for directive passthrough and extra bindings. |
+
+`ref` and `@forward()` are special attributes, not binding prefixes — included here for completeness.
+
+### Compile-time validation rules
+
+Invalid bindings on native elements:
+
+- `<input typ="text" />` — unknown attribute
+- `<span class="..." class={...}>` — duplicate static/bound
+- `<span on:click={...} on:click={...}>` — duplicate event
+
+Multiple `class:` and `style:` on the same element are allowed:
+
+- `<span class="..." class:some-class={...} class:some-other-class={...}>`
+
+Invalid bindings on components:
+
+- `<UserDetail role="admin" />` — unknown binding
+- `<UserDetail user={...} user={...} model:user={...} />` — duplicate binding
+- `<UserDetail on:makeAdmin={...} on:makeAdmin={...} />` — duplicate binding
+
+Avoid `on` prefix in input / model / output names:
+
+- `<UserDetail onInput={...} model:onModel={...} on:onEvent={...} />`
 
 
 ---
