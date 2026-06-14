@@ -656,8 +656,6 @@ export const Parent = component({
 });
 ```
 
-Binding syntax: `ref={...}` on elements and components, `use:directive(...):ref={...}` on directives.
-
 ## Dependency Injection Enhancements
 
 Improved ergonomics for types and tokens.
