@@ -276,12 +276,7 @@ export const SearchBox = component({
 
 ## One-time bindings (`once:`)
 
-`once:` lets the consumer freeze an input at creation time. The value is seeded once and never updated, even if the source signal changes later. Rules:
-
-- `once:` applies only to inputs.
-- `once:model:*` and `once:on:*` are compile-time errors.
-- `once:prop` and `prop` together on the same element are a duplicate binding error.
-- Literal input expressions are effectively one-time: `prop={'10'}` is semantically equivalent to `once:prop={v()}` where `v()` is a signal returning `'10'`.
+`once:` freezes an input at creation time — never updated afterwards, even if the source signal changes.
 
 ```ts
 import { component, signal } from '@angular/core';
