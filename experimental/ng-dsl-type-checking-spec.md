@@ -457,8 +457,12 @@ Argument checking uses FragmentArgs<T>:
   T = tuple [T₁, ..., Tₙ]      → args = [e₁, ..., eₙ] where eᵢ ⊑ Tᵢ
   T = array A[] (non-tuple)     → args = [e] where e ⊑ A[]
   T = other                     → args = [e] where e ⊑ T
+
+Optional injector override:
+  if options.injector present:
+    Γ ⊢ options.injector : Injector | 'outlet' | null | undefined
 ─────────────────────────────────────────────────────────────────
-Γ ⊢ @render(expr(args)) ✓
+Γ ⊢ @render(expr(args), { injector? }) ✓
 
 
 RENDER-OPTIONAL-GUARD
@@ -610,6 +614,274 @@ else:           x : Ref<E_D | undefined> ∈ Γ
 | D019 | `model:` on native element that is not input/select/textarea | Error |
 | D020 | `on`-prefixed input/model/output binding name | Warning |
 | D021 | Multiple `@forward()` in same template | Error |
+
+### 13.1 Diagnostic Examples
+
+Each example shows a violation and the diagnostic it triggers.
+
+#### D001 — Unknown attribute/property on native element
+
+```ts
+// ❌ "colour" is not a known property of HTMLDivElement
+<div colour="red">Hello</div>
+//   ~~~~~~ D001: Property 'colour' does not exist on element 'div'.
+```
+
+#### D002 — Unknown binding on component
+
+```ts
+const UserDetail = component({
+  bindings: { user: input.required<User>() },
+  setup: ({ user }) => (<span>{user().name}</span>),
+});
+
+// ❌ "role" is not declared in UserDetail's bindings
+<UserDetail user={u()} role="admin" />
+//                      ~~~~ D002: 'role' is not a known binding of 'UserDetail'.
+```
+
+#### D003 — Duplicate binding (same name, same kind)
+
+```ts
+// ❌ "disabled" bound twice
+<button disabled={true} disabled={false}>Click</button>
+//                      ~~~~~~~~ D003: Duplicate binding 'disabled'.
+
+// ❌ Same event bound twice on a component
+<UserDetail user={u()} on:makeAdmin={f1} on:makeAdmin={f2} />
+//                                       ~~~~~~~~~~~~ D003: Duplicate binding 'makeAdmin'.
+```
+
+#### D004 — Static attribute + dynamic binding clash
+
+```ts
+// ❌ "id" appears both as static attribute and dynamic binding
+<div id="static" id={dynamicId()}>Content</div>
+//                ~~ D004: 'id' is already set as a static attribute.
+```
+
+#### D005 — Missing required input/model/fragment
+
+```ts
+const Card = component({
+  bindings: {
+    title: input.required<string>(),
+    content: fragment.required<void>(),
+  },
+  setup: ({ title, content }) => (
+    <h2>{title()}</h2>
+    @render(content())
+  ),
+});
+
+// ❌ "title" is required but not provided
+<Card>
+  <p>Body</p>
+</Card>
+// D005: Required input 'title' is not provided for 'Card'.
+```
+
+#### D006 — Type mismatch
+
+```ts
+const Counter = component({
+  bindings: { count: input.required<number>() },
+  setup: ({ count }) => (<span>{count()}</span>),
+});
+
+// ❌ string is not assignable to number
+<Counter count={'five'} />
+//              ~~~~~~ D006: Type 'string' is not assignable to type 'number'.
+```
+
+#### D007 — model: bound to non-writable signal
+
+```ts
+const name = computed(() => 'readonly');
+
+// ❌ computed() is not writable
+<input type="text" model:value={name} />
+//                              ~~~~ D007: 'model:value' requires a WritableSignal, but received Signal<string>.
+```
+
+#### D008 — Directive host incompatible
+
+```ts
+const inputMask = directive({
+  host: ref<HTMLInputElement>(),
+  bindings: { mask: input.required<string>() },
+  setup: () => {},
+});
+
+// ❌ HTMLDivElement is not assignable to HTMLInputElement
+<div use:inputMask(mask={'###-####'})>Content</div>
+//   ~~~~~~~~~~~~~ D008: Directive 'inputMask' requires host 'HTMLInputElement', but applied to 'div' (HTMLDivElement).
+```
+
+#### D009 — Same directive applied twice
+
+```ts
+// ❌ tooltip appears twice on the same element
+<button
+  use:tooltip(message={'First'})
+  use:tooltip(message={'Second'})>
+//~~~~~~~~~~~~ D009: Directive 'tooltip' is already applied to this element.
+  Click
+</button>
+```
+
+#### D010 — once:model: or once:on:
+
+```ts
+// ❌ once: is only valid on inputs
+<UserDetail once:model:email={email} user={u()} />
+//          ~~~~~~~~~~~~~~~~ D010: 'once:' cannot be used with 'model:'. Only inputs support 'once:'.
+
+<UserDetail once:on:makeAdmin={f} user={u()} />
+//          ~~~~~~~~~~~~~~~~~ D010: 'once:' cannot be used with 'on:'. Only inputs support 'once:'.
+```
+
+#### D011 — once:prop + prop duplicate
+
+```ts
+// ❌ same input bound with and without once:
+<Counter once:count={5} count={dynamicCount()} />
+//                      ~~~~~ D011: 'count' cannot appear both as 'once:count' and 'count'.
+```
+
+#### D012 — Directive on non-forwarding component
+
+```ts
+const Plain = component({
+  bindings: { label: input.required<string>() },
+  setup: ({ label }) => (<span>{label()}</span>),
+});
+
+// ❌ Plain does not declare withForwarding
+<Plain label={'hi'} use:tooltip(message={'tip'}) />
+//                  ~~~~~~~~~~~~ D012: Cannot apply directive to 'Plain': component does not support forwarding.
+```
+
+#### D013 — No @forward() when wrapper remainder is non-empty
+
+```ts
+// ❌ Wrapper selects "user" but Target has "email" and "makeAdmin" that need forwarding
+const Broken = component.withForwarding(UserDetail, {
+  bindings: { user: input.required<User>() },
+  setup: ({ user }) => (
+    // Missing @forward() — remaining bindings have nowhere to go
+    <UserDetail user={user()} />
+//  D013: Component wraps 'UserDetail' but template has no '@forward()' target for remaining bindings: 'email', 'makeAdmin'.
+  ),
+});
+```
+
+#### D014 — @forward() element type not assignable to declared host
+
+```ts
+const Button = component.withForwarding<HTMLButtonElement>({
+  bindings: { label: input.required<string>() },
+  setup: ({ label }) => (
+    // ❌ <span> is HTMLSpanElement, not assignable to HTMLButtonElement
+    <span @forward()>{label()}</span>
+//        ~~~~~~~~~~ D014: Element 'span' (HTMLSpanElement) is not assignable to forwarding host 'HTMLButtonElement'.
+  ),
+});
+```
+
+#### D015 — Fragment argument count/type mismatch
+
+```ts
+const List = component({
+  bindings: {
+    items: input.required<string[]>(),
+    row: fragment.required<[string, number]>(),
+  },
+  setup: ({ items, row }) => (
+    @for (item of items(); track item) {
+      @render(row(item))
+    }
+//              ~~~~~~~~ D015: Fragment 'row' expects 2 arguments [string, number], but got 1.
+  ),
+});
+```
+
+#### D016 — ref variable type incompatible
+
+```ts
+const child = ref<HTMLDivElement>();
+
+const Child = component({
+  setup: () => {
+    return {
+      template: (<span>hi</span>),
+      expose: { value: signal(0).asReadonly() },
+    };
+  },
+});
+
+// ❌ ref expects { value: Signal<number> } | undefined, got HTMLDivElement | undefined
+<Child ref={child} />
+//          ~~~~~ D016: Type 'Ref<HTMLDivElement | undefined>' is not assignable. Expected 'Ref<{ value: Signal<number> } | undefined>'.
+```
+
+#### D017 — Unresolved identifier
+
+```ts
+export const App = component({
+  setup: () => (
+    // ❌ "userName" is not in any scope
+    <h1>{userName}</h1>
+//       ~~~~~~~~ D017: Cannot find name 'userName'.
+  ),
+});
+```
+
+#### D018 — Text interpolation with non-Stringifiable type
+
+```ts
+const data = signal({ x: 1, y: 2 });
+
+// ❌ {x: number, y: number} has no toString() override — not Stringifiable
+<p>{data()}</p>
+//  ~~~~~~ D018: Type '{ x: number; y: number }' is not assignable to 'Stringifiable'.
+```
+
+#### D019 — model: on non-modelable native element
+
+```ts
+// ❌ <div> does not support model:
+<div model:value={text}>Content</div>
+//   ~~~~~~~~~~~ D019: 'model:' is only valid on 'input', 'select', or 'textarea' elements.
+```
+
+#### D020 — on-prefixed binding name (Warning)
+
+```ts
+const Form = component({
+  bindings: {
+    onSubmit: output<void>(),  // ← name starts with "on"
+  },
+  setup: ({ onSubmit }) => (
+    <button on:click={() => onSubmit.emit()}>Submit</button>
+  ),
+});
+// D020 (warning): Binding name 'onSubmit' starts with 'on'. Consider renaming to 'submit' to avoid confusion with event syntax.
+```
+
+#### D021 — Multiple @forward() in same template
+
+```ts
+const Broken = component.withForwarding<HTMLElement>({
+  bindings: { label: input.required<string>() },
+  setup: ({ label }) => (
+    // ❌ Two @forward() markers
+    <div @forward()>{label()}</div>
+    <span @forward()>extra</span>
+//        ~~~~~~~~~~ D021: Only one '@forward()' is allowed per component template.
+  ),
+});
+```
 
 ---
 
