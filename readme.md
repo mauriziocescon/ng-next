@@ -583,8 +583,8 @@ export const UserDetail = component.withForwarding<HTMLElement>({
 
 `expose` defines the public interface of a component or directive, accessible through `ref`. Only what is listed in `expose` is reachable from outside — everything else stays private.
 
-- `ref(Type)` → `Signal<expose | undefined>`
-- `refMany(Type)` → `Signal<expose[]>`
+- `ref<typeof Type>()` → `Signal<expose | undefined>`
+- `refMany<typeof Type>()` → `Signal<expose[]>`
 - `ref<HTMLElement>()` → `Signal<HTMLElement | undefined>`
 
 Without `expose`, refs resolve to `Signal<undefined>`. Refs are readable after `afterNextRender`.
@@ -628,9 +628,9 @@ const Sibling = component({
 export const Parent = component({
   setup: () => {
     const el = ref<HTMLDivElement>();
-    const child = ref(Child);
-    const tlp = ref(tooltip);
-    const many = refMany(Child);
+    const child = ref<typeof Child>();
+    const tlp = ref<typeof tooltip>();
+    const many = refMany<typeof Child>();
 
     afterNextRender(() => {
       // all refs resolve here

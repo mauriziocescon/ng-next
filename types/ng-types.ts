@@ -329,7 +329,7 @@ type SetupReturn<E> =
 //
 // component.withForwarding(Target, config) — wrapper mode:
 //   Target is passed as a value; C is inferred from it (consistent
-//   with ref(Child), inject(Child), etc.). bindings are a strict
+//   with ref<typeof Child>(), inject(Child), etc.). bindings are a strict
 //   subset of target bindings, preserving key, binding kind, and
 //   inner type per selected key. setup receives selected bindings
 //   as first arg. Remaining bindings and directives are forwarded
@@ -535,35 +535,38 @@ export function derivation(config: any): any {
 //   - Native element (ref<H>()): the template compiler checks
 //     ref={x} against the tag's IntrinsicElements entry, so
 //     <div ref={el}> is valid only if el is Ref<HTMLDivElement>.
-//   - Component (ref(Comp)): resolves to Signal<expose | undefined>,
-//     where expose is inferred from the component's setup return.
-//   - Directive (ref(dir)): resolves to Signal<expose | undefined>,
-//     where expose is the directive's setup() return value.
-//   - refMany(Type): collects multiple instances (e.g. inside @for)
-//     into Signal<expose[]>.
+//   - Component (ref<typeof Comp>()): resolves to
+//     Signal<expose | undefined>, where expose is inferred from the
+//     component's setup return. typeof is required because const
+//     declarations only exist in the value namespace.
+//   - Directive (ref<typeof dir>()): resolves to
+//     Signal<expose | undefined>, where expose is the directive's
+//     setup() return value.
+//   - refMany<typeof Type>(): collects multiple instances
+//     (e.g. inside @for) into Signal<expose[]>.
 // ────────────────────────────────────────────────────────────────
 
 // Native element
 export function ref<H extends HTMLElement>(): Ref<H | undefined>;
-// Component or Directive (expose inferred)
+// Component or Directive (expose inferred from type parameter)
 export function ref<
   T extends
     | ComponentInstance<unknown, unknown, any>
     | DirectiveInstance<HTMLElement, unknown, unknown>,
->(type: T): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
+>(): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
 
-export function ref(_type?: any): any {
+export function ref(): any {
   return {} as any;
 }
 
-// Component or Directive (expose inferred)
+// Component or Directive (expose inferred from type parameter)
 export function refMany<
   T extends
     | ComponentInstance<unknown, unknown, any>
     | DirectiveInstance<HTMLElement, unknown, unknown>,
->(type: T): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
+>(): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
 
-export function refMany(_type?: any): any {
+export function refMany(): any {
   return {} as any;
 }
 

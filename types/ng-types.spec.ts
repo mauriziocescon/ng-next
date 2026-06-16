@@ -468,7 +468,7 @@ const ExposedInput = component({
   }),
 });
 
-const exposedInputRef = ref(ExposedInput);
+const exposedInputRef = ref<typeof ExposedInput>();
 const _exposedName: InputSignal<string> | undefined = exposedInputRef()?.name;
 const _exposedAge: InputSignal<number | undefined> | undefined =
   exposedInputRef()?.age;
@@ -489,12 +489,12 @@ const MixedExpose = component({
   },
 });
 
-const mixedRef = ref(MixedExpose);
+const mixedRef = ref<typeof MixedExpose>();
 const _mixedLabel: InputSignal<string> | undefined = mixedRef()?.label;
 const _mixedDoubled: Signal<number> | undefined = mixedRef()?.doubled;
 
 // Void expose through ref: resolves to Ref<undefined>, not Ref<void | undefined>
-const voidExposeRef = ref(NoExpose);
+const voidExposeRef = ref<typeof NoExpose>();
 const _voidExposeCheck: Ref<undefined> = voidExposeRef;
 
 // ────────────────────────────────────────────────────────────────
@@ -550,7 +550,7 @@ const _stubDirective = directive({ host: ref<HTMLElement>(), setup: () => {} });
 // 10. COMPONENT — wrapper with selected bindings + forwarding marker
 //
 // In the two-argument form, Target is passed as first arg and C is
-// inferred from the value (consistent with ref(Child), inject(Child), etc.).
+// inferred from the value (consistent with inject(Child), etc.).
 // setup receives selected bindings only.
 // @forward() is a compile-time forwarding marker used by
 // component.withForwarding(...) templates.
@@ -840,7 +840,7 @@ const voidDir = directive({
   host: ref<HTMLElement>(),
   setup: ({}, { host }) => {},
 });
-const voidDirRef = ref(voidDir);
+const voidDirRef = ref<typeof voidDir>();
 const _voidDirCheck: Ref<undefined> = voidDirRef;
 
 // Directive expose flows through ref with correct type
@@ -849,7 +849,7 @@ const typedDir = directive({
   bindings: { label: input<string>() },
   setup: ({ label }, { host }) => ({ getLabel: () => label() }),
 });
-const typedDirRef = ref(typedDir);
+const typedDirRef = ref<typeof typedDir>();
 const _typedDirRefCheck: Ref<
   { getLabel: () => string | undefined } | undefined
 > = typedDirRef;
@@ -886,7 +886,7 @@ const highlight = directive({
   setup: ({ color }, { host }) => ({ color }),
 });
 
-const highlightRef = ref(highlight);
+const highlightRef = ref<typeof highlight>();
 const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
 
 // Directive accepts fragment bindings (TemplateRef-style use cases)
@@ -1024,33 +1024,33 @@ const divRef = ref<HTMLDivElement>();
 const _divRefType: Ref<HTMLDivElement | undefined> = divRef;
 
 // Component with expose
-const childRef = ref(Child);
+const childRef = ref<typeof Child>();
 const _childRefType: Ref<{ text: Signal<string> } | undefined> = childRef;
 const _childRefAsSignal: Signal<{ text: Signal<string> } | undefined> =
   childRef;
 
 // Component without expose
-const noExposeRef = ref(NoExpose);
+const noExposeRef = ref<typeof NoExpose>();
 const _noExposeType: Ref<undefined> = noExposeRef;
 
 // Directive with expose
-const tooltipRef = ref(tooltip);
+const tooltipRef = ref<typeof tooltip>();
 const _tooltipRefType: Ref<{ toggle: () => void } | undefined> = tooltipRef;
 
 // Directive without expose
-const rippleRef = ref(ripple);
+const rippleRef = ref<typeof ripple>();
 const _rippleRefType: Ref<undefined> = rippleRef;
 
 // refMany
-const manyChildren = refMany(Child);
+const manyChildren = refMany<typeof Child>();
 const _manyType: Ref<{ text: Signal<string> }[]> = manyChildren;
 const _manyAsSignal: Signal<{ text: Signal<string> }[]> = manyChildren;
 
 // refMany without expose
-const manyNoExpose = refMany(NoExpose);
+const manyNoExpose = refMany<typeof NoExpose>();
 const _manyNoExposeType: Ref<undefined[]> = manyNoExpose;
 
-const manyRipple = refMany(ripple);
+const manyRipple = refMany<typeof ripple>();
 const _manyRippleType: Ref<undefined[]> = manyRipple;
 
 // Refs are read-only — .set() must not exist
@@ -1062,6 +1062,12 @@ childRef.set({ text: signal('') });
 tooltipRef.set({ toggle: () => {} });
 // @ts-expect-error
 manyChildren.set([]);
+
+// ref() must not accept runtime arguments — generic-only
+// @ts-expect-error ref does not accept a runtime argument
+ref(Child);
+// @ts-expect-error refMany does not accept a runtime argument
+refMany(Child);
 
 // Passing a ref as an input
 const Sibling = component({
@@ -1078,9 +1084,9 @@ const Sibling = component({
 const Parent = component({
   setup: () => {
     const el = ref<HTMLDivElement>();
-    const child = ref(Child);
-    const tlp = ref(tooltip);
-    const many = refMany(Child);
+    const child = ref<typeof Child>();
+    const tlp = ref<typeof tooltip>();
+    const many = refMany<typeof Child>();
 
     afterNextRender(() => {
       const _el: HTMLDivElement | undefined = el();
@@ -1508,7 +1514,7 @@ const Accordion = component({
 });
 
 // ref infers expose correctly through satisfies
-const accordionRef = ref(Accordion);
+const accordionRef = ref<typeof Accordion>();
 const _accordionRefType: Ref<Toggleable | undefined> = accordionRef;
 
 // -- Expose conformance: directive ----------------
@@ -1525,7 +1531,7 @@ const toggleDirective = directive({
   },
 });
 
-const toggleDirRef = ref(toggleDirective);
+const toggleDirRef = ref<typeof toggleDirective>();
 const _toggleDirRefType: Ref<Toggleable | undefined> = toggleDirRef;
 
 // -- Negative: missing key in bindings ------------
