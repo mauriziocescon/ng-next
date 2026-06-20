@@ -1,6 +1,6 @@
-# Anatomy of Signal Components
+# Exploring Angular Templates for an Agentic Future
 
-**⚠️ Note ⚠️: personal thoughts from a developer's perspective on [the future of Angular](https://myconf.dev/videos/2024-keynote-session-the-future-of-angular) at the template level.**
+**⚠️ Note ⚠️: personal thoughts from a developer's perspective on Angular's future template layer: explicit contracts, typed template surfaces, and structures that are easier for humans, tooling, and AI agents to reason about.**
 
 Highlights:
 
@@ -746,18 +746,18 @@ export const Counter = component({
 
 ### Concepts Impacted by These Changes
 
-- `ng-content`: replaced by `fragments`,
-- `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): likely replaced by `fragments`,
-- structural directives: likely replaced by `fragments`,
-- `pipes`: replaced by derivations — derivations cover the same transform use case and also support DI,
+- `ng-content`: can be modeled with `fragments`,
+- `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): likely modeled with `fragments`,
+- structural directives: likely modeled with `fragments`,
+- `pipes`: can be modeled with derivations — derivations cover the same transform use case and also support DI,
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers),
 - `@let`: unchanged,
 - `bindings aliasing` at the setup level (ts destructuring),
 - `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
-- `template reference variables`: likely replaced by `ref`,
-- `queries`: likely replaced by `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
-- `component and directive injection`: the preferred interaction model is an explicit `ref` passed as an `input`. Nevertheless, with `ref`/`expose` in place, component and directive injection are safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of abuse `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`);
+- `template reference variables`: likely modeled with `ref`,
+- `queries`: likely modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
+- `component and directive injection`: the preferred interaction model is an explicit `ref` passed as an `input`. Nevertheless, with `ref`/`expose` in place, component and directive injection can be made safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of abuse `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`);
 - `interface conformance`: opt-in via `satisfies` on `bindings` and `expose` — the same structural check that `implements` provides for classes.
 
 ### Notes
@@ -775,7 +775,7 @@ Pros:
 - familiar enough,
 - not subject to typical single-file component (SFC) limitations,
 - enforces a strict structure,
-- AI agent-friendly,
+- explicit structure for tooling and AI agents,
 - no `splitProps` drama 😅.
 
 Cons:
@@ -841,14 +841,14 @@ export const DataTable = component({
 });
 ```
 
-For medium and large components the binding declaration is a small fraction of the code, and the explicit contract pays for itself in readability, refactorability, and tooling support.
+For medium and large components the binding declaration is a small fraction of the code, and the explicit contract can pay for itself in readability, refactorability, and tooling support.
 
 Three additional points:
 - **Fairer comparison with other frameworks.** In React or Solid with TypeScript you typically write a separate `Props` interface that mirrors the component's accepted inputs — pure type-level boilerplate. Here, `bindings` serves double duty as both the type declaration *and* the runtime wiring. Counting the `Props` interface other frameworks require makes the math considerably more even.
 - **Multi-component co-location.** Traditional SFCs (Vue, Svelte, etc.) map one component to one file. Splitting a growing component means creating a new file, moving markup, wiring imports, and updating the module graph — even for small, tightly coupled pieces. `.ng` files let you define helper components, fragments, and directives in the same file and extract them only when they earn their own module boundary.
 - **Why not `defineBindings(...)` inside `setup`?** It would reduce repetition, but `providers` needs input access *before* `setup` runs — so it would require compiler hoisting magic or giving up input access in providers. It also introduces a second authoring style (à la Vue Options vs. Composition API) that tooling, docs, and developers all have to support.
 
-One authoring format, explicit bindings, keeps the mental model simple — for humans and AI agents alike.
+One authoring format, explicit bindings, keeps the mental model explicit — for humans and AI agents alike.
 
 
 ---
