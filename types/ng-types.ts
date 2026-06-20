@@ -339,7 +339,7 @@ export function refMany<
   T extends
     | ComponentInstance<unknown, unknown, any>
     | DirectiveInstance<HTMLElement, unknown, unknown>,
->(): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
+>(): Ref<ExposeOf<T> extends void ? [] : ExposeOf<T>[]>;
 
 export function refMany(): any {
   return {} as any;

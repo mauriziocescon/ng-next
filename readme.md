@@ -340,76 +340,68 @@ export const Counter = component({
 
 ## Expose and Template Refs
 
-`expose` defines the public interface of a component or directive, accessible through `ref`. Only what is listed in `expose` is reachable from outside — everything else stays private.
+`expose` is the public API a component or directive makes available through refs; everything else stays private. Refs are readable signals branded as `Ref<T>`:
 
-- `ref<typeof Type>()` → `Signal<expose | undefined>`
-- `refMany<typeof Type>()` → `Signal<expose[]>`
-- `ref<HTMLElement>()` → `Signal<HTMLElement | undefined>`
+- `ref<typeof Type>()` reads as `Signal<expose | undefined>`
+- `refMany<typeof Type>()` reads as `Signal<expose[]>`
+- `ref<HTMLElement>()` reads as `Signal<HTMLElement | undefined>`
 
-Without `expose`, refs resolve to `Signal<undefined>`. Refs are readable after `afterNextRender`.
+Without `expose`: `ref()` reads as `Signal<undefined>`, and `refMany()` reads as `Signal<[]>`. Refs are readable after `afterNextRender`.
 
-Defining `expose` in a component:
+Defining component and directive exposes:
 
 ```ts
-import { component, signal } from '@angular/core';
+import { component, directive, ref, signal } from '@angular/core';
 
-const Child = component({
+const TextBadge = component({
   setup: () => {
     const text = signal('');
-    const _internal = signal(0);
 
     return {
-      template: (...),
+      template: (<button>{text()}</button>),
       expose: {
         text: text.asReadonly(),
       },
     };
   },
 });
+
+const tooltip = directive({
+  host: ref<HTMLElement>(),
+  setup: () => ({
+    toggle: () => {},
+  }),
+});
 ```
 
 Using refs — elements, components, and directives:
 
 ```ts
-import { component, ref, refMany, signal, input, afterNextRender, Signal } from '@angular/core';
-import { ripple } from '@mylib/ripple';
-import { tooltip } from '@mylib/tooltip';
+import { afterNextRender, component, ref, refMany } from '@angular/core';
 
-const Sibling = component({
-  bindings: {
-    childRef: input.required<{ text: Signal<string> } | undefined>(),
-  },
-  setup: ({ childRef }) => (
-    <button on:click={() => childRef()?.text()}>Show text</button>
-  ),
-});
-
-export const Parent = component({
+export const RefShowcase = component({
   setup: () => {
-    const el = ref<HTMLDivElement>();
-    const child = ref<typeof Child>();
-    const tlp = ref<typeof tooltip>();
-    const many = refMany<typeof Child>();
+    const el = ref<HTMLDivElement>(); // Ref<HTMLDivElement | undefined>
+    const badge = ref<typeof TextBadge>();
+    const tip = ref<typeof tooltip>();
+    const badges = refMany<typeof TextBadge>(); // Ref<{ text: Signal<string> }[]>
 
     afterNextRender(() => {
-      // all refs resolve here
+      el()?.scrollIntoView();
+      badge()?.text();
+      tip()?.toggle();
+      badges().forEach((api) => api.text());
     });
 
     return (
-      <div
-        ref={el}
-        use:ripple()
-        use:tooltip(message={'something'}):ref={tlp}>
-          Something
-      </div>
+      <div ref={el} use:tooltip():ref={tip}>Target</div>
 
-      <Child ref={child} />
-      <Sibling childRef={child()} />
+      <TextBadge ref={badge} />
 
-      <Child ref={many} />
-      <Child ref={many} />
+      <TextBadge ref={badges} />
+      <TextBadge ref={badges} />
 
-      <button on:click={() => tlp()?.toggle()}>Toggle tlp</button>
+      <button on:click={() => tip()?.toggle()}>Toggle tlp</button>
     );
   },
 });

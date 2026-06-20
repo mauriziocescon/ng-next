@@ -633,10 +633,10 @@ const _manyAsSignal: Signal<{ text: Signal<string> }[]> = manyChildren;
 
 // refMany without expose
 const manyNoExpose = refMany<typeof NoExpose>();
-const _manyNoExposeType: Ref<undefined[]> = manyNoExpose;
+const _manyNoExposeType: Ref<[]> = manyNoExpose;
 
 const manyRipple = refMany<typeof ripple>();
-const _manyRippleType: Ref<undefined[]> = manyRipple;
+const _manyRippleType: Ref<[]> = manyRipple;
 
 // Refs are read-only — .set() must not exist
 // @ts-expect-error
