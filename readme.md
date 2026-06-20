@@ -1,6 +1,6 @@
 # Exploring Angular Templates for an Agentic Future
 
-**⚠️ Note ⚠️: personal thoughts from a developer's perspective on Angular's future template layer: explicit contracts, typed template surfaces, and structures that are easier for humans, tooling, and AI agents to reason about.**
+**⚠️ Note ⚠️: personal thoughts on Angular's future template layer: explicit contracts, typed template surfaces, and structures that are easier for humans, tooling, and AI agents to reason about.**
 
 Highlights:
 
