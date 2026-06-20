@@ -498,7 +498,194 @@ const voidExposeRef = ref<typeof NoExpose>();
 const _voidExposeCheck: Ref<undefined> = voidExposeRef;
 
 // ────────────────────────────────────────────────────────────────
-// 9. COMPONENT — withForwarding, one-argument directive forwarding
+// 9. DIRECTIVE — host as separate config, expose
+//
+// host is a top-level config property (not a binding) because it
+// is framework-provided context, not consumer-bindable.
+// setup receives bindings as first arg, { host } as second.
+// ────────────────────────────────────────────────────────────────
+
+// Directive with expose
+const tooltip = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    message: input.required<string>(),
+    dismiss: output<void>(),
+  },
+  setup: ({ message, dismiss }, { host }) => {
+    const _hostEl: Ref<HTMLElement | undefined> = host;
+    const _msg: string = message();
+    dismiss.emit();
+
+    return { toggle: () => {} };
+  },
+});
+
+// Directive without bindings
+const ripple = directive({
+  host: ref<HTMLElement>(),
+  setup: ({}, { host }) => {
+    const _hostEl: Ref<HTMLElement | undefined> = host;
+  },
+});
+
+// Directive with void expose: ref resolves to Ref<undefined>
+const voidDir = directive({
+  host: ref<HTMLElement>(),
+  setup: ({}, { host }) => {},
+});
+const voidDirRef = ref<typeof voidDir>();
+const _voidDirCheck: Ref<undefined> = voidDirRef;
+
+// Directive expose flows through ref with correct type
+const typedDir = directive({
+  host: ref<HTMLButtonElement>(),
+  bindings: { label: input<string>() },
+  setup: ({ label }, { host }) => ({ getLabel: () => label() }),
+});
+const typedDirRef = ref<typeof typedDir>();
+const _typedDirRefCheck: Ref<
+  { getLabel: () => string | undefined } | undefined
+> = typedDirRef;
+
+// Host type constraint: narrows to specific element type
+const buttonOnly = directive({
+  host: ref<HTMLButtonElement>(),
+  bindings: {
+    label: input<string>(),
+  },
+  setup: ({ label }, { host }) => {
+    const _hostEl: Ref<HTMLButtonElement | undefined> = host;
+    const _l: string | undefined = label();
+  },
+});
+
+const inputOnly = directive({
+  host: ref<HTMLInputElement>(),
+  bindings: {
+    label: input<string>(),
+  },
+  setup: ({ label }, { host }) => {
+    const _hostEl: Ref<HTMLInputElement | undefined> = host;
+    const _l: string | undefined = label();
+  },
+});
+
+// Directive exposing its input
+const highlight = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    color: input.required<string>(),
+  },
+  setup: ({ color }, { host }) => ({ color }),
+});
+
+const highlightRef = ref<typeof highlight>();
+const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
+
+// Directive accepts fragment bindings (TemplateRef-style use cases)
+const directiveWithFragment = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    content: fragment.required<void>(),
+  },
+  setup: ({ content }, { host }) => {
+    const _content: RequiredFragmentBinding<void> = content;
+    const _rendered = content();
+    const _host: Ref<HTMLElement | undefined> = host;
+  },
+});
+
+// ────────────────────────────────────────────────────────────────
+// 10. REF UTILITIES — ref, refMany, read-only enforcement
+//
+// ref()  → single instance (Ref<T | undefined>)
+// refMany() → multiple instances (Ref<T[]>)
+// Both resolve after afterNextRender.
+// ────────────────────────────────────────────────────────────────
+
+// Native element
+const divRef = ref<HTMLDivElement>();
+const _divRefType: Ref<HTMLDivElement | undefined> = divRef;
+
+// Component with expose
+const childRef = ref<typeof Child>();
+const _childRefType: Ref<{ text: Signal<string> } | undefined> = childRef;
+const _childRefAsSignal: Signal<{ text: Signal<string> } | undefined> =
+  childRef;
+
+// Component without expose
+const noExposeRef = ref<typeof NoExpose>();
+const _noExposeType: Ref<undefined> = noExposeRef;
+
+// Directive with expose
+const tooltipRef = ref<typeof tooltip>();
+const _tooltipRefType: Ref<{ toggle: () => void } | undefined> = tooltipRef;
+
+// Directive without expose
+const rippleRef = ref<typeof ripple>();
+const _rippleRefType: Ref<undefined> = rippleRef;
+
+// refMany
+const manyChildren = refMany<typeof Child>();
+const _manyType: Ref<{ text: Signal<string> }[]> = manyChildren;
+const _manyAsSignal: Signal<{ text: Signal<string> }[]> = manyChildren;
+
+// refMany without expose
+const manyNoExpose = refMany<typeof NoExpose>();
+const _manyNoExposeType: Ref<undefined[]> = manyNoExpose;
+
+const manyRipple = refMany<typeof ripple>();
+const _manyRippleType: Ref<undefined[]> = manyRipple;
+
+// Refs are read-only — .set() must not exist
+// @ts-expect-error
+divRef.set(document.createElement('div'));
+// @ts-expect-error
+childRef.set({ text: signal('') });
+// @ts-expect-error
+tooltipRef.set({ toggle: () => {} });
+// @ts-expect-error
+manyChildren.set([]);
+
+// ref() must not accept runtime arguments — generic-only
+// @ts-expect-error ref does not accept a runtime argument
+ref(Child);
+// @ts-expect-error refMany does not accept a runtime argument
+refMany(Child);
+
+// Passing a ref as an input
+const Sibling = component({
+  bindings: {
+    childRef: input<{ text: Signal<string> } | undefined>(),
+  },
+  setup: ({ childRef }) => {
+    const _val = childRef();
+    return tmpl;
+  },
+});
+
+// Full parent scenario: refs across components and directives
+const Parent = component({
+  setup: () => {
+    const el = ref<HTMLDivElement>();
+    const child = ref<typeof Child>();
+    const tlp = ref<typeof tooltip>();
+    const many = refMany<typeof Child>();
+
+    afterNextRender(() => {
+      const _el: HTMLDivElement | undefined = el();
+      const _child: { text: Signal<string> } | undefined = child();
+      const _tlp: { toggle: () => void } | undefined = tlp();
+      const _many: { text: Signal<string> }[] = many();
+    });
+
+    return tmpl;
+  },
+});
+
+// ────────────────────────────────────────────────────────────────
+// 11. COMPONENT — withForwarding, one-argument directive forwarding
 // ────────────────────────────────────────────────────────────────
 
 const ForwardingDefault = component.withForwarding({
@@ -540,14 +727,12 @@ const _NegComponentAsForwardingHost = component.withForwarding<typeof UserDetail
 });
 
 // @ts-expect-error directive instances are not valid forwarded DOM host types
-const _NegDirectiveAsForwardingHost = component.withForwarding<typeof _stubDirective>({
+const _NegDirectiveAsForwardingHost = component.withForwarding<typeof tooltip>({
   setup: () => tmpl,
 });
-// stub: any DirectiveInstance satisfies the test intent; full directive tests follow in section 12
-const _stubDirective = directive({ host: ref<HTMLElement>(), setup: () => {} });
 
 // ────────────────────────────────────────────────────────────────
-// 10. COMPONENT — wrapper with selected bindings + forwarding marker
+// 12. COMPONENT — wrapper with selected bindings + forwarding marker
 //
 // In the two-argument form, Target is passed as first arg and C is
 // inferred from the value (consistent with inject(Child), etc.).
@@ -761,7 +946,7 @@ const _NegWrapperExplicitFullGenerics = component.withForwarding<typeof UserDeta
 });
 
 // ────────────────────────────────────────────────────────────────
-// 11. COMPONENT — forward collision precedence (compiler contract)
+// 13. COMPONENT — forward collision precedence (compiler contract)
 //
 // Rule: explicit bindings override remainder bindings, regardless of
 // attribute order in source.
@@ -804,106 +989,7 @@ type _ExplicitThenForwardKeepsOthers = Assert<
 >;
 
 // ────────────────────────────────────────────────────────────────
-// 12. DIRECTIVE — host as separate config, expose
-//
-// host is a top-level config property (not a binding) because it
-// is framework-provided context, not consumer-bindable.
-// setup receives bindings as first arg, { host } as second.
-// ────────────────────────────────────────────────────────────────
-
-// Directive with expose
-const tooltip = directive({
-  host: ref<HTMLElement>(),
-  bindings: {
-    message: input.required<string>(),
-    dismiss: output<void>(),
-  },
-  setup: ({ message, dismiss }, { host }) => {
-    const _hostEl: Ref<HTMLElement | undefined> = host;
-    const _msg: string = message();
-    dismiss.emit();
-
-    return { toggle: () => {} };
-  },
-});
-
-// Directive without bindings
-const ripple = directive({
-  host: ref<HTMLElement>(),
-  setup: ({}, { host }) => {
-    const _hostEl: Ref<HTMLElement | undefined> = host;
-  },
-});
-
-// Directive with void expose: ref resolves to Ref<undefined>
-const voidDir = directive({
-  host: ref<HTMLElement>(),
-  setup: ({}, { host }) => {},
-});
-const voidDirRef = ref<typeof voidDir>();
-const _voidDirCheck: Ref<undefined> = voidDirRef;
-
-// Directive expose flows through ref with correct type
-const typedDir = directive({
-  host: ref<HTMLButtonElement>(),
-  bindings: { label: input<string>() },
-  setup: ({ label }, { host }) => ({ getLabel: () => label() }),
-});
-const typedDirRef = ref<typeof typedDir>();
-const _typedDirRefCheck: Ref<
-  { getLabel: () => string | undefined } | undefined
-> = typedDirRef;
-
-// Host type constraint: narrows to specific element type
-const buttonOnly = directive({
-  host: ref<HTMLButtonElement>(),
-  bindings: {
-    label: input<string>(),
-  },
-  setup: ({ label }, { host }) => {
-    const _hostEl: Ref<HTMLButtonElement | undefined> = host;
-    const _l: string | undefined = label();
-  },
-});
-
-const inputOnly = directive({
-  host: ref<HTMLInputElement>(),
-  bindings: {
-    label: input<string>(),
-  },
-  setup: ({ label }, { host }) => {
-    const _hostEl: Ref<HTMLInputElement | undefined> = host;
-    const _l: string | undefined = label();
-  },
-});
-
-// Directive exposing its input
-const highlight = directive({
-  host: ref<HTMLElement>(),
-  bindings: {
-    color: input.required<string>(),
-  },
-  setup: ({ color }, { host }) => ({ color }),
-});
-
-const highlightRef = ref<typeof highlight>();
-const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
-
-// Directive accepts fragment bindings (TemplateRef-style use cases)
-const directiveWithFragment = directive({
-  host: ref<HTMLElement>(),
-  bindings: {
-    content: fragment.required<void>(),
-  },
-  setup: ({ content }, { host }) => {
-    const _content: RequiredFragmentBinding<void> = content;
-    const _rendered = content();
-    const _host: Ref<HTMLElement | undefined> = host;
-  },
-});
-
-// ────────────────────────────────────────────────────────────────
-// 13. DIRECTIVE — forwarding compatibility
+// 14. DIRECTIVE — forwarding compatibility
 //
 // A directive can attach to a forwarded element only if the
 // forwarded element type is assignable to the directive host type.
@@ -963,7 +1049,7 @@ const _negInputForwardingWrapperRejectsButtonDirective: DirectiveFitsForwardedEl
 > = true;
 
 // ────────────────────────────────────────────────────────────────
-// 14. DERIVATION — only inputs, setup returns Signal<T>
+// 15. DERIVATION — only inputs, setup returns Signal<T>
 // ────────────────────────────────────────────────────────────────
 
 const simulation = derivation({
@@ -1009,94 +1095,6 @@ const _NegDerivationFragment = derivation({
     content: fragment<void>(),
   },
   setup: () => computed(() => 1),
-});
-
-// ────────────────────────────────────────────────────────────────
-// 15. REF UTILITIES — ref, refMany, read-only enforcement
-//
-// ref()  → single instance (Ref<T | undefined>)
-// refMany() → multiple instances (Ref<T[]>)
-// Both resolve after afterNextRender.
-// ────────────────────────────────────────────────────────────────
-
-// Native element
-const divRef = ref<HTMLDivElement>();
-const _divRefType: Ref<HTMLDivElement | undefined> = divRef;
-
-// Component with expose
-const childRef = ref<typeof Child>();
-const _childRefType: Ref<{ text: Signal<string> } | undefined> = childRef;
-const _childRefAsSignal: Signal<{ text: Signal<string> } | undefined> =
-  childRef;
-
-// Component without expose
-const noExposeRef = ref<typeof NoExpose>();
-const _noExposeType: Ref<undefined> = noExposeRef;
-
-// Directive with expose
-const tooltipRef = ref<typeof tooltip>();
-const _tooltipRefType: Ref<{ toggle: () => void } | undefined> = tooltipRef;
-
-// Directive without expose
-const rippleRef = ref<typeof ripple>();
-const _rippleRefType: Ref<undefined> = rippleRef;
-
-// refMany
-const manyChildren = refMany<typeof Child>();
-const _manyType: Ref<{ text: Signal<string> }[]> = manyChildren;
-const _manyAsSignal: Signal<{ text: Signal<string> }[]> = manyChildren;
-
-// refMany without expose
-const manyNoExpose = refMany<typeof NoExpose>();
-const _manyNoExposeType: Ref<undefined[]> = manyNoExpose;
-
-const manyRipple = refMany<typeof ripple>();
-const _manyRippleType: Ref<undefined[]> = manyRipple;
-
-// Refs are read-only — .set() must not exist
-// @ts-expect-error
-divRef.set(document.createElement('div'));
-// @ts-expect-error
-childRef.set({ text: signal('') });
-// @ts-expect-error
-tooltipRef.set({ toggle: () => {} });
-// @ts-expect-error
-manyChildren.set([]);
-
-// ref() must not accept runtime arguments — generic-only
-// @ts-expect-error ref does not accept a runtime argument
-ref(Child);
-// @ts-expect-error refMany does not accept a runtime argument
-refMany(Child);
-
-// Passing a ref as an input
-const Sibling = component({
-  bindings: {
-    childRef: input<{ text: Signal<string> } | undefined>(),
-  },
-  setup: ({ childRef }) => {
-    const _val = childRef();
-    return tmpl;
-  },
-});
-
-// Full parent scenario: refs across components and directives
-const Parent = component({
-  setup: () => {
-    const el = ref<HTMLDivElement>();
-    const child = ref<typeof Child>();
-    const tlp = ref<typeof tooltip>();
-    const many = refMany<typeof Child>();
-
-    afterNextRender(() => {
-      const _el: HTMLDivElement | undefined = el();
-      const _child: { text: Signal<string> } | undefined = child();
-      const _tlp: { toggle: () => void } | undefined = tlp();
-      const _many: { text: Signal<string> }[] = many();
-    });
-
-    return tmpl;
-  },
 });
 
 // ────────────────────────────────────────────────────────────────

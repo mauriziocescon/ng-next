@@ -14,8 +14,8 @@ Highlights:
 3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `class:`, `style:`, `animate:`, `use:`,
 4. Hostless components + TS lexical scoping for templates,
 5. Component inputs: lifted up + immediately available in setup and providers,
-6. Composition with Fragments, Directives, and Forward Syntax,
-7. Expose and Template Refs,
+6. Expose and Template Refs,
+7. Composition with Fragments, Directives, and Forward Syntax,
 8. Dependency Injection Enhancements,
 9. Final considerations (`!important`) + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
@@ -30,8 +30,8 @@ Highlights:
 - [Binding syntax helpers](#binding-syntax-helpers)
 - [One-time bindings (`once:`)](#one-time-bindings-once)
 - [Input-driven providers](#input-driven-providers)
-- [Composition with Fragments, Directives, and Forward Syntax](#composition-with-fragments-directives-and-forward-syntax)
 - [Expose and Template Refs](#expose-and-template-refs)
+- [Composition with Fragments, Directives, and Forward Syntax](#composition-with-fragments-directives-and-forward-syntax)
 - [Dependency Injection Enhancements](#dependency-injection-enhancements)
 - [Final considerations](#final-considerations)
 - [Appendix: Co-located templates in Angular via `.ng` files](#appendix-co-located-templates-in-angular-via-ng-files)
@@ -338,6 +338,83 @@ export const Counter = component({
 });
 ```
 
+## Expose and Template Refs
+
+`expose` defines the public interface of a component or directive, accessible through `ref`. Only what is listed in `expose` is reachable from outside — everything else stays private.
+
+- `ref<typeof Type>()` → `Signal<expose | undefined>`
+- `refMany<typeof Type>()` → `Signal<expose[]>`
+- `ref<HTMLElement>()` → `Signal<HTMLElement | undefined>`
+
+Without `expose`, refs resolve to `Signal<undefined>`. Refs are readable after `afterNextRender`.
+
+Defining `expose` in a component:
+
+```ts
+import { component, signal } from '@angular/core';
+
+const Child = component({
+  setup: () => {
+    const text = signal('');
+    const _internal = signal(0);
+
+    return {
+      template: (...),
+      expose: {
+        text: text.asReadonly(),
+      },
+    };
+  },
+});
+```
+
+Using refs — elements, components, and directives:
+
+```ts
+import { component, ref, refMany, signal, input, afterNextRender, Signal } from '@angular/core';
+import { ripple } from '@mylib/ripple';
+import { tooltip } from '@mylib/tooltip';
+
+const Sibling = component({
+  bindings: {
+    childRef: input.required<{ text: Signal<string> } | undefined>(),
+  },
+  setup: ({ childRef }) => (
+    <button on:click={() => childRef()?.text()}>Show text</button>
+  ),
+});
+
+export const Parent = component({
+  setup: () => {
+    const el = ref<HTMLDivElement>();
+    const child = ref<typeof Child>();
+    const tlp = ref<typeof tooltip>();
+    const many = refMany<typeof Child>();
+
+    afterNextRender(() => {
+      // all refs resolve here
+    });
+
+    return (
+      <div
+        ref={el}
+        use:ripple()
+        use:tooltip(message={'something'}):ref={tlp}>
+          Something
+      </div>
+
+      <Child ref={child} />
+      <Sibling childRef={child()} />
+
+      <Child ref={many} />
+      <Child ref={many} />
+
+      <button on:click={() => tlp()?.toggle()}>Toggle tlp</button>
+    );
+  },
+});
+```
+
 ## Composition with Fragments, Directives, and Forward Syntax
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
@@ -576,83 +653,6 @@ export const UserDetail = component.withForwarding<HTMLElement>({
       @render(children?.())
     </div>
   ),
-});
-```
-
-## Expose and Template Refs
-
-`expose` defines the public interface of a component or directive, accessible through `ref`. Only what is listed in `expose` is reachable from outside — everything else stays private.
-
-- `ref<typeof Type>()` → `Signal<expose | undefined>`
-- `refMany<typeof Type>()` → `Signal<expose[]>`
-- `ref<HTMLElement>()` → `Signal<HTMLElement | undefined>`
-
-Without `expose`, refs resolve to `Signal<undefined>`. Refs are readable after `afterNextRender`.
-
-Defining `expose` in a component:
-
-```ts
-import { component, signal } from '@angular/core';
-
-const Child = component({
-  setup: () => {
-    const text = signal('');
-    const _internal = signal(0);
-
-    return {
-      template: (...),
-      expose: {
-        text: text.asReadonly(),
-      },
-    };
-  },
-});
-```
-
-Using refs — elements, components, and directives:
-
-```ts
-import { component, ref, refMany, signal, input, afterNextRender, Signal } from '@angular/core';
-import { ripple } from '@mylib/ripple';
-import { tooltip } from '@mylib/tooltip';
-
-const Sibling = component({
-  bindings: {
-    childRef: input.required<{ text: Signal<string> } | undefined>(),
-  },
-  setup: ({ childRef }) => (
-    <button on:click={() => childRef()?.text()}>Show text</button>
-  ),
-});
-
-export const Parent = component({
-  setup: () => {
-    const el = ref<HTMLDivElement>();
-    const child = ref<typeof Child>();
-    const tlp = ref<typeof tooltip>();
-    const many = refMany<typeof Child>();
-
-    afterNextRender(() => {
-      // all refs resolve here
-    });
-
-    return (
-      <div
-        ref={el}
-        use:ripple()
-        use:tooltip(message={'something'}):ref={tlp}>
-          Something
-      </div>
-
-      <Child ref={child} />
-      <Sibling childRef={child()} />
-
-      <Child ref={many} />
-      <Child ref={many} />
-
-      <button on:click={() => tlp()?.toggle()}>Toggle tlp</button>
-    );
-  },
 });
 ```
 

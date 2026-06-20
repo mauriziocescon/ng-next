@@ -297,13 +297,61 @@ export type __ReservedBindingsConstraint<
   B extends Record<string, ComponentBindingValue>,
 > = ReservedBindingsConstraint<B>;
 
+// ────────────────────────────────────────────────────────────────
+// 6. REF UTILITIES
+//
+// ref()  — single instance, resolves after afterNextRender.
+// refMany() — multiple instances (e.g. inside @for).
+//
+// Each has overloads for native elements, components, and
+// directives. The expose type is inferred from the target.
+//
+// Type resolution rules:
+//   - Native element (ref<H>()): the template compiler checks
+//     ref={x} against the tag's IntrinsicElements entry, so
+//     <div ref={el}> is valid only if el is Ref<HTMLDivElement>.
+//   - Component (ref<typeof Comp>()): resolves to
+//     Signal<expose | undefined>, where expose is inferred from the
+//     component's setup return. typeof is required because const
+//     declarations only exist in the value namespace.
+//   - Directive (ref<typeof dir>()): resolves to
+//     Signal<expose | undefined>, where expose is the directive's
+//     setup() return value.
+//   - refMany<typeof Type>(): collects multiple instances
+//     (e.g. inside @for) into Signal<expose[]>.
+// ────────────────────────────────────────────────────────────────
+
+// Native element
+export function ref<H extends HTMLElement>(): Ref<H | undefined>;
+// Component or Directive (expose inferred from type parameter)
+export function ref<
+  T extends
+    | ComponentInstance<unknown, unknown, any>
+    | DirectiveInstance<HTMLElement, unknown, unknown>,
+>(): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
+
+export function ref(): any {
+  return {} as any;
+}
+
+// Component or Directive (expose inferred from type parameter)
+export function refMany<
+  T extends
+    | ComponentInstance<unknown, unknown, any>
+    | DirectiveInstance<HTMLElement, unknown, unknown>,
+>(): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
+
+export function refMany(): any {
+  return {} as any;
+}
+
 type SetupReturn<E> =
   | { template: TemplateMarkup; expose: E } // full form with expose
   | { template: TemplateMarkup } // full form, no expose
   | TemplateMarkup; // shorthand: raw template
 
 // ────────────────────────────────────────────────────────────────
-// 6. COMPONENT
+// 7. COMPONENT
 //
 // setup return type — two forms:
 //   Shorthand: return raw TemplateMarkup (no expose).
@@ -441,7 +489,7 @@ export namespace component {
   maybeConfig ?? targetOrConfig;
 
 // ────────────────────────────────────────────────────────────────
-// 7. DIRECTIVE
+// 8. DIRECTIVE
 //
 // Single-call, all generics inferred:
 //   H from host, B from bindings, E from setup return.
@@ -477,7 +525,7 @@ export function directive(config: any): any {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 8. DERIVATION
+// 9. DERIVATION
 //
 // Template-scoped reactive computation. Only InputSignal bindings
 // are allowed (no host, no outputs, no models — a derivation has
@@ -520,54 +568,6 @@ export function derivation<T>(config: {
 
 export function derivation(config: any): any {
   return config as any;
-}
-
-// ────────────────────────────────────────────────────────────────
-// 9. REF UTILITIES
-//
-// ref()  — single instance, resolves after afterNextRender.
-// refMany() — multiple instances (e.g. inside @for).
-//
-// Each has overloads for native elements, components, and
-// directives. The expose type is inferred from the target.
-//
-// Type resolution rules:
-//   - Native element (ref<H>()): the template compiler checks
-//     ref={x} against the tag's IntrinsicElements entry, so
-//     <div ref={el}> is valid only if el is Ref<HTMLDivElement>.
-//   - Component (ref<typeof Comp>()): resolves to
-//     Signal<expose | undefined>, where expose is inferred from the
-//     component's setup return. typeof is required because const
-//     declarations only exist in the value namespace.
-//   - Directive (ref<typeof dir>()): resolves to
-//     Signal<expose | undefined>, where expose is the directive's
-//     setup() return value.
-//   - refMany<typeof Type>(): collects multiple instances
-//     (e.g. inside @for) into Signal<expose[]>.
-// ────────────────────────────────────────────────────────────────
-
-// Native element
-export function ref<H extends HTMLElement>(): Ref<H | undefined>;
-// Component or Directive (expose inferred from type parameter)
-export function ref<
-  T extends
-    | ComponentInstance<unknown, unknown, any>
-    | DirectiveInstance<HTMLElement, unknown, unknown>,
->(): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
-
-export function ref(): any {
-  return {} as any;
-}
-
-// Component or Directive (expose inferred from type parameter)
-export function refMany<
-  T extends
-    | ComponentInstance<unknown, unknown, any>
-    | DirectiveInstance<HTMLElement, unknown, unknown>,
->(): Ref<ExposeOf<T> extends void ? undefined[] : ExposeOf<T>[]>;
-
-export function refMany(): any {
-  return {} as any;
 }
 
 // ────────────────────────────────────────────────────────────────

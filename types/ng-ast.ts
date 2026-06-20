@@ -95,8 +95,8 @@ export interface ElementNode extends BaseNode {
   outputs: BoundEventNode[];
   models: BoundModelNode[];
   animations: AnimateBindingNode[];
-  directives: DirectiveBindingNode[];
   references: RefNode[];
+  directives: DirectiveBindingNode[];
   fragments: FragmentNode[];
   i18n?: I18nMeta;
 }
@@ -170,6 +170,10 @@ export interface AnimateBindingNode extends BaseNode {
   handlerSpan?: SourceSpan;
 }
 
+// ────────────────────────────────────────────────────────────────
+// 6. REF NODES
+// ────────────────────────────────────────────────────────────────
+
 /**
  * Unified ref node for elements, components, and directives.
  * `target` is always a Variable — the framework wires it at creation time.
@@ -182,7 +186,7 @@ export interface RefNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 6. DIRECTIVE BINDING NODES
+// 7. DIRECTIVE BINDING NODES
 // ────────────────────────────────────────────────────────────────
 
 export interface DirectiveBindingNode extends BaseNode {
@@ -229,7 +233,7 @@ export interface DirectiveWhenNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 7. TEXT & INTERPOLATION NODES
+// 8. TEXT & INTERPOLATION NODES
 // ────────────────────────────────────────────────────────────────
 
 export interface TextNode extends BaseNode {
@@ -244,7 +248,7 @@ export interface TextInterpolationNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 8. @let DECLARATION
+// 9. @let DECLARATION
 // ────────────────────────────────────────────────────────────────
 
 export interface LetNode extends BaseNode {
@@ -254,7 +258,7 @@ export interface LetNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 9. CONTROL FLOW
+// 10. CONTROL FLOW
 // ────────────────────────────────────────────────────────────────
 
 export type ControlFlowNode =
@@ -322,7 +326,7 @@ export interface SwitchDefaultNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 10. TEMPLATE DIRECTIVES — @render, @derive
+// 11. TEMPLATE DIRECTIVES — @render, @derive
 // ────────────────────────────────────────────────────────────────
 
 export type TemplateDirectiveNode =
@@ -354,7 +358,7 @@ export interface DerivationInputNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 11. FRAGMENT NODES
+// 12. FRAGMENT NODES
 // ────────────────────────────────────────────────────────────────
 
 export interface FragmentNode extends BaseNode {
@@ -371,7 +375,7 @@ export interface FragmentParameterNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 12. EXPRESSION AST
+// 13. EXPRESSION AST
 // ────────────────────────────────────────────────────────────────
 
 export type AST =
@@ -499,7 +503,7 @@ export interface Unary extends BaseAST {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 13. METADATA TYPES
+// 14. METADATA TYPES
 // ────────────────────────────────────────────────────────────────
 
 export type TypeNode =
@@ -665,7 +669,7 @@ export interface I18nMeta {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 14. VISITOR
+// 15. VISITOR
 // ────────────────────────────────────────────────────────────────
 
 export interface TemplateAstVisitor<T = void> {
@@ -702,7 +706,7 @@ export interface TemplateAstVisitor<T = void> {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 15. TRAVERSAL UTILITIES
+// 16. TRAVERSAL UTILITIES
 // ────────────────────────────────────────────────────────────────
 
 export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>, context: T): void {

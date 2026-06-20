@@ -329,7 +329,37 @@ ON-PREFIX-WARNING
 
 ---
 
-## 5. Directive Application
+## 5. Ref (Template-Side Validation)
+
+The checker validates that `ref={x}` and `use:dir(...):ref={x}` reference variables with compatible types.
+
+```
+REF-ON-NATIVE-ELEMENT
+─────────────────────────────────────────────────
+<tag ref={x}>   where H = I(tag)
+x : Ref<H | undefined> ∈ Γ
+─────────────────────────────────────────────────
+
+
+REF-ON-COMPONENT
+─────────────────────────────────────────────────
+<C ref={x}>    where E(C) = E
+if E = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<undefined[]> ∈ Γ
+else:         x : Ref<E | undefined> ∈ Γ  ∨  x : Ref<E[]> ∈ Γ
+─────────────────────────────────────────────────
+
+
+REF-ON-DIRECTIVE
+─────────────────────────────────────────────────
+use:D(...):ref={x}    where E(D) = E_D
+if E_D = void:  x : Ref<undefined> ∈ Γ
+else:           x : Ref<E_D | undefined> ∈ Γ
+─────────────────────────────────────────────────
+```
+
+---
+
+## 6. Directive Application
 
 ```
 CHECK-DIRECTIVE-USE
@@ -369,7 +399,7 @@ if dir.ref:
 Γ ⊢ use:D(...) ✓
 ```
 
-### 5.1 Host Compatibility
+### 6.1 Host Compatibility
 
 ```
 NATIVE-HOST
@@ -396,7 +426,7 @@ F(C) = never → directive on component tag is an error
 
 ---
 
-## 6. @forward() Marker
+## 7. @forward() Marker
 
 ```
 FORWARD-PASSTHROUGH (one-argument withForwarding<S>)
@@ -426,7 +456,7 @@ COLLISION-PRECEDENCE
 
 ---
 
-## 7. @derive
+## 8. @derive
 
 ```
 DERIVE
@@ -451,9 +481,9 @@ Scope: block-scoped to enclosing control-flow block. Not accessible outside.
 
 ---
 
-## 8. Fragment & @render
+## 9. Fragment & @render
 
-### 8.1 Inline @fragment Definition
+### 9.1 Inline @fragment Definition
 
 ```
 FRAGMENT-DEF
@@ -467,7 +497,7 @@ Fragment is auto-passed to matching fragment binding on parent component.
 ─────────────────────────────────────────────────────────────────
 ```
 
-### 8.2 Implicit children
+### 9.2 Implicit children
 
 ```
 IMPLICIT-CHILDREN
@@ -478,7 +508,7 @@ Satisfies `children: fragment<void>()` or `children: fragment.required<void>()`
 ─────────────────────────────────────────────────────────────────
 ```
 
-### 8.3 @render Invocation
+### 9.3 @render Invocation
 
 ```
 RENDER
@@ -507,9 +537,9 @@ Must guard: @render(expr?.(...))  or  @if (expr) { @render(expr(...)) }
 
 ---
 
-## 9. Control Flow
+## 10. Control Flow
 
-### 9.1 @if
+### 10.1 @if
 
 ```
 IF
@@ -523,7 +553,7 @@ else:
 ─────────────────────────────────────────────────
 ```
 
-### 9.2 @for
+### 10.2 @for
 
 ```
 FOR
@@ -546,7 +576,7 @@ if empty block: Γ ⊢ empty.children ✓
 ─────────────────────────────────────────────────
 ```
 
-### 9.3 @switch
+### 10.3 @switch
 
 ```
 SWITCH
@@ -561,7 +591,7 @@ SWITCH
 
 ---
 
-## 10. @let
+## 11. @let
 
 ```
 LET
@@ -571,38 +601,6 @@ LET
 ─────────────────────────────────────────────────
 Γ ⊢ @let name = expr;   producing Γ'
 ```
-
----
-
-## 11. Ref (Template-Side Validation)
-
-The checker validates that `ref={x}` and `use:dir(...):ref={x}` reference variables with compatible types.
-
-```
-REF-ON-NATIVE-ELEMENT
-─────────────────────────────────────────────────
-<tag ref={x}>   where H = I(tag)
-x : Ref<H | undefined> ∈ Γ
-─────────────────────────────────────────────────
-
-
-REF-ON-COMPONENT
-─────────────────────────────────────────────────
-<C ref={x}>    where E(C) = E
-if E = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<undefined[]> ∈ Γ
-else:         x : Ref<E | undefined> ∈ Γ  ∨  x : Ref<E[]> ∈ Γ
-─────────────────────────────────────────────────
-
-
-REF-ON-DIRECTIVE
-─────────────────────────────────────────────────
-use:D(...):ref={x}    where E(D) = E_D
-if E_D = void:  x : Ref<undefined> ∈ Γ
-else:           x : Ref<E_D | undefined> ∈ Γ
-─────────────────────────────────────────────────
-```
-
----
 
 ## 12. Binding Prefix & Modifier Validation
 
