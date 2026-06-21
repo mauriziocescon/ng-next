@@ -785,21 +785,17 @@ Co-locating template and logic is not just a style preference. At the component 
 
 Angular templates are also not plain HTML. They require Angular-specific knowledge to read or modify, so the "designers own the HTML" workflow is rarely the real maintenance model for Angular applications. CSS is a different case and remains separable.
 
-Key goals:
-- template and setup live in the same lexical scope,
-- tooling and agents get stable structural markers (`component`, `directive`, `derivation`, `fragment`),
-- bindings remain explicit and statically typed,
-- provider declarations remain separate from setup/template logic,
+For that to work well in Angular, the format should preserve a few constraints:
+
+- template and setup share the same lexical scope,
+- bindings stay explicit, statically typed, and remain the public API surface,
+- `setup` owns component-local logic and runs once at component creation,
+- provider declarations stay separate from setup/template logic,
 - providers can depend on inputs, but not on setup-local variables,
-- component internals stay private — only what `expose` returns is reachable through `ref`.
+- tooling and agents get stable structural markers (`component`, `directive`, `derivation`, `fragment`),
+- component internals stay private: only what `expose` returns is reachable through `ref`.
 
-This keeps the explicit contract model:
-- `bindings` remain the canonical public API surface,
-- Angular performs synchronization/wiring,
-- strict checks happen at build time,
-- `setup` runs once at component creation.
-
-Interface conformance for `bindings` and `expose` stays opt-in via `satisfies`.
+This keeps the explicit contract model: Angular performs synchronization/wiring, strict checks happen at build time, and interface conformance for `bindings` and `expose` stays opt-in via `satisfies`.
 
 ### Boilerplate tax — a known trade-off
 
