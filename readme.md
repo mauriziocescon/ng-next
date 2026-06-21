@@ -781,7 +781,9 @@ Cons:
 
 `tsx` does not support Angular control flow/directives today, so co-located templates likely require an Angular DSL in `*.ng` files plus dedicated tooling/parser support.
 
-This is not only syntax preference: if co-location becomes default, losing `templateUrl` would be a regression for some teams. The intent is co-location without weakening Angular's structural model.
+Co-locating template and logic is not just a style preference. At the component boundary, the two usually change together: a meaningful change to one often requires a change to the other.
+
+Angular templates are also not plain HTML. They require Angular-specific knowledge to read or modify, so the "designers own the HTML" workflow is rarely the real maintenance model for Angular applications. CSS is a different case and remains separable.
 
 Key goals:
 - template and setup live in the same lexical scope,
