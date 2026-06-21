@@ -794,7 +794,7 @@ If `.ng` files make co-location the default, they should still preserve Angular'
 - providers can depend on inputs, but not on setup-local variables,
 - component internals stay private: only what `expose` returns is reachable through `ref`.
 
-This keeps the explicit contract model: Angular performs synchronization/wiring, strict checks happen at build time, and interface conformance for `bindings` and `expose` stays opt-in via `satisfies`.
+This keeps the explicit contract model: Angular performs synchronization/wiring, strict checks happen at build time, interface conformance for `bindings` and `expose` stays opt-in via `satisfies`, and type inference does most of the work instead of relying on class-shaped assertions.
 
 ### Boilerplate tax — a known trade-off
 
