@@ -39,7 +39,7 @@ export const UserDetail = component({
     makeAdmin: output<void>(),
     children: fragment<void>(),
   },
-  setup: ({ user, email, makeAdmin, children }) => (...),
+  setup: ({ user, email, makeAdmin, children }) => @{ ... },
 });
 
 export const EnterpriseUser = component.withForwarding(UserDetail, {
@@ -51,7 +51,7 @@ export const EnterpriseUser = component.withForwarding(UserDetail, {
     contactEmail: model.required<string>(),
     readOnly: input<boolean>(true),
   },
-  setup: (bindings) => (
+  setup: (bindings) => @{
     <UserDetail
       @forward()
       model:email={bindings.contactEmail}
@@ -60,7 +60,7 @@ export const EnterpriseUser = component.withForwarding(UserDetail, {
           // internal policy
         }
       }} />
-  ),
+  },
 });
 ```
 
@@ -148,9 +148,9 @@ Given:
 component.withForwarding(Target, {
   omitBindings: { x: true },
   addBindings: { y: input.required<number>() },
-  setup: (bindings) => (
+  setup: (bindings) => @{
     <Target @forward() x={bindings.y()} />
-  ),
+  },
 });
 ```
 
@@ -185,7 +185,7 @@ export const ThirdPartyGrid = component({
     theme: input<'default' | 'corporate'>('default'),
     rowClick: output<Row>(),
   },
-  setup: ({ rows, columns, density, debugMode, unsafeHtml, theme, rowClick }) => (...),
+  setup: ({ rows, columns, density, debugMode, unsafeHtml, theme, rowClick }) => @{ ... },
 });
 
 export const CorpGrid = component.withForwarding(ThirdPartyGrid, {
@@ -197,14 +197,14 @@ export const CorpGrid = component.withForwarding(ThirdPartyGrid, {
   addBindings: {
     corporateDensity: input<'compact' | 'comfortable'>('compact'),
   },
-  setup: (bindings) => (
+  setup: (bindings) => @{
     <ThirdPartyGrid
       @forward()
       debugMode={false}
       unsafeHtml={false}
       theme={'corporate'}
       density={bindings.corporateDensity()} />
-  ),
+  },
 });
 ```
 
@@ -217,7 +217,7 @@ export const UserDetail = component({
     email: model.required<string>(),
     makeAdmin: output<void>(),
   },
-  setup: ({ user, email, makeAdmin }) => (...),
+  setup: ({ user, email, makeAdmin }) => @{ ... },
 });
 
 export const UserProfile = component.withForwarding(UserDetail, {
@@ -227,9 +227,9 @@ export const UserProfile = component.withForwarding(UserDetail, {
   addBindings: {
     contactEmail: model.required<string>(),
   },
-  setup: (bindings) => (
+  setup: (bindings) => @{
     <UserDetail @forward() model:email={bindings.contactEmail} />
-  ),
+  },
 });
 ```
 
@@ -242,18 +242,18 @@ export const UserDetail = component({
     email: model.required<string>(),
     makeAdmin: output<void>(),
   },
-  setup: ({ user, email, makeAdmin }) => (...),
+  setup: ({ user, email, makeAdmin }) => @{ ... },
 });
 
 export const UserCard = component.withForwarding(UserDetail, {
   addBindings: {
     highlight: input<boolean>(false),
   },
-  setup: (bindings) => (
+  setup: (bindings) => @{
     <section class:highlight={bindings.highlight()}>
       <UserDetail @forward() />
     </section>
-  ),
+  },
 });
 ```
 

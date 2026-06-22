@@ -52,6 +52,8 @@ export interface BaseAST {
 // 3. TEMPLATE ROOT & NODE UNION
 // ────────────────────────────────────────────────────────────────
 
+// Root of a parsed `@{ … }` markup literal: the `@{ … }` surface syntax
+// parses into a TemplateAST whose `nodes` are the literal's contents.
 export interface TemplateAST extends BaseNode {
   type: 'Template';
   nodes: TemplateNode[];
