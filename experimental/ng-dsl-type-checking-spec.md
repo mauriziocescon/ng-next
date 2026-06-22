@@ -625,47 +625,98 @@ LET
 
 | Code | Condition | Severity |
 |------|-----------|----------|
-| D001 | Unknown attribute/property on native element | Error |
-| D002 | Unknown binding on component | Error |
-| D003 | Duplicate binding (same name, same kind) | Error |
-| D004 | Static attribute + dynamic binding clash (same name) | Error |
-| D005 | Missing required input/model/fragment | Error |
-| D006 | Type mismatch (expression not assignable to binding type) | Error |
-| D007 | `model:` bound to non-writable signal | Error |
-| D008 | Directive host incompatible with element/forwarded type | Error |
-| D009 | Same directive applied twice to same element | Error |
-| D010 | `once:model:*` or `once:on:*` | Error |
-| D011 | `once:prop` + `prop` duplicate on same element | Error |
-| D012 | Directive on non-forwarding component | Error |
-| D013 | No `@forward()` when wrapper remainder is non-empty | Error |
-| D014 | `@forward()` element type not assignable to declared host S | Error |
-| D015 | Fragment argument count/type mismatch | Error |
-| D016 | `ref=` variable type incompatible with element/component/directive expose | Error |
-| D017 | Unresolved identifier in template expression | Error |
-| D018 | Text interpolation `{e}` where e is not Stringifiable | Error |
-| D019 | `model:` on native element that is not input/select/textarea | Error |
-| D020 | `on`-prefixed input/model/output binding name | Warning |
-| D021 | Multiple `@forward()` in same template | Error |
-| D022 | `animate:` used on component element (not native) | Error |
-| D023 | `animate:` with invalid phase (not `enter` or `leave`) | Error |
-| D024 | Duplicate `animate:enter` or `animate:leave` class binding on same element | Error |
-| D025 | Duplicate `on:animate:enter` or `on:animate:leave` event binding on same element | Error |
-| D026 | `animate:` expression type mismatch (not `string \| string[]`) | Error |
-| D027 | `on:animate:` handler type mismatch (not `(event: AnimationCallbackEvent) => void`) | Error |
+| D001 | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
+| D002 | Unknown attribute/property on native element | Error |
+| D003 | Unknown binding on component | Error |
+| D004 | Duplicate binding (same name, same kind) | Error |
+| D005 | Static attribute + dynamic binding clash (same name) | Error |
+| D006 | Missing required input/model/fragment | Error |
+| D007 | Type mismatch (expression not assignable to binding type) | Error |
+| D008 | `model:` bound to non-writable signal | Error |
+| D009 | Directive host incompatible with element/forwarded type | Error |
+| D010 | Same directive applied twice to same element | Error |
+| D011 | `once:model:*` or `once:on:*` | Error |
+| D012 | `once:prop` + `prop` duplicate on same element | Error |
+| D013 | Directive on non-forwarding component | Error |
+| D014 | No `@forward()` when wrapper remainder is non-empty | Error |
+| D015 | `@forward()` element type not assignable to declared host S | Error |
+| D016 | Fragment argument count/type mismatch | Error |
+| D017 | `ref=` variable type incompatible with element/component/directive expose | Error |
+| D018 | Unresolved identifier in template expression | Error |
+| D019 | Text interpolation `{e}` where e is not Stringifiable | Error |
+| D020 | `model:` on native element that is not input/select/textarea | Error |
+| D021 | `on`-prefixed input/model/output binding name | Warning |
+| D022 | Multiple `@forward()` in same template | Error |
+| D023 | `animate:` used on component element (not native) | Error |
+| D024 | `animate:` with invalid phase (not `enter` or `leave`) | Error |
+| D025 | Duplicate `animate:enter` or `animate:leave` class binding on same element | Error |
+| D026 | Duplicate `on:animate:enter` or `on:animate:leave` event binding on same element | Error |
+| D027 | `animate:` expression type mismatch (not `string \| string[]`) | Error |
+| D028 | `on:animate:` handler type mismatch (not `(event: AnimationCallbackEvent) => void`) | Error |
 
 ### 13.1 Diagnostic Examples
 
 Each example shows a violation and the diagnostic it triggers.
 
-#### D001 — Unknown attribute/property on native element
+#### D001 — Binding primitive used outside `bindings`
+
+`input()`, `output()`, `model()`, and `fragment()` (and their `.required()` / `.once()` variants) are declaration-only primitives. They may only appear as direct property initializers inside a `bindings` object literal passed to `component()`, `directive()`, or `derivation()`.
+
+```ts
+// ❌ input() inside setup
+const Broken = component({
+  setup: () => {
+    const name = input<string>();
+//               ~~~~~ D001: 'input()' can only be used inside a 'bindings' declaration.
+    return @{ <span>{name()}</span> };
+  },
+});
+
+// ❌ output() inside providers
+const AlsoBroken = component({
+  bindings: { c: input.required<number>() },
+  setup: () => tmpl,
+  providers: ({ c }) => {
+    const ev = output<void>();
+//             ~~~~~~ D001: 'output()' can only be used inside a 'bindings' declaration.
+    return [];
+  },
+});
+
+// ❌ model() at file scope
+const email = model<string>();
+//            ~~~~~ D001: 'model()' can only be used inside a 'bindings' declaration.
+
+// ❌ fragment() inside directive setup
+const broken = directive({
+  host: ref<HTMLElement>(),
+  setup: ({}, { host }) => {
+    const tpl = fragment<void>();
+//              ~~~~~~~~ D001: 'fragment()' can only be used inside a 'bindings' declaration.
+  },
+});
+
+// ✅ All binding primitives inside bindings — valid
+const Valid = component({
+  bindings: {
+    name: input.required<string>(),
+    email: model<string>(),
+    save: output<void>(),
+    children: fragment<void>(),
+  },
+  setup: ({ name, email, save, children }) => tmpl,
+});
+```
+
+#### D002 — Unknown attribute/property on native element
 
 ```ts
 // ❌ "colour" is not a known property of HTMLDivElement
 <div colour="red">Hello</div>
-//   ~~~~~~ D001: Property 'colour' does not exist on element 'div'.
+//   ~~~~~~ D002: Property 'colour' does not exist on element 'div'.
 ```
 
-#### D002 — Unknown binding on component
+#### D003 — Unknown binding on component
 
 ```ts
 const UserDetail = component({
@@ -675,30 +726,30 @@ const UserDetail = component({
 
 // ❌ "role" is not declared in UserDetail's bindings
 <UserDetail user={u()} role="admin" />
-//                      ~~~~ D002: 'role' is not a known binding of 'UserDetail'.
+//                      ~~~~ D003: 'role' is not a known binding of 'UserDetail'.
 ```
 
-#### D003 — Duplicate binding (same name, same kind)
+#### D004 — Duplicate binding (same name, same kind)
 
 ```ts
 // ❌ "disabled" bound twice
 <button disabled={true} disabled={false}>Click</button>
-//                      ~~~~~~~~ D003: Duplicate binding 'disabled'.
+//                      ~~~~~~~~ D004: Duplicate binding 'disabled'.
 
 // ❌ Same event bound twice on a component
 <UserDetail user={u()} on:makeAdmin={f1} on:makeAdmin={f2} />
-//                                       ~~~~~~~~~~~~ D003: Duplicate binding 'makeAdmin'.
+//                                       ~~~~~~~~~~~~ D004: Duplicate binding 'makeAdmin'.
 ```
 
-#### D004 — Static attribute + dynamic binding clash
+#### D005 — Static attribute + dynamic binding clash
 
 ```ts
 // ❌ "id" appears both as static attribute and dynamic binding
 <div id="static" id={dynamicId()}>Content</div>
-//                ~~ D004: 'id' is already set as a static attribute.
+//                ~~ D005: 'id' is already set as a static attribute.
 ```
 
-#### D005 — Missing required input/model/fragment
+#### D006 — Missing required input/model/fragment
 
 ```ts
 const Card = component({
@@ -716,10 +767,10 @@ const Card = component({
 <Card>
   <p>Body</p>
 </Card>
-// D005: Required input 'title' is not provided for 'Card'.
+// D006: Required input 'title' is not provided for 'Card'.
 ```
 
-#### D006 — Type mismatch
+#### D007 — Type mismatch
 
 ```ts
 const Counter = component({
@@ -729,20 +780,20 @@ const Counter = component({
 
 // ❌ string is not assignable to number
 <Counter count={'five'} />
-//              ~~~~~~ D006: Type 'string' is not assignable to type 'number'.
+//              ~~~~~~ D007: Type 'string' is not assignable to type 'number'.
 ```
 
-#### D007 — model: bound to non-writable signal
+#### D008 — model: bound to non-writable signal
 
 ```ts
 const name = computed(() => 'readonly');
 
 // ❌ computed() is not writable
 <input type="text" model:value={name} />
-//                              ~~~~ D007: 'model:value' requires a WritableSignal, but received Signal<string>.
+//                              ~~~~ D008: 'model:value' requires a WritableSignal, but received Signal<string>.
 ```
 
-#### D008 — Directive host incompatible
+#### D009 — Directive host incompatible
 
 ```ts
 const inputMask = directive({
@@ -753,41 +804,41 @@ const inputMask = directive({
 
 // ❌ HTMLDivElement is not assignable to HTMLInputElement
 <div use:inputMask(mask={'###-####'})>Content</div>
-//   ~~~~~~~~~~~~~ D008: Directive 'inputMask' requires host 'HTMLInputElement', but applied to 'div' (HTMLDivElement).
+//   ~~~~~~~~~~~~~ D009: Directive 'inputMask' requires host 'HTMLInputElement', but applied to 'div' (HTMLDivElement).
 ```
 
-#### D009 — Same directive applied twice
+#### D010 — Same directive applied twice
 
 ```ts
 // ❌ tooltip appears twice on the same element
 <button
   use:tooltip(message={'First'})
   use:tooltip(message={'Second'})>
-//~~~~~~~~~~~~ D009: Directive 'tooltip' is already applied to this element.
+//~~~~~~~~~~~~ D010: Directive 'tooltip' is already applied to this element.
   Click
 </button>
 ```
 
-#### D010 — once:model: or once:on:
+#### D011 — once:model: or once:on:
 
 ```ts
 // ❌ once: is only valid on inputs
 <UserDetail once:model:email={email} user={u()} />
-//          ~~~~~~~~~~~~~~~~ D010: 'once:' cannot be used with 'model:'. Only inputs support 'once:'.
+//          ~~~~~~~~~~~~~~~~ D011: 'once:' cannot be used with 'model:'. Only inputs support 'once:'.
 
 <UserDetail once:on:makeAdmin={f} user={u()} />
-//          ~~~~~~~~~~~~~~~~~ D010: 'once:' cannot be used with 'on:'. Only inputs support 'once:'.
+//          ~~~~~~~~~~~~~~~~~ D011: 'once:' cannot be used with 'on:'. Only inputs support 'once:'.
 ```
 
-#### D011 — once:prop + prop duplicate
+#### D012 — once:prop + prop duplicate
 
 ```ts
 // ❌ same input bound with and without once:
 <Counter once:count={5} count={dynamicCount()} />
-//                      ~~~~~ D011: 'count' cannot appear both as 'once:count' and 'count'.
+//                      ~~~~~ D012: 'count' cannot appear both as 'once:count' and 'count'.
 ```
 
-#### D012 — Directive on non-forwarding component
+#### D013 — Directive on non-forwarding component
 
 ```ts
 const Plain = component({
@@ -797,10 +848,10 @@ const Plain = component({
 
 // ❌ Plain does not declare withForwarding
 <Plain label={'hi'} use:tooltip(message={'tip'}) />
-//                  ~~~~~~~~~~~~ D012: Cannot apply directive to 'Plain': component does not support forwarding.
+//                  ~~~~~~~~~~~~ D013: Cannot apply directive to 'Plain': component does not support forwarding.
 ```
 
-#### D013 — No @forward() when wrapper remainder is non-empty
+#### D014 — No @forward() when wrapper remainder is non-empty
 
 ```ts
 // ❌ Wrapper selects "user" but Target has "email" and "makeAdmin" that need forwarding
@@ -809,12 +860,12 @@ const Broken = component.withForwarding(UserDetail, {
   setup: ({ user }) => @{
     // Missing @forward() — remaining bindings have nowhere to go
     <UserDetail user={user()} />
-//  D013: Component wraps 'UserDetail' but template has no '@forward()' target for remaining bindings: 'email', 'makeAdmin'.
+//  D014: Component wraps 'UserDetail' but template has no '@forward()' target for remaining bindings: 'email', 'makeAdmin'.
   },
 });
 ```
 
-#### D014 — @forward() element type not assignable to declared host
+#### D015 — @forward() element type not assignable to declared host
 
 ```ts
 const Button = component.withForwarding<HTMLButtonElement>({
@@ -822,12 +873,12 @@ const Button = component.withForwarding<HTMLButtonElement>({
   setup: ({ label }) => @{
     // ❌ <span> is HTMLSpanElement, not assignable to HTMLButtonElement
     <span @forward()>{label()}</span>
-//        ~~~~~~~~~~ D014: Element 'span' (HTMLSpanElement) is not assignable to forwarding host 'HTMLButtonElement'.
+//        ~~~~~~~~~~ D015: Element 'span' (HTMLSpanElement) is not assignable to forwarding host 'HTMLButtonElement'.
   },
 });
 ```
 
-#### D015 — Fragment argument count/type mismatch
+#### D016 — Fragment argument count/type mismatch
 
 ```ts
 const List = component({
@@ -839,12 +890,12 @@ const List = component({
     @for (item of items(); track item) {
       @render(row(item))
     }
-//              ~~~~~~~~ D015: Fragment 'row' expects 2 arguments [string, number], but got 1.
+//              ~~~~~~~~ D016: Fragment 'row' expects 2 arguments [string, number], but got 1.
   },
 });
 ```
 
-#### D016 — ref variable type incompatible
+#### D017 — ref variable type incompatible
 
 ```ts
 const child = ref<HTMLDivElement>();
@@ -860,40 +911,40 @@ const Child = component({
 
 // ❌ ref expects { value: Signal<number> } | undefined, got HTMLDivElement | undefined
 <Child ref={child} />
-//          ~~~~~ D016: Type 'Ref<HTMLDivElement | undefined>' is not assignable. Expected 'Ref<{ value: Signal<number> } | undefined>'.
+//          ~~~~~ D017: Type 'Ref<HTMLDivElement | undefined>' is not assignable. Expected 'Ref<{ value: Signal<number> } | undefined>'.
 ```
 
-#### D017 — Unresolved identifier
+#### D018 — Unresolved identifier
 
 ```ts
 export const App = component({
   setup: () => @{
     // ❌ "userName" is not in any scope
     <h1>{userName}</h1>
-//       ~~~~~~~~ D017: Cannot find name 'userName'.
+//       ~~~~~~~~ D018: Cannot find name 'userName'.
   },
 });
 ```
 
-#### D018 — Text interpolation with non-Stringifiable type
+#### D019 — Text interpolation with non-Stringifiable type
 
 ```ts
 const data = signal({ x: 1, y: 2 });
 
 // ❌ {x: number, y: number} has no toString() override — not Stringifiable
 <p>{data()}</p>
-//  ~~~~~~ D018: Type '{ x: number; y: number }' is not assignable to 'Stringifiable'.
+//  ~~~~~~ D019: Type '{ x: number; y: number }' is not assignable to 'Stringifiable'.
 ```
 
-#### D019 — model: on non-modelable native element
+#### D020 — model: on non-modelable native element
 
 ```ts
 // ❌ <div> does not support model:
 <div model:value={text}>Content</div>
-//   ~~~~~~~~~~~ D019: 'model:' is only valid on 'input', 'select', or 'textarea' elements.
+//   ~~~~~~~~~~~ D020: 'model:' is only valid on 'input', 'select', or 'textarea' elements.
 ```
 
-#### D020 — on-prefixed binding name (Warning)
+#### D021 — on-prefixed binding name (Warning)
 
 ```ts
 const Form = component({
@@ -904,10 +955,10 @@ const Form = component({
     <button on:click={() => onSubmit.emit()}>Submit</button>
   },
 });
-// D020 (warning): Binding name 'onSubmit' starts with 'on'. Consider renaming to 'submit' to avoid confusion with event syntax.
+// D021 (warning): Binding name 'onSubmit' starts with 'on'. Consider renaming to 'submit' to avoid confusion with event syntax.
 ```
 
-#### D021 — Multiple @forward() in same template
+#### D022 — Multiple @forward() in same template
 
 ```ts
 const Broken = component.withForwarding<HTMLElement>({
@@ -916,12 +967,12 @@ const Broken = component.withForwarding<HTMLElement>({
     // ❌ Two @forward() markers
     <div @forward()>{label()}</div>
     <span @forward()>extra</span>
-//        ~~~~~~~~~~ D021: Only one '@forward()' is allowed per component template.
+//        ~~~~~~~~~~ D022: Only one '@forward()' is allowed per component template.
   },
 });
 ```
 
-#### D022 — `animate:` on component element
+#### D023 — `animate:` on component element
 
 ```ts
 const Card = component({
@@ -931,51 +982,51 @@ const Card = component({
 
 // ❌ animate: is only valid on native elements
 <Card title={'hi'} animate:enter={'fade-in'} />
-//                  ~~~~~~~~~~~~~~ D022: 'animate:' can only be used on native elements, not component 'Card'.
+//                  ~~~~~~~~~~~~~~ D023: 'animate:' can only be used on native elements, not component 'Card'.
 ```
 
-#### D023 — Invalid animate phase
+#### D024 — Invalid animate phase
 
 ```ts
 // ❌ "show" is not a valid phase
 <div animate:show={'fade-in'}>Content</div>
-//   ~~~~~~~~~~~~~ D023: Invalid animation phase 'show'. Only 'enter' and 'leave' are supported.
+//   ~~~~~~~~~~~~~ D024: Invalid animation phase 'show'. Only 'enter' and 'leave' are supported.
 ```
 
-#### D024 — Duplicate animate class binding
+#### D025 — Duplicate animate class binding
 
 ```ts
 // ❌ animate:enter bound twice
 <div animate:enter={'fade-in'} animate:enter={'slide-in'}>Content</div>
-//                             ~~~~~~~~~~~~~~ D024: Duplicate 'animate:enter' binding.
+//                             ~~~~~~~~~~~~~~ D025: Duplicate 'animate:enter' binding.
 ```
 
-#### D025 — Duplicate animate event binding
+#### D026 — Duplicate animate event binding
 
 ```ts
 // ❌ on:animate:leave bound twice
 <div on:animate:leave={fn1} on:animate:leave={fn2}>Content</div>
-//                          ~~~~~~~~~~~~~~~~~ D025: Duplicate 'on:animate:leave' binding.
+//                          ~~~~~~~~~~~~~~~~~ D026: Duplicate 'on:animate:leave' binding.
 ```
 
-#### D026 — Animate class type mismatch
+#### D027 — Animate class type mismatch
 
 ```ts
 const count = signal(42);
 
 // ❌ number is not a valid animate class value
 <div animate:enter={count()}>Content</div>
-//                  ~~~~~~~ D026: Type 'number' is not assignable to 'string | string[]'.
+//                  ~~~~~~~ D027: Type 'number' is not assignable to 'string | string[]'.
 ```
 
-#### D027 — Animate event handler type mismatch
+#### D028 — Animate event handler type mismatch
 
 ```ts
 function wrongHandler(x: string) {}
 
 // ❌ handler signature doesn't match AnimationCallbackEvent
 <div on:animate:enter={wrongHandler}>Content</div>
-//                     ~~~~~~~~~~~~ D027: Type '(x: string) => void' is not assignable to '(event: AnimationCallbackEvent) => void'.
+//                     ~~~~~~~~~~~~ D028: Type '(x: string) => void' is not assignable to '(event: AnimationCallbackEvent) => void'.
 ```
 
 ---
@@ -1002,9 +1053,10 @@ Stringifiable = string | number | boolean | null | undefined
 
 ## 15. Well-Formedness Invariants
 
-1. **Single @forward()**: At most one per component template.
-2. **Scope containment**: `@derive` and `@let` names are block-scoped to their enclosing control-flow block.
-3. **Ref availability**: Refs resolve after `afterNextRender` — reading before yields `undefined`.
-4. **Implicit children**: Nested content auto-satisfies `children` fragment binding. Cannot also bind `children=` explicitly.
-5. **Derivation is view-scoped**: Each `@derive` instance follows the lifecycle of its enclosing embedded view. In `@for`, each iteration owns an independent instance.
-6. **@forward() host check**: The actual native element at the `@forward()` site must be assignable to the declared forwarding host type S.
+1. **Binding primitives are declaration-only**: Calls to `input()`, `output()`, `model()`, `fragment()` (and variants) are valid only as direct property values inside a `bindings` object. The compiler rejects them in any other syntactic position (setup body, providers factory, file scope, helper functions).
+2. **Single @forward()**: At most one per component template.
+3. **Scope containment**: `@derive` and `@let` names are block-scoped to their enclosing control-flow block.
+4. **Ref availability**: Refs resolve after `afterNextRender` — reading before yields `undefined`.
+5. **Implicit children**: Nested content auto-satisfies `children` fragment binding. Cannot also bind `children=` explicitly.
+6. **Derivation is view-scoped**: Each `@derive` instance follows the lifecycle of its enclosing embedded view. In `@for`, each iteration owns an independent instance.
+7. **@forward() host check**: The actual native element at the `@forward()` site must be assignable to the declared forwarding host type S.
