@@ -15,7 +15,7 @@ Highlights:
 4. Hostless components + TS lexical scoping for templates,
 5. Component inputs: lifted up + immediately available in setup and providers,
 6. Expose and Template Refs,
-7. Composition with Fragments, Directives, and Forward Syntax,
+7. Composition with Fragments, Directives, and Forwarding,
 8. Dependency Injection Enhancements,
 9. Final considerations (`!important`) + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
@@ -31,7 +31,7 @@ Highlights:
 - [One-time bindings (`once:`)](#one-time-bindings-once)
 - [Input-driven providers](#input-driven-providers)
 - [Expose and Template Refs](#expose-and-template-refs)
-- [Composition with Fragments, Directives, and Forward Syntax](#composition-with-fragments-directives-and-forward-syntax)
+- [Composition with Fragments, Directives, and Forwarding](#composition-with-fragments-directives-and-forwarding)
 - [Dependency Injection Enhancements](#dependency-injection-enhancements)
 - [Final considerations](#final-considerations)
 - [Appendix: Co-located templates in Angular via `.ng` files](#appendix-co-located-templates-in-angular-via-ng-files)
@@ -407,7 +407,7 @@ export const RefShowcase = component({
 });
 ```
 
-## Composition with Fragments, Directives, and Forward Syntax
+## Composition with Fragments, Directives, and Forwarding
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 

@@ -72,6 +72,10 @@ export type TemplateNode =
 // 4. ELEMENT NODE
 // ────────────────────────────────────────────────────────────────
 
+/**
+ * Placement marker for the forwarding payload declared by the enclosing
+ * component API. The checker validates the marked node.
+ */
 export interface ForwardMarkerNode extends BaseNode {
   type: 'ForwardMarker';
 }
