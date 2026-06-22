@@ -9,18 +9,28 @@ import {
   type Signal,
 } from '@angular/core';
 
+import type { TemplateAST } from './ng-ast';
+
 // ────────────────────────────────────────────────────────────────
 // 1. TEMPLATE MARKUP
 //
 // Branded type so the compiler can distinguish a raw template
 // return (shorthand) from an object return (full form).
-// In practice the compiler produces TemplateMarkup from the DSL;
-// here we use `any` as a stand-in.
+// The AST payload is phantom type metadata: the compiler produces
+// TemplateMarkup<TAst> from the DSL, while public APIs can accept
+// the default TemplateMarkup alias when they do not inspect the tree.
 // ────────────────────────────────────────────────────────────────
 
 declare const TEMPLATE: unique symbol;
+declare const TEMPLATE_AST: unique symbol;
 
-export type TemplateMarkup = { readonly [TEMPLATE]: true };
+export type TemplateMarkup<TAst extends TemplateAST = TemplateAST> = {
+  readonly [TEMPLATE]: true;
+  readonly [TEMPLATE_AST]: TAst;
+};
+
+export type TemplateAstOf<T extends TemplateMarkup> =
+  T extends TemplateMarkup<infer TAst> ? TAst : never;
 
 // ────────────────────────────────────────────────────────────────
 // 2. BRANDED BINDING TYPES
@@ -106,11 +116,14 @@ export type ComponentBindingValue = AnyBindingValue;
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
 //
-// ComponentInstance has bindings + expose + directive-forwarding metadata.
+// ComponentInstance has bindings + expose + template + directive-forwarding
+// metadata.
 // DirectiveInstance adds a host element type (H) — a directive
 // must be attached to a DOM element.
 //
-// ExposeOf<T> works for both thanks to structural match on EXPOSE.
+// ExposeOf<T> works for components and directives thanks to structural match
+// on EXPOSE. ComponentTemplateOf<T> exposes the template markup metadata that
+// component(...) inferred from setup's return value.
 //
 // InputsOnly<B> filters a bindings record to InputSignal keys
 // only (excluding ModelSignal, which extends InputSignal in
@@ -119,13 +132,20 @@ export type ComponentBindingValue = AnyBindingValue;
 
 declare const BINDINGS: unique symbol;
 declare const EXPOSE: unique symbol;
+declare const COMPONENT_TEMPLATE: unique symbol;
 declare const HOST: unique symbol;
 declare const DIRECTIVE_FORWARDING: unique symbol;
 
-export type ComponentInstance<B, E = void, S extends HTMLElement = never> = {
+export type ComponentInstance<
+  B,
+  E = void,
+  S extends HTMLElement = never,
+  TMarkup extends TemplateMarkup = TemplateMarkup,
+> = {
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
   readonly [DIRECTIVE_FORWARDING]: S;
+  readonly [COMPONENT_TEMPLATE]: TMarkup;
 };
 
 export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
@@ -135,6 +155,9 @@ export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
 };
 
 type ExposeOf<T> = T extends { readonly [EXPOSE]: infer E } ? E : never;
+
+export type ComponentTemplateOf<T extends ComponentInstance<any, any, any>> =
+  T extends { readonly [COMPONENT_TEMPLATE]: infer TMarkup } ? TMarkup : never;
 
 type TargetBindings<C extends ComponentInstance<unknown, unknown, any>> =
   C extends { readonly [BINDINGS]: infer B } ? B : never;
@@ -283,7 +306,8 @@ type ReservedBindingsConstraint<
   ? B['children'] extends FragmentBinding<unknown>
     ? {}
     : {
-        __reserved_children_error__: 'children binding must use fragment(...) or fragment.required(...)';
+        __reserved_children_error__:
+          'children binding must use fragment(...) or fragment.required(...)';
       }
   : unknown;
 
@@ -345,11 +369,6 @@ export function refMany(): any {
   return {} as any;
 }
 
-type SetupReturn<E> =
-  | { template: TemplateMarkup; expose: E } // full form with expose
-  | { template: TemplateMarkup } // full form, no expose
-  | TemplateMarkup; // shorthand: raw template
-
 // ────────────────────────────────────────────────────────────────
 // 7. COMPONENT
 //
@@ -397,27 +416,36 @@ type SetupReturn<E> =
 //   of source order. This applies uniformly to all binding kinds.
 // ────────────────────────────────────────────────────────────────
 
+type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
+  | { template: TMarkup; expose: E } // full form with expose
+  | { template: TMarkup } // full form, no expose
+  | TMarkup; // shorthand: raw template
+
 // With bindings
 export function component<
   B extends Record<string, ComponentBindingValue>,
   E = void,
+  TMarkup extends TemplateMarkup = TemplateMarkup,
 >(
   config: {
     bindings: B;
-    setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+    setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
     providers?: (inputs: InputsOnly<B>) => Provider[];
     style?: string;
     styleUrl?: string;
   } & ReservedBindingsConstraint<B>,
-): ComponentInstance<B, E>;
+): ComponentInstance<B, E, never, TMarkup>;
 
 // No bindings
-export function component<E = void>(config: {
-  setup: () => SetupReturn<E>;
+export function component<
+  E = void,
+  TMarkup extends TemplateMarkup = TemplateMarkup,
+>(config: {
+  setup: () => SetupReturn<E, TMarkup>;
   providers?: () => Provider[];
   style?: string;
   styleUrl?: string;
-}): ComponentInstance<{}, E>;
+}): ComponentInstance<{}, E, never, TMarkup>;
 
 export function component(config: any): any {
   return config;
@@ -428,39 +456,42 @@ export namespace component {
   export declare function withForwarding<
     B extends Record<string, ComponentBindingValue>,
     E = void,
+    TMarkup extends TemplateMarkup = TemplateMarkup,
   >(
     config: {
       bindings: B;
-      setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+      setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
       providers?: (inputs: InputsOnly<B>) => Provider[];
       style?: string;
       styleUrl?: string;
     } & ReservedBindingsConstraint<B>,
-  ): ComponentInstance<B, E, HTMLElement>;
+  ): ComponentInstance<B, E, HTMLElement, TMarkup>;
 
   export declare function withForwarding<
     S extends HTMLElement,
     B extends Record<string, ComponentBindingValue>,
     E = void,
+    TMarkup extends TemplateMarkup = TemplateMarkup,
   >(
     config: {
       bindings: B;
-      setup: (bindings: SetupBindings<B>) => SetupReturn<E>;
+      setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
       providers?: (inputs: InputsOnly<B>) => Provider[];
       style?: string;
       styleUrl?: string;
     } & ReservedBindingsConstraint<B>,
-  ): ComponentInstance<B, E, S>;
+  ): ComponentInstance<B, E, S, TMarkup>;
 
   export declare function withForwarding<
     S extends HTMLElement = HTMLElement,
     E = void,
+    TMarkup extends TemplateMarkup = TemplateMarkup,
   >(config: {
-    setup: () => SetupReturn<E>;
+    setup: () => SetupReturn<E, TMarkup>;
     providers?: () => Provider[];
     style?: string;
     styleUrl?: string;
-  }): ComponentInstance<{}, E, S>;
+  }): ComponentInstance<{}, E, S, TMarkup>;
 
   export declare function withForwarding<
     ExplicitWrapperGenericsAreNotAllowed extends never = never,
@@ -471,18 +502,24 @@ export namespace component {
     >,
     Sel extends Record<string, ComponentBindingValue> = {},
     E = void,
+    TMarkup extends TemplateMarkup = TemplateMarkup,
   >(
     target: C,
     config: TargetBindings<C> extends Record<string, ComponentBindingValue>
       ? {
           bindings: ValidateWrapSelection<Sel, TargetBindings<C>>;
-          setup: (bindings: SetupBindings<Sel>) => SetupReturn<E>;
+          setup: (bindings: SetupBindings<Sel>) => SetupReturn<E, TMarkup>;
           providers?: (inputs: InputsOnly<Sel>) => Provider[];
           style?: string;
           styleUrl?: string;
         }
       : never,
-  ): ComponentInstance<TargetBindings<C>, E, DirectiveForwardingHostOf<C>>;
+  ): ComponentInstance<
+    TargetBindings<C>,
+    E,
+    DirectiveForwardingHostOf<C>,
+    TMarkup
+  >;
 }
 
 (component as any).withForwarding = (targetOrConfig: any, maybeConfig?: any) =>

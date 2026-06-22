@@ -13,9 +13,12 @@ import {
   signal,
 } from '@angular/core';
 
+import type { TemplateAST } from './ng-ast';
+
 import {
   type ComponentInstance,
   type ComponentBindingValue,
+  type ComponentTemplateOf,
   type DerivationInstance,
   type DirectiveInstance,
   type IntrinsicElementDescriptor,
@@ -25,6 +28,7 @@ import {
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
+  type TemplateAstOf,
   type TemplateMarkup,
   type __ReservedBindingsConstraint,
   type __WrapSelectionDiagnostics,
@@ -50,6 +54,10 @@ interface Item {
   desc: string;
 }
 
+interface SpecificTemplateAST extends TemplateAST {
+  readonly __specificTemplate: true;
+}
+
 // ────────────────────────────────────────────────────────────────
 // TEST HELPERS
 //
@@ -72,6 +80,18 @@ type MergeProps<Left, Right> = Omit<Left, keyof Right> & Right;
 
 // TemplateMarkup is assignable to itself
 const _tmplAssign: TemplateMarkup = tmpl;
+
+declare const specificTmpl: TemplateMarkup<SpecificTemplateAST>;
+
+// Specific TemplateMarkup is assignable to the generic TemplateMarkup API
+const _specificTmplAssign: TemplateMarkup = specificTmpl;
+
+type _SpecificTemplateAst = Assert<
+  IsEqual<TemplateAstOf<typeof specificTmpl>, SpecificTemplateAST>
+>;
+
+// @ts-expect-error generic TemplateMarkup does not carry the specific AST
+const _genericTmplNotSpecific: TemplateMarkup<SpecificTemplateAST> = tmpl;
 
 // TemplateMarkup is not assignable from a plain object
 // @ts-expect-error plain object is not TemplateMarkup
@@ -160,6 +180,30 @@ const MinimalFullProviders = component({
   setup: () => ({ template: tmpl }),
   providers: () => [],
 });
+
+// Component instances preserve the specific TemplateMarkup<TAst> returned by
+// setup.
+const SpecificTemplateComponent = component({
+  setup: () => specificTmpl,
+});
+
+type _SpecificComponentTemplateAst = Assert<
+  IsEqual<
+    TemplateAstOf<ComponentTemplateOf<typeof SpecificTemplateComponent>>,
+    SpecificTemplateAST
+  >
+>;
+
+const SpecificTemplateFullComponent = component({
+  setup: () => ({ template: specificTmpl }),
+});
+
+type _SpecificFullComponentTemplateAst = Assert<
+  IsEqual<
+    TemplateAstOf<ComponentTemplateOf<typeof SpecificTemplateFullComponent>>,
+    SpecificTemplateAST
+  >
+>;
 
 // ────────────────────────────────────────────────────────────────
 // 5. COMPONENT — bindings (input, model, output, fragment)
@@ -721,10 +765,12 @@ const _NegForwardingMetadataInSetup = component.withForwarding({
   },
 });
 
-// @ts-expect-error component instances are not valid forwarded DOM host types
-const _NegComponentAsForwardingHost = component.withForwarding<typeof UserDetail>({
-  setup: () => tmpl,
-});
+const _NegComponentAsForwardingHost = (
+  // @ts-expect-error component instances are not valid forwarded DOM host types
+  component.withForwarding<typeof UserDetail>({
+    setup: () => tmpl,
+  })
+);
 
 // @ts-expect-error directive instances are not valid forwarded DOM host types
 const _NegDirectiveAsForwardingHost = component.withForwarding<typeof tooltip>({
@@ -921,7 +967,7 @@ type _NoForwardingWrapperKeepsNever = Assert<
   IsEqual<typeof NoForwardingWrapper, ComponentInstance<{}, void, never>>
 >;
 
-// @ts-expect-error two-argument withForwarding infers target from the value; explicit host generic is invalid
+// @ts-expect-error explicit host generic is invalid in wrapper mode
 const _NegWrapperExplicitHostGeneric = component.withForwarding<HTMLButtonElement>(
   UserDetail,
   {
@@ -930,20 +976,24 @@ const _NegWrapperExplicitHostGeneric = component.withForwarding<HTMLButtonElemen
   },
 );
 
-// @ts-expect-error two-argument withForwarding infers target from the value; explicit component generic is invalid
-const _NegWrapperExplicitComponentGeneric = component.withForwarding<typeof UserDetail>(
-  UserDetail,
-  {
-    bindings: {},
-    setup: () => tmpl,
-  },
+const _NegWrapperExplicitComponentGeneric = (
+  // @ts-expect-error explicit component generic is invalid in wrapper mode
+  component.withForwarding<typeof UserDetail>(
+    UserDetail,
+    {
+      bindings: {},
+      setup: () => tmpl,
+    },
+  )
 );
 
-// @ts-expect-error wrapper mode is inference-only even if all generics are supplied
-const _NegWrapperExplicitFullGenerics = component.withForwarding<typeof UserDetail, {}>(UserDetail, {
-  bindings: {},
-  setup: () => tmpl,
-});
+const _NegWrapperExplicitFullGenerics = (
+  // @ts-expect-error wrapper mode is inference-only even if all generics are supplied
+  component.withForwarding<typeof UserDetail, {}>(UserDetail, {
+    bindings: {},
+    setup: () => tmpl,
+  })
+);
 
 // ────────────────────────────────────────────────────────────────
 // 13. COMPONENT — forward collision precedence (compiler contract)
@@ -1021,7 +1071,7 @@ type _ButtonForwardingAcceptsGenericDirective = Assert<
     true
   >
 >;
-// @ts-expect-error HTMLInputElement host directive is incompatible with HTMLButtonElement forwarded element
+// @ts-expect-error input-host directive cannot attach to a forwarded button
 const _negButtonForwardingRejectsInputDirective: DirectiveFitsForwardedElement<
   typeof ButtonForwarding,
   typeof inputOnly
@@ -1042,7 +1092,7 @@ type _InputForwardingWrapperAcceptsGenericDirective = Assert<
     true
   >
 >;
-// @ts-expect-error HTMLButtonElement host directive is incompatible with HTMLInputElement forwarded through wrapper
+// @ts-expect-error button-host directive cannot attach to a forwarded input
 const _negInputForwardingWrapperRejectsButtonDirective: DirectiveFitsForwardedElement<
   typeof InputForwardingWrapper,
   typeof buttonOnly
@@ -1547,7 +1597,7 @@ const _NegMissingKey = component({
 const _NegWrongBindingType = component({
   bindings: {
     sortKey: input.required<string>(),
-    // @ts-expect-error sortDirection should be InputSignal<'asc' | 'desc'>, not InputSignal<number>
+    // @ts-expect-error sortDirection should be InputSignal<'asc' | 'desc'>
     sortDirection: input<number>(),
   } satisfies Sortable,
   setup: ({ sortKey, sortDirection }) => tmpl,
