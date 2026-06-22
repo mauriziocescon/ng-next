@@ -19,7 +19,7 @@ Highlights:
 8. Dependency Injection Enhancements,
 9. Final considerations (`!important`) + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
-**Template syntax note**: the template syntax in the examples below resembles TSX syntactically but is Angular DSL, not JSX. It supports Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
+**Template syntax note**: template markup is written inside a `@{ }` markup literal (the `@` marks the TypeScript→DSL boundary). The syntax in the examples below resembles TSX syntactically but is Angular DSL, not JSX. It supports Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
 
 <details>
   <summary><strong>Table of contents</strong></summary>
@@ -66,14 +66,14 @@ export const TextSearch = component({
       valueChange.emit(text());
     }
 
-    return (
+    return @{
       <label class:danger={isDanger()}>Text:</label>
       <input type="text" model:value={text} on:input={textChange} />
 
       <button disabled={text().length === 0} on:click={() => text.set('')}>
         {'Reset ' + text()}
       </button>
-    );
+    };
   },
   style: `
     .danger {
@@ -96,12 +96,12 @@ export const UserDetailConsumer = component({
 
     function makeAdmin() {/** ... **/}
 
-    return (
+    return @{
       <UserDetail
         user={user()}
         model:email={email}
         on:makeAdmin={makeAdmin} />
-    );
+    };
   },
 });
 
@@ -116,9 +116,9 @@ export const UserDetail = component({
     email: model<string>(),
     makeAdmin: output<void>(),
   },
-  setup: (bindings) => (
+  setup: (bindings) => @{
     // bindings.user, bindings.email, bindings.makeAdmin
-  ),
+  },
 });
 ```
 
@@ -137,13 +137,13 @@ const type = Type.Counter;
 const counter = (value: number) => `Let's count till ${value}`;
 
 export const Counter = component({
-  setup: () => (
+  setup: () => @{
     @if (type === Type.Counter) {
       <p>{counter(5)}</p>
     } @else {
       <span>Empty</span>
     }
-  ),
+  },
 });
 ```
 
@@ -165,7 +165,7 @@ export const TextSearch = component({
     function valueChange() {/** ... **/}
     function doSomething() {/** ... **/}
 
-    return (
+    return @{
       <input
         type="text"
         model:value={text}
@@ -173,7 +173,7 @@ export const TextSearch = component({
         use:tooltip(message={message()} on:dismiss={doSomething}) />
 
       <p>Value: {text()}</p>
-    );
+    };
   },
 });
 
@@ -235,14 +235,14 @@ export const PriceSimulator = component({
      * a pure pipe. Each row owns an independent instance. Not accessible
      * outside its block.
      */
-    return (
+    return @{
       @for (item of items(); track item.id) {
         @derive price = simulation(item={item} qty={1});
 
         <h5>{item.desc}</h5>
         <div>Price: {price()}</div>
       }
-    );
+    };
   },
 });
 ```
@@ -262,14 +262,14 @@ export const SearchBox = component({
     const showTip = signal(true);
     const tip = signal('Type to search');
 
-    return (
+    return @{
       // Literal equivalence: placeholder="Search" and placeholder={'Search'} are identical
       <input
         type="text"
         placeholder="Search"
         model:value={text}
         use:tooltip(message={tip()}):when={showTip()} />
-    );
+    };
   },
 });
 ```
@@ -289,12 +289,12 @@ export const UserDetailConsumer = component({
 
     function makeAdmin() {/** ... **/}
 
-    return (
+    return @{
       <UserDetail
         once:user={user()}
         model:email={email}
         on:makeAdmin={makeAdmin} />
-    );
+    };
   },
 });
 ```
@@ -325,12 +325,12 @@ export const Counter = component({
   setup: () => {
     const store = inject(CounterStore);
 
-    return (
+    return @{
       <h1>Counter</h1>
       <div>Value: {store.value()}</div>
       <button on:click={() => store.decrease()}>-</button>
       <button on:click={() => store.increase()}>+</button>
-    );
+    };
   },
   providers: ({ c }) => [
     provide(CounterStore, () => new CounterStore(c)),
@@ -358,7 +358,7 @@ const TextBadge = component({
     const text = signal('');
 
     return {
-      template: (<button>{text()}</button>),
+      template: @{ <button>{text()}</button> },
       expose: {
         text: text.asReadonly(),
       },
@@ -393,7 +393,7 @@ export const RefShowcase = component({
       badges().forEach((api) => api.text());
     });
 
-    return (
+    return @{
       <div ref={el} use:tooltip():ref={tip}>Target</div>
 
       <TextBadge ref={badge} />
@@ -402,7 +402,7 @@ export const RefShowcase = component({
       <TextBadge ref={badges} />
 
       <button on:click={() => tip()?.toggle()}>Toggle tlp</button>
-    );
+    };
   },
 });
 ```
@@ -425,12 +425,12 @@ export const MenuConsumer = component({
     const second = signal('Second');
 
     // Markup inside a component tag implicitly becomes a children fragment
-    return (
+    return @{
       <Menu>
         <MenuItem>{first()}</MenuItem>
         <MenuItem>{second()}</MenuItem>
       </Menu>
-    );
+    };
   },
 });
 
@@ -446,13 +446,13 @@ export const Menu = component({
     /** ... **/
 
     // No ng-container needed; full form: @render(fragment(), { injector })
-    return (
+    return @{
       @if (children) {
         @render(children())
       } @else {
         <span>Empty</span>
       }
-    );
+    };
   },
 });
 
@@ -460,9 +460,9 @@ export const MenuItem = component({
   bindings: {
     children: fragment.required<void>(),
   },
-  setup: ({ children }) => (
+  setup: ({ children }) => @{
     @render(children())
-  ),
+  },
 });
 ```
 
@@ -483,7 +483,7 @@ export const MenuConsumer = component({
     const items = signal<Item[]>(/** ... **/);
 
     // Inline @fragment is auto-passed as the matching fragment input
-    return (
+    return @{
       <Menu items={items()}>
         @fragment menuItem(item: Item) {
           <div class="my-menu-item">
@@ -491,7 +491,7 @@ export const MenuConsumer = component({
           </div>
         }
       </Menu>
-    );
+    };
   },
   styleUrl: './menu-consumer.css',
 });
@@ -504,13 +504,13 @@ export const Menu = component({
     items: input.required<{ id: string, desc: string }[]>(),
     menuItem: fragment.required<[{ id: string, desc: string }]>(),
   },
-  setup: ({ items, menuItem }) => (
+  setup: ({ items, menuItem }) => @{
     <h1> Total items: {items().length} </h1>
 
     @for (item of items(); track item.id) {
       @render(menuItem(item))
     }
-  ),
+  },
 });
 ```
 
@@ -531,7 +531,7 @@ export const ButtonConsumer = component({
 
     function doSomething() {/** ... **/}
 
-    return (
+    return @{
       <Button
         type="button"
         style="background-color: cyan"
@@ -542,7 +542,7 @@ export const ButtonConsumer = component({
         on:click={doSomething}>
           Click / Hover me
       </Button>
-    );
+    };
   },
 });
 
@@ -562,7 +562,7 @@ export const Button = component.withForwarding<HTMLButtonElement>({
     const innerStyle = computed(() => `${style()}; color: red;`);
 
     // Directives applied to <Button /> are forwarded to this element
-    return (
+    return @{
       <button
         @forward()
         type={type()}
@@ -572,7 +572,7 @@ export const Button = component.withForwarding<HTMLButtonElement>({
         on:click={() => click.emit()}>
         @render(children())
       </button>
-    );
+    };
   },
 });
 ```
@@ -591,12 +591,12 @@ export const UserDetailConsumer = component({
 
     function makeAdmin() {/** ... **/}
 
-    return (
+    return @{
       <UserDetailWrapper
         user={user()}
         model:email={email}
         on:makeAdmin={makeAdmin} />
-    );
+    };
   },
 });
 
@@ -608,12 +608,12 @@ export const UserDetailWrapper = component.withForwarding(UserDetail, {
   setup: ({ user }) => {
     const other = computed(() => /** something depending on user() or a default value **/);
 
-    return (
+    return @{
       <UserDetail 
         @forward() 
         use:tooltip(message={'Tooltip message'}) 
         user={other()} />
-    );
+    };
   },
 });
 
@@ -632,7 +632,7 @@ export const UserDetail = component.withForwarding<HTMLElement>({
     makeAdmin: output<void>(),
     children: fragment<void>(),
   },
-  setup: ({ user, email, makeAdmin, children }) => (
+  setup: ({ user, email, makeAdmin, children }) => @{
     <div @forward()>
       <h3>{user().name}</h3>
       <p>Role: {user().role}</p>
@@ -644,7 +644,7 @@ export const UserDetail = component.withForwarding<HTMLElement>({
 
       @render(children?.())
     </div>
-  ),
+  },
 });
 ```
 
@@ -720,7 +720,7 @@ export const Counter = component({
     const multi = inject(multiToken); // number[]
     const store = inject(Store);
     /** ... **/
-    return (...);
+    return @{ ... };
   },
   providers: ({ initialValue }) => [
     provide(compToken),                     // shorthand — uses token's factory
@@ -807,9 +807,9 @@ export const Badge = component({
     label: input.required<string>(),
     variant: input<'info' | 'warn'>('info'),
   },
-  setup: ({ label, variant }) => (
+  setup: ({ label, variant }) => @{
     <span class={variant()}>{label()}</span>
-  ),
+  },
 });
 
 // Medium — the same tax is a small fraction of the overall code
@@ -825,7 +825,7 @@ export const DataTable = component({
     const filter = signal('');
     const filtered = computed(() => applyFilter(sorted(), filter()));
     // ... 30+ lines of logic, handlers, derived state
-    return (...);
+    return @{ ... };
   },
 });
 ```
@@ -912,22 +912,22 @@ export const Settings = component({
   setup: () => {
     const darkMode = signal(false);
 
-    return (
+    return @{
       <MatSlideToggle model:checked={darkMode}>
         Dark mode
       </MatSlideToggle>
-    );
+    };
   },
 });
 
 // ngProjectAs for named ng-content slots
 export const MyPage = component({
-  setup: () => (
+  setup: () => @{
     <MyCard>
       <div ngProjectAs="my-card-header">header</div>
       <div ngProjectAs="my-card-content">content</div>
     </MyCard>
-  ),
+  },
 });
 
 // @fragment replaces ng-template
@@ -935,13 +935,13 @@ export const ListPage = component({
   setup: () => {
     const items = signal([{ id: '1', name: 'Item 1' }, { id: '2', name: 'Item 2' }]);
 
-    return (
+    return @{
       <MyList items={items()}>
         @fragment itemTemplate(item: { id: string; name: string }) {
           <span>{item.name}</span>
         }
       </MyList>
-    );
+    };
   },
 });
 
@@ -950,11 +950,11 @@ export const Nav = component({
   setup: () => {
     const hasPermissions = signal(false);
 
-    return (
+    return @{
       <MatButton:a href={'/admin'} disabled={hasPermissions()}>
         Admin
       </MatButton:a>
-    );
+    };
   },
 });
 ```
@@ -979,7 +979,7 @@ export const DraggableCard = component({
       position.set(event.source.getFreeDragPosition());
     }
 
-    return (
+    return @{
       // On native elements
       <div
         use:MatTooltip(matTooltip={tip()})
@@ -999,7 +999,7 @@ export const DraggableCard = component({
         use:tooltip(message={'Click me'})>
           Admin
       </MatButton:a>
-    );
+    };
   },
 });
 ```
@@ -1027,12 +1027,12 @@ export const EventList = component({
   bindings: {
     events: input.required<{ id: string; date: Date }[]>(),
   },
-  setup: ({ events }) => (
+  setup: ({ events }) => @{
     @for (event of events(); track event.id) {
       @derive formatted = dateFmt(value={event.date} format={'medium'});
       <span>{formatted()}</span>
     }
-  ),
+  },
 });
 ```
 

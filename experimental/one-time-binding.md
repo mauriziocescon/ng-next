@@ -40,12 +40,12 @@ export const UserDetailConsumer = component({
      * ‼️ <UserDetail once:model:email={email} /> // model cannot be once ‼️
      * ‼️ <UserDetail once:user={...} user={...} /> // duplicate binding ‼️
      */
-    return (
+    return @{
       <UserDetail
         once:user={user()}
         model:email={email}
         on:makeAdmin={makeAdmin} />
-    );
+    };
   },
 });
 ```
@@ -104,14 +104,14 @@ export const Panel = component({
 
     const open = signal(collapsible);
 
-    return (
+    return @{
       <div class={mode()}>
         <h2>{title}</h2>
         @if (collapsible) {
           <button on:click={() => open.update(v => !v)}>Toggle</button>
         }
       </div>
-    );
+    };
   },
 });
 ```
@@ -146,7 +146,7 @@ export const Panel = component({
   },
   setup: () => {
     const svc = inject(PanelService);
-    return (<div>{svc.title}</div>);
+    return @{ <div>{svc.title}</div> };
   },
   providers: ({ title }) => [
     // title is OnceInput<string> here — read once via title()

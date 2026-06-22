@@ -670,7 +670,7 @@ Each example shows a violation and the diagnostic it triggers.
 ```ts
 const UserDetail = component({
   bindings: { user: input.required<User>() },
-  setup: ({ user }) => (<span>{user().name}</span>),
+  setup: ({ user }) => @{ <span>{user().name}</span> },
 });
 
 // ❌ "role" is not declared in UserDetail's bindings
@@ -706,10 +706,10 @@ const Card = component({
     title: input.required<string>(),
     content: fragment.required<void>(),
   },
-  setup: ({ title, content }) => (
+  setup: ({ title, content }) => @{
     <h2>{title()}</h2>
     @render(content())
-  ),
+  },
 });
 
 // ❌ "title" is required but not provided
@@ -724,7 +724,7 @@ const Card = component({
 ```ts
 const Counter = component({
   bindings: { count: input.required<number>() },
-  setup: ({ count }) => (<span>{count()}</span>),
+  setup: ({ count }) => @{ <span>{count()}</span> },
 });
 
 // ❌ string is not assignable to number
@@ -792,7 +792,7 @@ const inputMask = directive({
 ```ts
 const Plain = component({
   bindings: { label: input.required<string>() },
-  setup: ({ label }) => (<span>{label()}</span>),
+  setup: ({ label }) => @{ <span>{label()}</span> },
 });
 
 // ❌ Plain does not declare withForwarding
@@ -806,11 +806,11 @@ const Plain = component({
 // ❌ Wrapper selects "user" but Target has "email" and "makeAdmin" that need forwarding
 const Broken = component.withForwarding(UserDetail, {
   bindings: { user: input.required<User>() },
-  setup: ({ user }) => (
+  setup: ({ user }) => @{
     // Missing @forward() — remaining bindings have nowhere to go
     <UserDetail user={user()} />
 //  D013: Component wraps 'UserDetail' but template has no '@forward()' target for remaining bindings: 'email', 'makeAdmin'.
-  ),
+  },
 });
 ```
 
@@ -819,11 +819,11 @@ const Broken = component.withForwarding(UserDetail, {
 ```ts
 const Button = component.withForwarding<HTMLButtonElement>({
   bindings: { label: input.required<string>() },
-  setup: ({ label }) => (
+  setup: ({ label }) => @{
     // ❌ <span> is HTMLSpanElement, not assignable to HTMLButtonElement
     <span @forward()>{label()}</span>
 //        ~~~~~~~~~~ D014: Element 'span' (HTMLSpanElement) is not assignable to forwarding host 'HTMLButtonElement'.
-  ),
+  },
 });
 ```
 
@@ -835,12 +835,12 @@ const List = component({
     items: input.required<string[]>(),
     row: fragment.required<[string, number]>(),
   },
-  setup: ({ items, row }) => (
+  setup: ({ items, row }) => @{
     @for (item of items(); track item) {
       @render(row(item))
     }
 //              ~~~~~~~~ D015: Fragment 'row' expects 2 arguments [string, number], but got 1.
-  ),
+  },
 });
 ```
 
@@ -852,7 +852,7 @@ const child = ref<HTMLDivElement>();
 const Child = component({
   setup: () => {
     return {
-      template: (<span>hi</span>),
+      template: @{ <span>hi</span> },
       expose: { value: signal(0).asReadonly() },
     };
   },
@@ -867,11 +867,11 @@ const Child = component({
 
 ```ts
 export const App = component({
-  setup: () => (
+  setup: () => @{
     // ❌ "userName" is not in any scope
     <h1>{userName}</h1>
 //       ~~~~~~~~ D017: Cannot find name 'userName'.
-  ),
+  },
 });
 ```
 
@@ -900,9 +900,9 @@ const Form = component({
   bindings: {
     onSubmit: output<void>(),  // ← name starts with "on"
   },
-  setup: ({ onSubmit }) => (
+  setup: ({ onSubmit }) => @{
     <button on:click={() => onSubmit.emit()}>Submit</button>
-  ),
+  },
 });
 // D020 (warning): Binding name 'onSubmit' starts with 'on'. Consider renaming to 'submit' to avoid confusion with event syntax.
 ```
@@ -912,12 +912,12 @@ const Form = component({
 ```ts
 const Broken = component.withForwarding<HTMLElement>({
   bindings: { label: input.required<string>() },
-  setup: ({ label }) => (
+  setup: ({ label }) => @{
     // ❌ Two @forward() markers
     <div @forward()>{label()}</div>
     <span @forward()>extra</span>
 //        ~~~~~~~~~~ D021: Only one '@forward()' is allowed per component template.
-  ),
+  },
 });
 ```
 
@@ -926,7 +926,7 @@ const Broken = component.withForwarding<HTMLElement>({
 ```ts
 const Card = component({
   bindings: { title: input.required<string>() },
-  setup: ({ title }) => (<h2>{title()}</h2>),
+  setup: ({ title }) => @{ <h2>{title()}</h2> },
 });
 
 // ❌ animate: is only valid on native elements
