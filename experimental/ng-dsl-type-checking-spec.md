@@ -2,7 +2,24 @@
 
 ## Angular Signal Components — Template DSL
 
-This document defines what the **template type checker** must verify. It covers only constructs that live inside the template DSL — things TypeScript cannot check because they are not plain TS expressions.
+This document defines what the **template type checker** must verify. It covers
+only constructs that live inside the template DSL — things TypeScript cannot
+check because they are not plain TS expressions.
+
+The parser, lowering pipeline, and non-template TypeScript helper APIs are out
+of scope except where their output is needed by the checker. `inject()`,
+`provide()`, `injectionToken()`, and opt-in `satisfies` checks are specified by
+the TypeScript types/tests, not by this template-node judgment document.
+
+The expected template pipeline is:
+
+1. parse `@{ ... }` into `TemplateAST`;
+2. assign the markup literal the type `TemplateMarkup<ConcreteTemplateAST>`;
+3. check the `TemplateAST` using the judgments below;
+4. lower the checked tree to runtime instructions.
+
+Normative language follows RFC 2119 style: **must** / **must not** are required
+for conformance, while **may** describes implementation freedom.
 
 ---
 
@@ -15,11 +32,24 @@ This document defines what the **template type checker** must verify. It covers 
 | `Γ ⊢ node ✓` | Under Γ, template node type-checks |
 | `B(C)` | Bindings record of component/directive/derivation C |
 | `E(C)` | Expose type of C |
+| `T(C)` | Template markup type of component C |
 | `H(D)` | Host element type of directive D |
 | `F(C)` | Forwarding host type of component C (`never` if none) |
 | `I(tag)` | Intrinsic element host type (e.g. `I("button") = HTMLButtonElement`) |
 | `⊑` | Assignability (subtype) |
 | `≡` | Exact type equality |
+
+Type-level component metadata follows the public helper types:
+
+```
+C : ComponentInstance<B, E, S, M>
+B = bindings record
+E = expose type (`void` when absent)
+S = forwarding host type (`never` when absent)
+M = TemplateMarkup<TAst>
+T(C) = M
+TemplateAstOf<M> = TAst
+```
 
 ---
 
@@ -34,8 +64,10 @@ Lookup priority: Γ_template > Γ_setup > Γ_module > Γ_global
 First match wins.
 ```
 
-- `Γ_template`: `@let`, `@derive`, `@for` item + context variables, `@fragment` parameters, `@if` aliases
-- `Γ_setup`: variables/functions visible from setup's return (or the full setup scope for the template)
+- `Γ_template`: `@let`, `@derive`, `@for` item + context variables,
+  `@fragment` parameters, `@if` aliases
+- `Γ_setup`: variables/functions in the lexical setup scope captured by the
+  `@{ ... }` markup literal
 - `Γ_module`: top-level imports, constants, enums, interfaces
 - `Γ_global`: DOM globals, built-in JS types
 
@@ -43,7 +75,8 @@ First match wins.
 
 ## 2. Expression Typing (Template Expressions)
 
-Template expressions use `{expr}` syntax. The checker must type-check these against the scope.
+Template expressions use `{expr}` syntax. The checker must type-check these
+against the scope.
 
 ```
 VAR
@@ -93,6 +126,21 @@ where Stringifiable = string | number | boolean | null | undefined
                     | { toString(): string }
 ```
 
+### 2.1 Markup Literal Typing
+
+```
+MARKUP-LITERAL
+─────────────────────────────────────────────────────────────────
+parse(@{ source }) = TAst
+TAst : TemplateAST
+─────────────────────────────────────────────────────────────────
+Γ ⊢ @{ source } : TemplateMarkup<TAst>
+```
+
+`TemplateMarkup<TAst>` is opaque nominal markup. It is assignable to the
+generic `TemplateMarkup` API, but a generic `TemplateMarkup` must not be
+treated as a specific `TemplateMarkup<TAst>`.
+
 ---
 
 ## 3. Native Element
@@ -103,7 +151,7 @@ INTRINSIC-ELEMENT
 tag ∈ IntrinsicElements
 H = I(tag)
 
-∀ attr ∈ node.attributes:    attr.name ∈ Attrs(H)
+∀ attr ∈ node.attributes:    CHECK-NATIVE-TEXT-ATTR(Γ, H, attr)
 ∀ input ∈ node.inputs:       CHECK-NATIVE-INPUT(Γ, H, input)
 ∀ output ∈ node.outputs:     CHECK-NATIVE-OUTPUT(Γ, H, output)
 ∀ model ∈ node.models:       CHECK-NATIVE-MODEL(Γ, H, model)
@@ -114,6 +162,13 @@ NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ <tag ...> ✓
+
+
+CHECK-NATIVE-TEXT-ATTR
+─────────────────────────────────────────────────
+attr.name ∈ Attrs(H)
+  ∨ (attr.name ∈ Props(H) ∧ string ⊑ Props(H)[attr.name])
+─────────────────────────────────────────────────
 
 
 CHECK-NATIVE-INPUT
@@ -197,7 +252,10 @@ on:animate:phase={handler}   where phase ∈ {"enter", "leave"}
 Γ ⊢ handler : (event: AnimationCallbackEvent) => void
 ─────────────────────────────────────────────────
 
-where AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction }
+where AnimationCallbackEvent = {
+  target: Element;
+  animationComplete: VoidFunction;
+}
 
 
 ANIMATE-CONSTRAINTS
@@ -220,8 +278,9 @@ Both class form and event form can coexist for the same phase on the same elemen
 ```
 COMPONENT-ELEMENT
 ─────────────────────────────────────────────────────────────────
-C = resolve(tag, Γ)     C : ComponentInstance<B, E, S>
+C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 
+∀ attr ∈ node.attributes: CHECK-COMP-TEXT-INPUT(Γ, B, attr)
 ∀ input ∈ node.inputs:   CHECK-COMP-INPUT(Γ, B, input)
 ∀ model ∈ node.models:   CHECK-COMP-MODEL(Γ, B, model)
 ∀ output ∈ node.outputs: CHECK-COMP-OUTPUT(Γ, B, output)
@@ -233,6 +292,14 @@ NO-DUPLICATE-BINDINGS(node)
 NO-UNKNOWN-BINDINGS(B, node)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ <C ...> ✓
+
+
+CHECK-COMP-TEXT-INPUT
+─────────────────────────────────────────────────
+attr.name ∈ keys(B)
+B[attr.name] : InputSignal<T>
+string ⊑ T
+─────────────────────────────────────────────────
 
 
 CHECK-COMP-INPUT
@@ -272,7 +339,7 @@ B[frag.name] : FragmentBinding<T>
 CHECK-COMP-REF
 ─────────────────────────────────────────────────
 ref.target.name = x
-if E = void:  x : Ref<undefined> ∈ Γ   ∨   x : Ref<undefined[]> ∈ Γ
+if E = void:  x : Ref<undefined> ∈ Γ   ∨   x : Ref<[]> ∈ Γ
 else:         x : Ref<E | undefined> ∈ Γ  ∨  x : Ref<E[]> ∈ Γ
 ─────────────────────────────────────────────────
 
@@ -298,6 +365,7 @@ CHECK-REQUIRED
 
 NO-UNKNOWN-BINDINGS
 ─────────────────────────────────────────────────
+∀ attr ∈ node.attributes:  attr.name ∈ keys(B)
 ∀ input ∈ node.inputs:   input.name ∈ keys(B)
 ∀ model ∈ node.models:   model.name ∈ keys(B)
 ∀ output ∈ node.outputs: output.name ∈ keys(B)
@@ -323,9 +391,67 @@ once:prop + prop on same element → duplicate error
 ON-PREFIX-WARNING
 ─────────────────────────────────────────────────
 ∀ binding name starting with "on" in B → warning
-  (Applies to input, model, or output bindings named e.g. onInput, onModel, onEvent)
+  (Applies to input, model, or output bindings named e.g.
+   onInput, onModel, onEvent)
 ─────────────────────────────────────────────────
 ```
+
+### 4.3 Component Declaration Contracts
+
+These checks are TypeScript API well-formedness rules rather than template-node
+judgments. They align with `component(...)`, `component.withForwarding(...)`,
+and their helper types.
+
+```
+SETUP-RETURN
+─────────────────────────────────────────────────────────────────
+setup returns either:
+  M
+  { template: M }
+  { template: M, expose: E }
+where M : TemplateMarkup<TAst>
+─────────────────────────────────────────────────────────────────
+component(...) : ComponentInstance<B, E, S, M>
+```
+
+```
+PROVIDERS-INPUTS-ONLY
+─────────────────────────────────────────────────────────────────
+providers receives Pick<B, input keys only>
+Models, outputs, and fragments are excluded.
+─────────────────────────────────────────────────────────────────
+```
+
+```
+RESERVED-CHILDREN-BINDING
+─────────────────────────────────────────────────────────────────
+if "children" ∈ keys(B):
+  B["children"] : FragmentBinding<T>
+otherwise error
+─────────────────────────────────────────────────────────────────
+```
+
+```
+WRAPPER-SELECTION
+─────────────────────────────────────────────────────────────────
+component.withForwarding(Target, config)
+Target : ComponentInstance<B_Target, E_Target, S_Target, M_Target>
+Selected = B(config)
+
+keys(Selected) ⊆ keys(B_Target)
+∀ k ∈ keys(Selected):
+  BindingKind(Selected[k]) ≡ BindingKind(B_Target[k])
+  Selected[k] ≡ B_Target[k]
+
+setup receives SetupBindings<Selected>
+providers receives Pick<Selected, input keys only>
+result : ComponentInstance<B_Target, E, S_Target, M>
+─────────────────────────────────────────────────────────────────
+```
+
+The two-argument wrapper form is inference-only: explicit generics must not be
+accepted. The one-argument `withForwarding<S>(config)` form accepts an explicit
+HTMLElement subtype `S`; non-HTMLElement types are rejected.
 
 ---
 
@@ -344,7 +470,7 @@ x : Ref<H | undefined> ∈ Γ
 REF-ON-COMPONENT
 ─────────────────────────────────────────────────
 <C ref={x}>    where E(C) = E
-if E = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<undefined[]> ∈ Γ
+if E = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<[]> ∈ Γ
 else:         x : Ref<E | undefined> ∈ Γ  ∨  x : Ref<E[]> ∈ Γ
 ─────────────────────────────────────────────────
 
@@ -352,8 +478,8 @@ else:         x : Ref<E | undefined> ∈ Γ  ∨  x : Ref<E[]> ∈ Γ
 REF-ON-DIRECTIVE
 ─────────────────────────────────────────────────
 use:D(...):ref={x}    where E(D) = E_D
-if E_D = void:  x : Ref<undefined> ∈ Γ
-else:           x : Ref<E_D | undefined> ∈ Γ
+if E_D = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<[]> ∈ Γ
+else:           x : Ref<E_D | undefined> ∈ Γ  ∨  x : Ref<E_D[]> ∈ Γ
 ─────────────────────────────────────────────────
 ```
 
@@ -393,8 +519,8 @@ if dir.when:
 
 if dir.ref:
   x = dir.ref.target.name
-  if E_D = void:  x : Ref<undefined> ∈ Γ
-  else:           x : Ref<E_D | undefined> ∈ Γ
+  if E_D = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<[]> ∈ Γ
+  else:           x : Ref<E_D | undefined> ∈ Γ  ∨  x : Ref<E_D[]> ∈ Γ
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ use:D(...) ✓
 ```
@@ -439,10 +565,11 @@ H ⊑ S   (actual element compatible with declared forwarding host)
 
 FORWARD-WRAPPER (two-argument withForwarding(Target, config))
 ─────────────────────────────────────────────────────────────────
-Template has exactly one <Target @forward() .../> 
+Template has at most one <Target @forward() .../>
 Remainder = B(Target) \ Selected
 Explicit bindings on @forward() element override Remainder for same key
 if |Remainder| > 0 ∧ no @forward() → error
+if @forward() exists: F(result) = F(Target)
 ─────────────────────────────────────────────────────────────────
 
 
@@ -617,7 +744,7 @@ LET
 | `:when` | `use:` directive | No (per dir) | Condition must be `boolean` |
 | `:ref` | `use:` directive | No (per dir) | Target must match directive expose |
 | `ref` | native, component | No | Target must match element/component expose |
-| `@forward()` | native (in comp template) | No (one per template) | Forwarding target marker |
+| `@forward()` | native or wrapped component target | No | Forwarding target marker |
 
 ---
 
@@ -653,6 +780,12 @@ LET
 | D026 | Duplicate `on:animate:enter` or `on:animate:leave` event binding on same element | Error |
 | D027 | `animate:` expression type mismatch (not `string \| string[]`) | Error |
 | D028 | `on:animate:` handler type mismatch (not `(event: AnimationCallbackEvent) => void`) | Error |
+| D029 | Reserved `children` binding is not a fragment binding | Error |
+| D030 | Wrapper selects a binding key not present on target | Error |
+| D031 | Wrapper selected binding kind differs from target | Error |
+| D032 | Wrapper selected binding type is not exactly the target type | Error |
+| D033 | `providers` reads model/output/fragment bindings | Error |
+| D034 | Component setup does not return `TemplateMarkup` or `{ template }` | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -660,7 +793,10 @@ Each example shows a violation and the diagnostic it triggers.
 
 #### D001 — Binding primitive used outside `bindings`
 
-`input()`, `output()`, `model()`, and `fragment()` (and their `.required()` / `.once()` variants) are declaration-only primitives. They may only appear as direct property initializers inside a `bindings` object literal passed to `component()`, `directive()`, or `derivation()`.
+`input()`, `output()`, `model()`, and `fragment()` (and their `.required()`
+variants) are declaration-only primitives. They may only appear as direct
+property initializers inside a `bindings` object literal passed to
+`component()`, `directive()`, or `derivation()`.
 
 ```ts
 // ❌ input() inside setup
@@ -1029,6 +1165,81 @@ function wrongHandler(x: string) {}
 //                     ~~~~~~~~~~~~ D028: Type '(x: string) => void' is not assignable to '(event: AnimationCallbackEvent) => void'.
 ```
 
+#### D029 — Reserved `children` binding is not a fragment
+
+```ts
+const Broken = component({
+  bindings: {
+    children: input<string>(),
+//  ~~~~~~~~ D029: Reserved binding 'children' must use fragment().
+  },
+  setup: () => tmpl,
+});
+```
+
+#### D030-D032 — Invalid wrapper binding selection
+
+```ts
+const Target = component({
+  bindings: {
+    user: input.required<User>(),
+    save: output<void>(),
+  },
+  setup: () => tmpl,
+});
+
+component.withForwarding(Target, {
+  bindings: {
+    role: input<string>(),
+//  ~~~~ D030: 'role' is not a binding of Target.
+  },
+  setup: () => tmpl,
+});
+
+component.withForwarding(Target, {
+  bindings: {
+    save: input<void>(),
+//  ~~~~ D031: Binding kind must match Target's output binding.
+  },
+  setup: () => tmpl,
+});
+
+component.withForwarding(Target, {
+  bindings: {
+    user: input.required<string>(),
+//  ~~~~ D032: Binding type must exactly match Target's user binding.
+  },
+  setup: () => tmpl,
+});
+```
+
+#### D033 — Providers can read inputs only
+
+```ts
+const Broken = component({
+  bindings: {
+    value: input.required<string>(),
+    selected: model<boolean>(),
+    saved: output<void>(),
+  },
+  setup: () => tmpl,
+  providers: (inputs) => {
+    inputs.selected;
+//  ~~~~~~~~~~~~~~~ D033: Providers receive inputs only.
+    return [];
+  },
+});
+```
+
+#### D034 — Invalid setup return
+
+```ts
+component({
+  setup: () => ({ expose: {} }),
+//          ~~~~~~~~~~~~~~~~~~ D034: setup must return TemplateMarkup or { template }.
+});
+```
+
 ---
 
 ## 14. Auxiliary Definitions
@@ -1047,16 +1258,34 @@ Narrow(T) = Exclude<T, null | undefined | false | 0 | "">
 
 Stringifiable = string | number | boolean | null | undefined
               | { toString(): string }
+
+
+BindingKind<V> =
+  V extends ModelSignal<any>         → model
+  V extends InputSignal<any>         → input
+  V extends OutputEmitterRef<any>    → output
+  V extends FragmentBinding<any>     → fragment
+  otherwise                          → unknown
 ```
 
 ---
 
 ## 15. Well-Formedness Invariants
 
-1. **Binding primitives are declaration-only**: Calls to `input()`, `output()`, `model()`, `fragment()` (and variants) are valid only as direct property values inside a `bindings` object. The compiler rejects them in any other syntactic position (setup body, providers factory, file scope, helper functions).
+1. **Binding primitives are declaration-only**: Calls to `input()`, `output()`,
+   `model()`, `fragment()` (and `.required()` variants) are valid only as direct
+   property values inside a `bindings` object. The compiler rejects them in any
+   other syntactic position (setup body, providers factory, file scope, helper
+   functions).
 2. **Single @forward()**: At most one per component template.
-3. **Scope containment**: `@derive` and `@let` names are block-scoped to their enclosing control-flow block.
+3. **Scope containment**: `@derive` and `@let` names are block-scoped to their
+   enclosing control-flow block.
 4. **Ref availability**: Refs resolve after `afterNextRender` — reading before yields `undefined`.
-5. **Implicit children**: Nested content auto-satisfies `children` fragment binding. Cannot also bind `children=` explicitly.
-6. **Derivation is view-scoped**: Each `@derive` instance follows the lifecycle of its enclosing embedded view. In `@for`, each iteration owns an independent instance.
-7. **@forward() host check**: The actual native element at the `@forward()` site must be assignable to the declared forwarding host type S.
+5. **Implicit children**: Nested content auto-satisfies `children` fragment
+   binding. Cannot also bind `children=` explicitly.
+6. **Derivation is view-scoped**: Each `@derive` instance follows the lifecycle
+   of its enclosing embedded view. In `@for`, each iteration owns an independent
+   instance.
+7. **@forward() target check**: In passthrough mode, the forwarded native
+   element must be assignable to the declared forwarding host type `S`. In
+   wrapper mode, the forwarded component target must be the wrapper target.
