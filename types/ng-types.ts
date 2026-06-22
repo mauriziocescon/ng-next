@@ -116,7 +116,7 @@ export type ComponentBindingValue = AnyBindingValue;
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
 //
-// ComponentInstance has bindings + expose + template + directive-forwarding
+// ComponentInstance has bindings + expose + template + proxy-surface
 // metadata.
 // DirectiveInstance adds a host element type (H) — a directive
 // must be attached to a DOM element.
@@ -134,7 +134,7 @@ declare const BINDINGS: unique symbol;
 declare const EXPOSE: unique symbol;
 declare const COMPONENT_TEMPLATE: unique symbol;
 declare const HOST: unique symbol;
-declare const DIRECTIVE_FORWARDING: unique symbol;
+declare const PROXY_SURFACE: unique symbol;
 
 export type ComponentInstance<
   B,
@@ -144,7 +144,7 @@ export type ComponentInstance<
 > = {
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
-  readonly [DIRECTIVE_FORWARDING]: S;
+  readonly [PROXY_SURFACE]: S;
   readonly [COMPONENT_TEMPLATE]: TMarkup;
 };
 
@@ -162,8 +162,8 @@ export type ComponentTemplateOf<T extends ComponentInstance<any, any, any>> =
 type TargetBindings<C extends ComponentInstance<unknown, unknown, any>> =
   C extends { readonly [BINDINGS]: infer B } ? B : never;
 
-type DirectiveForwardingHostOf<C extends ComponentInstance<any, any, any>> =
-  C extends { readonly [DIRECTIVE_FORWARDING]: infer S } ? S : never;
+type ProxySurfaceOf<C extends ComponentInstance<any, any, any>> =
+  C extends { readonly [PROXY_SURFACE]: infer S } ? S : never;
 
 /**
  * Documentation-only shape for the Angular DSL intrinsic element map.
@@ -372,48 +372,22 @@ export function refMany(): any {
 // ────────────────────────────────────────────────────────────────
 // 7. COMPONENT
 //
-// setup return type — two forms:
-//   Shorthand: return raw TemplateMarkup (no expose).
-//   Full form: return { template, expose? }.
+// setup returns TemplateMarkup directly or { template, expose? }.
 //
-// component(...) — standard mode:
-//   B inferred from bindings, setup receives Angular signal types
-//   (InputSignal, ModelSignal, OutputEmitterRef, …). providers
-//   receives only inputs (not models or outputs) and runs before
-//   setup so DI is ready when setup executes.
+// component(...) declares a normal component. `bindings` is the public API;
+// setup receives those binding objects; providers receive inputs only.
 //
-// component.withForwarding<S>(config) — directive passthrough:
-//   Declares that the component accepts directives on its tag.
-//   Directives are propagated to and instantiated on the internal
-//   element marked with @forward(). S is the forwarded host type:
-//   for native tags, the compiler resolves that type through
-//   IntrinsicElements (e.g. <button @forward()> -> HTMLButtonElement)
-//   and checks directive host compatibility against it.
-//   S is a public directive-compatibility contract and must be
-//   HTMLElement or a subtype. TypeScript validates the declared API
-//   shape; the template checker must validate that the actual native
-//   @forward() site is assignable to S.
+// component.proxy<S>(...) declares a public directive-compatible surface.
+// S is explicit, must extend HTMLElement, and is realized by a compatible
+// native @forward() placement in the template.
 //
-// component.withForwarding(Target, config) — wrapper mode:
-//   Target is passed as a value; C is inferred from it (consistent
-//   with ref<typeof Child>(), inject(Child), etc.). bindings are a strict
-//   subset of target bindings, preserving key, binding kind, and
-//   inner type per selected key. setup receives selected bindings
-//   as first arg. Remaining bindings and directives are forwarded
-//   to the wrapped component via @forward().
+// component.wrap(Target, ...) declares a wrapper around Target. Selected
+// bindings go to setup; the target remainder and inherited proxy payload are
+// placed on the wrapped target by @forward().
 //
-// @forward() semantics (shared by directive passthrough and wrapper):
-//   On elements: forwards directives to that element.
-//   On components (wrapper): forwards remaining bindings and
-//   directives.
-//
-//   Compile-time marker — the compiler unrolls it into individual
-//   remainder bindings. If remainder is non-empty and no @forward()
-//   is present, the compiler emits a diagnostic.
-//
-//   Collision precedence: explicit bindings on the target element
-//   always override remainder bindings for the same key, regardless
-//   of source order. This applies uniformly to all binding kinds.
+// @forward() is marker-only: no runtime forwarding object, no spread. The
+// enclosing component API defines the payload; the marked node defines the
+// placement. Explicit bindings on a wrapped target override forwarded ones.
 // ────────────────────────────────────────────────────────────────
 
 type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
@@ -451,49 +425,47 @@ export function component(config: any): any {
   return config;
 }
 
-// Forwarding namespace helper
+// Component namespace helpers
 export namespace component {
-  export declare function withForwarding<
-    B extends Record<string, ComponentBindingValue>,
+  export declare function proxy<
+    S extends HTMLElement = never,
+    B extends Record<string, ComponentBindingValue> = never,
     E = void,
     TMarkup extends TemplateMarkup = TemplateMarkup,
   >(
-    config: {
-      bindings: B;
-      setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
-      providers?: (inputs: InputsOnly<B>) => Provider[];
-      style?: string;
-      styleUrl?: string;
-    } & ReservedBindingsConstraint<B>,
-  ): ComponentInstance<B, E, HTMLElement, TMarkup>;
-
-  export declare function withForwarding<
-    S extends HTMLElement,
-    B extends Record<string, ComponentBindingValue>,
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    config: {
-      bindings: B;
-      setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
-      providers?: (inputs: InputsOnly<B>) => Provider[];
-      style?: string;
-      styleUrl?: string;
-    } & ReservedBindingsConstraint<B>,
+    config: [S] extends [never]
+      ? {
+          __proxy_surface_error__:
+            'component.proxy requires an explicit HTMLElement surface type';
+        }
+      : {
+          bindings: B;
+          setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
+          providers?: (inputs: InputsOnly<B>) => Provider[];
+          style?: string;
+          styleUrl?: string;
+        } & ReservedBindingsConstraint<B>,
   ): ComponentInstance<B, E, S, TMarkup>;
 
-  export declare function withForwarding<
-    S extends HTMLElement = HTMLElement,
+  export declare function proxy<
+    S extends HTMLElement = never,
     E = void,
     TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(config: {
-    setup: () => SetupReturn<E, TMarkup>;
-    providers?: () => Provider[];
-    style?: string;
-    styleUrl?: string;
-  }): ComponentInstance<{}, E, S, TMarkup>;
+  >(
+    config: [S] extends [never]
+      ? {
+          __proxy_surface_error__:
+            'component.proxy requires an explicit HTMLElement surface type';
+        }
+      : {
+          setup: () => SetupReturn<E, TMarkup>;
+          providers?: () => Provider[];
+          style?: string;
+          styleUrl?: string;
+        },
+  ): ComponentInstance<{}, E, S, TMarkup>;
 
-  export declare function withForwarding<
+  export declare function wrap<
     ExplicitWrapperGenericsAreNotAllowed extends never = never,
     C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
       unknown,
@@ -517,13 +489,13 @@ export namespace component {
   ): ComponentInstance<
     TargetBindings<C>,
     E,
-    DirectiveForwardingHostOf<C>,
+    ProxySurfaceOf<C>,
     TMarkup
   >;
 }
 
-(component as any).withForwarding = (targetOrConfig: any, maybeConfig?: any) =>
-  maybeConfig ?? targetOrConfig;
+(component as any).proxy = (config: any) => config;
+(component as any).wrap = (_target: any, config: any) => config;
 
 // ────────────────────────────────────────────────────────────────
 // 8. DIRECTIVE

@@ -411,7 +411,7 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-`@forward()` designates where forwarded directives and bindings land. In `component.withForwarding<S>(config)`, it targets an element for directive passthrough. In `component.withForwarding(Target, config)`, it forwards remaining bindings and directives to the wrapped component. The generic host type is only valid in the one-argument form; the two-argument form infers the forwarded host type from `Target`.
+Forwarding has two component APIs and one marker: `component.proxy<T>()` exposes a directive-compatible native surface, `component.wrap(Target)` forwards a wrapped component's remaining API, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings/directive instructions.
 
 ### Implicit children fragment
 
@@ -514,9 +514,9 @@ export const Menu = component({
 });
 ```
 
-### Directive passthrough
+### Proxying directives to an internal element
 
-Type safety: `Button` forwards to `HTMLButtonElement`, so only directives whose `host` is assignable from `HTMLButtonElement` are accepted (e.g. `host: ref<HTMLInputElement>()` → compile error). The same directive cannot be applied more than once to the same component / element.
+`Button` exposes an `HTMLButtonElement` proxy surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the internal `@forward()` element. The same directive cannot be applied more than once to the same final element.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -549,7 +549,7 @@ export const ButtonConsumer = component({
 // -- button in @mylib/button --------------------
 import { component, input, output, computed, fragment } from '@angular/core';
 
-export const Button = component.withForwarding<HTMLButtonElement>({
+export const Button = component.proxy<HTMLButtonElement>({
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -600,8 +600,8 @@ export const UserDetailConsumer = component({
   },
 });
 
-// Wrapper: selected bindings go to setup, remainder forwarded via @forward()
-export const UserDetailWrapper = component.withForwarding(UserDetail, {
+// Select user locally; forward the remaining UserDetail bindings.
+export const UserDetailWrapper = component.wrap(UserDetail, {
   bindings: {
     user: input.required<User>(),
   },
@@ -609,9 +609,9 @@ export const UserDetailWrapper = component.withForwarding(UserDetail, {
     const other = computed(() => /** something depending on user() or a default value **/);
 
     return @{
-      <UserDetail 
-        @forward() 
-        use:tooltip(message={'Tooltip message'}) 
+      <UserDetail
+        @forward()
+        use:tooltip(message={'Tooltip message'})
         user={other()} />
     };
   },
@@ -625,7 +625,7 @@ export interface User {
   role: string;
 }
 
-export const UserDetail = component.withForwarding<HTMLElement>({
+export const UserDetail = component.proxy<HTMLDivElement>({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -855,11 +855,11 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native elements, components (with forwarding) | Yes (different directives) | Attaches a directive. Same directive cannot appear twice on the same element. |
+| `use:` | native elements, `component.proxy` components, wrapped proxy components | Yes (different directives) | Attaches a directive. On proxy / wrapped components, directives are placed at `@forward()`. Same directive cannot appear twice on the same final element. |
 | `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. |
-| `@forward()` | native elements (inside component template) | No | Marks the element as the forwarding target for directive passthrough and extra bindings. |
+| `@forward()` | compatible native or wrapped component nodes | No | Places the forwarding payload declared by `component.proxy` or `component.wrap`. |
 
 `ref` and `@forward()` are special attributes, not binding prefixes — included here for completeness.
 

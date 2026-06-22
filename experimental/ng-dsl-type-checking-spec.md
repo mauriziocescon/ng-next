@@ -34,7 +34,8 @@ for conformance, while **may** describes implementation freedom.
 | `E(C)` | Expose type of C |
 | `T(C)` | Template markup type of component C |
 | `H(D)` | Host element type of directive D |
-| `F(C)` | Forwarding host type of component C (`never` if none) |
+| `P(C)` | Proxy surface type of component C (`never` if none) |
+| `W(C)` | Wrapped target of component C (`never` if not a wrapper) |
 | `I(tag)` | Intrinsic element host type (e.g. `I("button") = HTMLButtonElement`) |
 | `⊑` | Assignability (subtype) |
 | `≡` | Exact type equality |
@@ -45,7 +46,7 @@ Type-level component metadata follows the public helper types:
 C : ComponentInstance<B, E, S, M>
 B = bindings record
 E = expose type (`void` when absent)
-S = forwarding host type (`never` when absent)
+S = proxy surface type (`never` when absent)
 M = TemplateMarkup<TAst>
 T(C) = M
 TemplateAstOf<M> = TAst
@@ -399,7 +400,7 @@ ON-PREFIX-WARNING
 ### 4.3 Component Declaration Contracts
 
 These checks are TypeScript API well-formedness rules rather than template-node
-judgments. They align with `component(...)`, `component.withForwarding(...)`,
+judgments. They align with `component(...)`, `component.proxy(...)`, `component.wrap(...)`,
 and their helper types.
 
 ```
@@ -432,9 +433,19 @@ otherwise error
 ```
 
 ```
+PROXY-SURFACE
+─────────────────────────────────────────────────────────────────
+component.proxy<S>(config)
+S ⊑ HTMLElement
+S must be explicit
+result : ComponentInstance<B, E, S, M>
+─────────────────────────────────────────────────────────────────
+```
+
+```
 WRAPPER-SELECTION
 ─────────────────────────────────────────────────────────────────
-component.withForwarding(Target, config)
+component.wrap(Target, config)
 Target : ComponentInstance<B_Target, E_Target, S_Target, M_Target>
 Selected = B(config)
 
@@ -449,9 +460,7 @@ result : ComponentInstance<B_Target, E, S_Target, M>
 ─────────────────────────────────────────────────────────────────
 ```
 
-The two-argument wrapper form is inference-only: explicit generics must not be
-accepted. The one-argument `withForwarding<S>(config)` form accepts an explicit
-HTMLElement subtype `S`; non-HTMLElement types are rejected.
+The wrapper form is inference-only: explicit generics must not be accepted.
 
 ---
 
@@ -536,9 +545,9 @@ H ⊑ H_D → compatible
 ─────────────────────────────────────────────────
 
 
-FORWARDED-HOST
+PROXY-SURFACE-HOST
 ─────────────────────────────────────────────────
-Component C: F(C) = S (S ≠ never)
+Component C: P(C) = S (S ≠ never)
 Directive host: H_D
 S ⊑ H_D → compatible
 ─────────────────────────────────────────────────
@@ -546,7 +555,7 @@ S ⊑ H_D → compatible
 
 NO-FORWARDING
 ─────────────────────────────────────────────────
-F(C) = never → directive on component tag is an error
+P(C) = never → directive on component tag is an error
 ─────────────────────────────────────────────────
 ```
 
@@ -555,21 +564,30 @@ F(C) = never → directive on component tag is an error
 ## 7. @forward() Marker
 
 ```
-FORWARD-PASSTHROUGH (one-argument withForwarding<S>)
+FORWARD-PROXY
 ─────────────────────────────────────────────────────────────────
-Template has exactly one element with @forward()
+Enclosing component declared by component.proxy<S>(...)
+Template has exactly one native element with @forward()
 That element is native: H = I(tag)
-H ⊑ S   (actual element compatible with declared forwarding host)
+H ⊑ S   (actual element compatible with declared proxy surface)
 ─────────────────────────────────────────────────────────────────
 
 
-FORWARD-WRAPPER (two-argument withForwarding(Target, config))
+FORWARD-WRAP
 ─────────────────────────────────────────────────────────────────
+Enclosing component declared by component.wrap(Target, ...)
 Template has at most one <Target @forward() .../>
 Remainder = B(Target) \ Selected
 Explicit bindings on @forward() element override Remainder for same key
 if |Remainder| > 0 ∧ no @forward() → error
-if @forward() exists: F(result) = F(Target)
+if @forward() exists: P(result) = P(Target)
+─────────────────────────────────────────────────────────────────
+
+
+FORWARD-INVALID
+─────────────────────────────────────────────────────────────────
+Marked node cannot consume the enclosing component's forwarding payload
+→ error
 ─────────────────────────────────────────────────────────────────
 
 
@@ -740,11 +758,11 @@ LET
 | `class:` | native | Yes | Conditional class |
 | `style:` | native | Yes | Conditional style |
 | `animate:` | native | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native, forwarding comp | Yes (diff dirs) | Same directive only once per element |
+| `use:` | native, proxy comp, wrapped proxy comp | Yes (diff dirs) | Same directive only once per final element |
 | `:when` | `use:` directive | No (per dir) | Condition must be `boolean` |
 | `:ref` | `use:` directive | No (per dir) | Target must match directive expose |
 | `ref` | native, component | No | Target must match element/component expose |
-| `@forward()` | native or wrapped component target | No | Forwarding target marker |
+| `@forward()` | compatible native or wrapped component target | No | Forwarding payload placement marker |
 
 ---
 
@@ -764,9 +782,9 @@ LET
 | D010 | Same directive applied twice to same element | Error |
 | D011 | `once:model:*` or `once:on:*` | Error |
 | D012 | `once:prop` + `prop` duplicate on same element | Error |
-| D013 | Directive on non-forwarding component | Error |
+| D013 | Directive on non-proxy component | Error |
 | D014 | No `@forward()` when wrapper remainder is non-empty | Error |
-| D015 | `@forward()` element type not assignable to declared host S | Error |
+| D015 | `@forward()` element type not assignable to declared proxy surface S | Error |
 | D016 | Fragment argument count/type mismatch | Error |
 | D017 | `ref=` variable type incompatible with element/component/directive expose | Error |
 | D018 | Unresolved identifier in template expression | Error |
@@ -974,7 +992,7 @@ const inputMask = directive({
 //                      ~~~~~ D012: 'count' cannot appear both as 'once:count' and 'count'.
 ```
 
-#### D013 — Directive on non-forwarding component
+#### D013 — Directive on non-proxy component
 
 ```ts
 const Plain = component({
@@ -982,16 +1000,16 @@ const Plain = component({
   setup: ({ label }) => @{ <span>{label()}</span> },
 });
 
-// ❌ Plain does not declare withForwarding
+// ❌ Plain does not declare component.proxy
 <Plain label={'hi'} use:tooltip(message={'tip'}) />
-//                  ~~~~~~~~~~~~ D013: Cannot apply directive to 'Plain': component does not support forwarding.
+//                  ~~~~~~~~~~~~ D013: Cannot apply directive to 'Plain': component does not expose a proxy surface.
 ```
 
 #### D014 — No @forward() when wrapper remainder is non-empty
 
 ```ts
 // ❌ Wrapper selects "user" but Target has "email" and "makeAdmin" that need forwarding
-const Broken = component.withForwarding(UserDetail, {
+const Broken = component.wrap(UserDetail, {
   bindings: { user: input.required<User>() },
   setup: ({ user }) => @{
     // Missing @forward() — remaining bindings have nowhere to go
@@ -1001,15 +1019,15 @@ const Broken = component.withForwarding(UserDetail, {
 });
 ```
 
-#### D015 — @forward() element type not assignable to declared host
+#### D015 — @forward() element type not assignable to declared proxy surface
 
 ```ts
-const Button = component.withForwarding<HTMLButtonElement>({
+const Button = component.proxy<HTMLButtonElement>({
   bindings: { label: input.required<string>() },
   setup: ({ label }) => @{
     // ❌ <span> is HTMLSpanElement, not assignable to HTMLButtonElement
     <span @forward()>{label()}</span>
-//        ~~~~~~~~~~ D015: Element 'span' (HTMLSpanElement) is not assignable to forwarding host 'HTMLButtonElement'.
+//        ~~~~~~~~~~ D015: Element 'span' (HTMLSpanElement) is not assignable to proxy surface 'HTMLButtonElement'.
   },
 });
 ```
@@ -1097,7 +1115,7 @@ const Form = component({
 #### D022 — Multiple @forward() in same template
 
 ```ts
-const Broken = component.withForwarding<HTMLElement>({
+const Broken = component.proxy<HTMLElement>({
   bindings: { label: input.required<string>() },
   setup: ({ label }) => @{
     // ❌ Two @forward() markers
@@ -1188,7 +1206,7 @@ const Target = component({
   setup: () => tmpl,
 });
 
-component.withForwarding(Target, {
+component.wrap(Target, {
   bindings: {
     role: input<string>(),
 //  ~~~~ D030: 'role' is not a binding of Target.
@@ -1196,7 +1214,7 @@ component.withForwarding(Target, {
   setup: () => tmpl,
 });
 
-component.withForwarding(Target, {
+component.wrap(Target, {
   bindings: {
     save: input<void>(),
 //  ~~~~ D031: Binding kind must match Target's output binding.
@@ -1204,7 +1222,7 @@ component.withForwarding(Target, {
   setup: () => tmpl,
 });
 
-component.withForwarding(Target, {
+component.wrap(Target, {
   bindings: {
     user: input.required<string>(),
 //  ~~~~ D032: Binding type must exactly match Target's user binding.
@@ -1286,6 +1304,6 @@ BindingKind<V> =
 6. **Derivation is view-scoped**: Each `@derive` instance follows the lifecycle
    of its enclosing embedded view. In `@for`, each iteration owns an independent
    instance.
-7. **@forward() target check**: In passthrough mode, the forwarded native
-   element must be assignable to the declared forwarding host type `S`. In
-   wrapper mode, the forwarded component target must be the wrapper target.
+7. **@forward() target check**: In proxy mode, the marked native element must
+   be assignable to the declared proxy surface type `S`. In wrapper mode, the
+   marked component target must be the wrapper target.

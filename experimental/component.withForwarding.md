@@ -1,6 +1,6 @@
-# Wrapper API Shaping (`addBindings` / `omitBindings`)
+# `component.wrap` API Shaping (`addBindings` / `omitBindings`)
 
-This proposal evolves the two-argument `component.withForwarding(Target, config)` form so wrappers can expose a curated API while preserving current compile-time forwarding guarantees.
+This proposal evolves the two-argument `component.wrap(Target, config)` form so wrappers can expose a curated API while preserving current compile-time forwarding guarantees.
 
 > Status: proposal only. This document describes a possible evolution and is not implemented in `experimental/types.ts` yet.
 
@@ -14,7 +14,7 @@ Normative keywords in this document follow RFC-style meaning:
 
 ## Summary
 
-Today, `component.withForwarding(Target, config)` mirrors target bindings (with optional overrides), and setup receives selected/effective bindings in `setup(bindings)`. In templates, `@forward()` forwards target-compatible bindings at compile time.
+Today, `component.wrap(Target, config)` mirrors target bindings (with optional overrides), and setup receives selected/effective bindings in `setup(bindings)`. In templates, `@forward()` places the wrapper payload on the wrapped target at compile time.
 
 This evolution adds two capabilities:
 
@@ -42,7 +42,7 @@ export const UserDetail = component({
   setup: ({ user, email, makeAdmin, children }) => @{ ... },
 });
 
-export const EnterpriseUser = component.withForwarding(UserDetail, {
+export const EnterpriseUser = component.wrap(UserDetail, {
   omitBindings: {
     email: true,
     makeAdmin: true,
@@ -107,12 +107,12 @@ type ForwardableTargetBindings<
 > = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>>;
 ```
 
-`withForwarding(Target, config)` config sketch:
+`wrap(Target, config)` config sketch:
 
-This is a **proposed** extension of `component.withForwarding(Target, config)`, not the current signature in `experimental/types.ts`.
+This is a **proposed** extension of `component.wrap(Target, config)`, not the current signature in `experimental/types.ts`.
 
 ```ts
-export declare function withForwarding<
+export declare function wrap<
   C extends ComponentInstance<any, any, any>,
   Added extends Record<string, ComponentBindingValue> = {},
   OmitM extends OmitMap<TargetBindings<C>> = {},
@@ -128,7 +128,11 @@ export declare function withForwarding<
     style?: string;
     styleUrl?: string;
   }
-): ComponentInstance<EffectiveBindings<C, Added, OmitM>, E>;
+): ComponentInstance<
+  EffectiveBindings<C, Added, OmitM>,
+  E,
+  ProxySurfaceOf<C>
+>;
 ```
 
 Notes:
@@ -136,7 +140,7 @@ Notes:
 - `bindings` still means target binding overrides only.
 - `addBindings` is separate to avoid ambiguity.
 - `setup` sees target-minus-omitted plus added as the first argument.
-- `@forward()` forwards target-minus-omitted bindings only.
+- `@forward()` places target-minus-omitted bindings only.
 
 ---
 
@@ -145,7 +149,7 @@ Notes:
 Given:
 
 ```ts
-component.withForwarding(Target, {
+component.wrap(Target, {
   omitBindings: { x: true },
   addBindings: { y: input.required<number>() },
   setup: (bindings) => @{
@@ -160,11 +164,11 @@ Compiler contract:
 2. The compiler `MUST` lower `@forward()` by unrolling only that key set.
 3. The compiler `MUST NOT` include `addBindings` keys in target forwarding.
 4. The compiler `MUST` keep existing explicit-binding precedence (React-style last wins).
-5. The compiler `SHOULD` preserve directive forwarding metadata inheritance by inheriting the target forwarded host type in wrappers. For native forwarding targets, that host type comes from the Angular DSL `IntrinsicElements` map.
+5. The compiler `SHOULD` preserve proxy-surface metadata inheritance by inheriting the target proxy surface type in wrappers. For native proxy placements, that surface type comes from the Angular DSL `IntrinsicElements` map.
 6. The compiler `MUST` treat `@forward()` as marker-only: no forwarding object, property reads, or enumeration.
-7. In wrapper binding-forwarding context, the compiler `MUST` reject `@forward()` on non-component elements.
+7. The compiler `MUST` reject `@forward()` placed on a node that cannot consume the wrapper payload.
 
-No runtime forwarding object is required; the same strategy as current `component.withForwarding(Target, config)` is retained.
+No runtime forwarding object is required; the same strategy as current `component.wrap(Target, config)` is retained.
 
 ---
 
@@ -188,7 +192,7 @@ export const ThirdPartyGrid = component({
   setup: ({ rows, columns, density, debugMode, unsafeHtml, theme, rowClick }) => @{ ... },
 });
 
-export const CorpGrid = component.withForwarding(ThirdPartyGrid, {
+export const CorpGrid = component.wrap(ThirdPartyGrid, {
   omitBindings: {
     debugMode: true,
     unsafeHtml: true,
@@ -220,7 +224,7 @@ export const UserDetail = component({
   setup: ({ user, email, makeAdmin }) => @{ ... },
 });
 
-export const UserProfile = component.withForwarding(UserDetail, {
+export const UserProfile = component.wrap(UserDetail, {
   omitBindings: {
     email: true,
   },
@@ -245,7 +249,7 @@ export const UserDetail = component({
   setup: ({ user, email, makeAdmin }) => @{ ... },
 });
 
-export const UserCard = component.withForwarding(UserDetail, {
+export const UserCard = component.wrap(UserDetail, {
   addBindings: {
     highlight: input<boolean>(false),
   },
@@ -272,7 +276,9 @@ export const UserCard = component.withForwarding(UserDetail, {
 | Omitted required target input is not set internally | `WRAP007` — required target input missing |
 | token-style forwarding inspection is attempted (`token.foo`, `Object.keys(token)`, etc.) | `WRAP008` — forwarding is marker-only via `@forward()` |
 | JS destructuring with spread used to derive forwarding (`...rest` / `...token`) | `WRAP009` — spread-based forwarding is unsupported; use `@forward()` |
-| `@forward()` used on non-component elements in wrapper binding-forwarding context | `WRAP010` — wrapper binding-forwarding marker can only target component elements (element `@forward()` remains valid for directive forwarding) |
+| `@forward()` placed on a node that cannot consume the wrapper payload | `WRAP010` — invalid wrapper forwarding placement |
+
+`component.wrap` diagnostics should refer to the wrapped target by name whenever possible. Example: "`@forward()` for this wrapper must be placed on `<UserDetail>` or an approved wrapper target."
 
 ---
 
@@ -292,7 +298,7 @@ This can be introduced as a backward-compatible extension:
 `addBindings` / `omitBindings` is primarily a **compiler + type-system** evolution.
 
 - **Type system** computes effective wrapper API.
-- **Compiler** adjusts key expansion set for `@forward()`, enforces non-forwarding of wrapper-local keys, and rejects non-component usage only for wrapper binding-forwarding `@forward()`.
+- **Compiler** adjusts key expansion set for `@forward()`, enforces non-forwarding of wrapper-local keys, and rejects placements that cannot consume the wrapper payload.
 - **Runtime** remains unchanged in principle; generated instructions stay in the same class as those emitted today.
 
 **Change Class:** Compiler + Type-level (no new runtime primitive).

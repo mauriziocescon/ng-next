@@ -212,7 +212,15 @@ type _SpecificFullComponentTemplateAst = Assert<
 // OutputEmitterRef, FragmentBinding.
 // ────────────────────────────────────────────────────────────────
 
-const UserDetail = component.withForwarding({
+type UserDetailBindings = {
+  user: InputSignal<User>;
+  email: ModelSignal<string>;
+  makeAdmin: OutputEmitterRef<void>;
+  children: OptionalFragmentBinding<void>;
+};
+
+// TS-only spec: spell out bindings after the explicit proxy surface generic.
+const UserDetail = component.proxy<HTMLElement, UserDetailBindings>({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -729,69 +737,60 @@ const Parent = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// 11. COMPONENT — withForwarding, one-argument directive forwarding
+// 11. COMPONENT — proxy, directive forwarding surface
 // ────────────────────────────────────────────────────────────────
 
-const ForwardingDefault = component.withForwarding({
+const _NegProxyRequiresExplicitSurface = component.proxy({
+  // @ts-expect-error component.proxy requires an explicit proxy surface type
   setup: () => tmpl,
 });
-type _ForwardingDefaultType = Assert<
-  IsEqual<typeof ForwardingDefault, ComponentInstance<{}, void, HTMLElement>>
->;
 
-const ButtonForwarding = component.withForwarding<HTMLButtonElement>({
+const ButtonProxy = component.proxy<HTMLButtonElement>({
   setup: () => tmpl,
 });
-type _ButtonForwardingType = Assert<
+type _ButtonProxyType = Assert<
   IsEqual<
-    typeof ButtonForwarding,
+    typeof ButtonProxy,
     ComponentInstance<{}, void, HTMLButtonElement>
   >
 >;
 
-// @ts-expect-error host must be an HTMLElement subtype
-const _NegInvalidHost = component.withForwarding<string>({
+// @ts-expect-error proxy surface must be an HTMLElement subtype
+const _NegInvalidProxySurface = component.proxy<string>({
   setup: () => tmpl,
 });
 
-const _NegForwardingMetadataInSetup = component.withForwarding({
+const _NegProxyMetadataInSetup = component.proxy<
+  HTMLElement,
+  { label: InputSignal<string | undefined> }
+>({
   bindings: {
     label: input<string>(),
   },
   setup: (bindings) => {
-    // @ts-expect-error forwarding metadata is not visible in setup bindings
-    bindings.directiveForwarding;
+    // @ts-expect-error proxy surface metadata is not visible in setup bindings
+    bindings.proxySurface;
     return tmpl;
   },
 });
 
-const _NegComponentAsForwardingHost = (
-  // @ts-expect-error component instances are not valid forwarded DOM host types
-  component.withForwarding<typeof UserDetail>({
+const _NegComponentAsProxySurface = (
+  // @ts-expect-error component instances are not valid proxy surface types
+  component.proxy<typeof UserDetail>({
     setup: () => tmpl,
   })
 );
 
-// @ts-expect-error directive instances are not valid forwarded DOM host types
-const _NegDirectiveAsForwardingHost = component.withForwarding<typeof tooltip>({
+// @ts-expect-error directive instances are not valid proxy surface types
+const _NegDirectiveAsProxySurface = component.proxy<typeof tooltip>({
   setup: () => tmpl,
 });
 
 // ────────────────────────────────────────────────────────────────
-// 12. COMPONENT — wrapper with selected bindings + forwarding marker
-//
-// In the two-argument form, Target is passed as first arg and C is
-// inferred from the value (consistent with inject(Child), etc.).
-// setup receives selected bindings only.
-// @forward() is a compile-time forwarding marker used by
-// component.withForwarding(...) templates.
-//
-// @forward() has dual meaning:
-// - component elements: binding and directives forwarding (wrapper remainder)
-// - native elements: directive forwarding
+// 12. COMPONENT — wrap with selected bindings + forwarding marker
 // ────────────────────────────────────────────────────────────────
 
-const UserDetailWrapper = component.withForwarding(UserDetail, {
+const UserDetailWrapper = component.wrap(UserDetail, {
   bindings: {
     user: input.required<User>(),
   },
@@ -801,8 +800,8 @@ const UserDetailWrapper = component.withForwarding(UserDetail, {
   },
 });
 
-// setup first arg includes only selected keys
-const _NegSelectedOnly = component.withForwarding(UserDetail, {
+// setup sees selected keys only
+const _NegSelectedOnly = component.wrap(UserDetail, {
   bindings: { user: input.required<User>() },
   setup: ({
     user,
@@ -811,8 +810,8 @@ const _NegSelectedOnly = component.withForwarding(UserDetail, {
   }) => tmpl,
 });
 
-// bindings should NOT accept keys outside the target type
-const _NegExtra = component.withForwarding(UserDetail, {
+// selected keys must exist on target
+const _NegExtra = component.wrap(UserDetail, {
   // @ts-expect-error nonsense is not in target bindings
   bindings: {
     user: input.required<User>(),
@@ -821,8 +820,8 @@ const _NegExtra = component.withForwarding(UserDetail, {
   setup: () => tmpl,
 });
 
-// bindings should NOT accept wrong inner types
-const _NegWrongType = component.withForwarding(UserDetail, {
+// selected binding types must match exactly
+const _NegWrongType = component.wrap(UserDetail, {
   // @ts-expect-error user input type should be User
   bindings: {
     user: input.required<string>(),
@@ -830,8 +829,8 @@ const _NegWrongType = component.withForwarding(UserDetail, {
   setup: () => tmpl,
 });
 
-// bindings should preserve target binding kind
-const _NegWrongKind = component.withForwarding(UserDetail, {
+// selected binding kinds must match
+const _NegWrongKind = component.wrap(UserDetail, {
   // @ts-expect-error makeAdmin is an output on target, not an input
   bindings: {
     makeAdmin: input<void>(),
@@ -839,7 +838,7 @@ const _NegWrongKind = component.withForwarding(UserDetail, {
   setup: () => tmpl,
 });
 
-// bindings should NOT allow subtype narrowing in wrappers
+// no narrowing
 const WideInput = component({
   bindings: {
     value: input.required<string | number>(),
@@ -847,7 +846,7 @@ const WideInput = component({
   setup: ({ value }) => tmpl,
 });
 
-const _NegNarrowedSubtype = component.withForwarding(WideInput, {
+const _NegNarrowedSubtype = component.wrap(WideInput, {
   // @ts-expect-error wrapper bindings must exactly match target binding type
   bindings: {
     value: input.required<string>(),
@@ -855,7 +854,7 @@ const _NegNarrowedSubtype = component.withForwarding(WideInput, {
   setup: () => tmpl,
 });
 
-// bindings should NOT allow supertype widening in wrappers
+// no widening
 const NarrowInput = component({
   bindings: {
     value: input.required<string>(),
@@ -863,7 +862,7 @@ const NarrowInput = component({
   setup: ({ value }) => tmpl,
 });
 
-const _NegWidenedSupertype = component.withForwarding(NarrowInput, {
+const _NegWidenedSupertype = component.wrap(NarrowInput, {
   // @ts-expect-error wrapper bindings must exactly match target binding type
   bindings: {
     value: input.required<string | number>(),
@@ -871,7 +870,7 @@ const _NegWidenedSupertype = component.withForwarding(NarrowInput, {
   setup: () => tmpl,
 });
 
-// Wrap with empty selected bindings: all target bindings are in forwarding remainder
+// empty selection means setup gets no target bindings
 interface Simple {
   id: string;
 }
@@ -885,7 +884,7 @@ const Base = component({
   setup: ({ item, selected, click }) => tmpl,
 });
 
-const ForwardAll = component.withForwarding(Base, {
+const ForwardAll = component.wrap(Base, {
   bindings: {},
   setup: (bindings) => {
     // @ts-expect-error empty selection should expose no setup keys
@@ -894,8 +893,8 @@ const ForwardAll = component.withForwarding(Base, {
   },
 });
 
-// Wrapper providers should receive selected inputs only (Option A)
-const WrapperProviders = component.withForwarding(UserDetail, {
+// providers see selected inputs only
+const WrapperProviders = component.wrap(UserDetail, {
   bindings: {
     user: input.required<User>(),
   },
@@ -912,9 +911,8 @@ const WrapperProviders = component.withForwarding(UserDetail, {
   },
 });
 
-// Wrapper providers expose only selected INPUT bindings, even if selected
-// bindings include models/outputs.
-const WrapperProvidersSelectedKinds = component.withForwarding(Base, {
+// providers still exclude selected models/outputs
+const WrapperProvidersSelectedKinds = component.wrap(Base, {
   bindings: {
     item: input.required<Simple>(),
     selected: model<boolean>(),
@@ -931,27 +929,27 @@ const WrapperProvidersSelectedKinds = component.withForwarding(Base, {
   },
 });
 
-const ForwardingWrapper = component.withForwarding(ButtonForwarding, {
+const ProxyWrapper = component.wrap(ButtonProxy, {
   bindings: {},
   setup: () => tmpl,
 });
-type _ForwardingWrapperPreservesHost = Assert<
+type _ProxyWrapperPreservesHost = Assert<
   IsEqual<
-    typeof ForwardingWrapper,
+    typeof ProxyWrapper,
     ComponentInstance<{}, void, HTMLButtonElement>
   >
 >;
 
-const InputForwarding = component.withForwarding<HTMLInputElement>({
+const InputProxy = component.proxy<HTMLInputElement>({
   setup: () => tmpl,
 });
-const InputForwardingWrapper = component.withForwarding(InputForwarding, {
+const InputProxyWrapper = component.wrap(InputProxy, {
   bindings: {},
   setup: () => tmpl,
 });
-type _InputForwardingWrapperPreservesHost = Assert<
+type _InputProxyWrapperPreservesHost = Assert<
   IsEqual<
-    typeof InputForwardingWrapper,
+    typeof InputProxyWrapper,
     ComponentInstance<{}, void, HTMLInputElement>
   >
 >;
@@ -959,16 +957,16 @@ type _InputForwardingWrapperPreservesHost = Assert<
 const NoForwardingTarget = component({
   setup: () => tmpl,
 });
-const NoForwardingWrapper = component.withForwarding(NoForwardingTarget, {
+const NoProxyWrapper = component.wrap(NoForwardingTarget, {
   bindings: {},
   setup: () => tmpl,
 });
-type _NoForwardingWrapperKeepsNever = Assert<
-  IsEqual<typeof NoForwardingWrapper, ComponentInstance<{}, void, never>>
+type _NoProxyWrapperKeepsNever = Assert<
+  IsEqual<typeof NoProxyWrapper, ComponentInstance<{}, void, never>>
 >;
 
-// @ts-expect-error explicit host generic is invalid in wrapper mode
-const _NegWrapperExplicitHostGeneric = component.withForwarding<HTMLButtonElement>(
+// @ts-expect-error component.wrap is inference-only; explicit generics are invalid
+const _NegWrapperExplicitGeneric = component.wrap<HTMLButtonElement>(
   UserDetail,
   {
     bindings: {},
@@ -978,7 +976,7 @@ const _NegWrapperExplicitHostGeneric = component.withForwarding<HTMLButtonElemen
 
 const _NegWrapperExplicitComponentGeneric = (
   // @ts-expect-error explicit component generic is invalid in wrapper mode
-  component.withForwarding<typeof UserDetail>(
+  component.wrap<typeof UserDetail>(
     UserDetail,
     {
       bindings: {},
@@ -989,7 +987,7 @@ const _NegWrapperExplicitComponentGeneric = (
 
 const _NegWrapperExplicitFullGenerics = (
   // @ts-expect-error wrapper mode is inference-only even if all generics are supplied
-  component.withForwarding<typeof UserDetail, {}>(UserDetail, {
+  component.wrap<typeof UserDetail, {}>(UserDetail, {
     bindings: {},
     setup: () => tmpl,
   })
@@ -998,16 +996,8 @@ const _NegWrapperExplicitFullGenerics = (
 // ────────────────────────────────────────────────────────────────
 // 13. COMPONENT — forward collision precedence (compiler contract)
 //
-// Rule: explicit bindings override remainder bindings, regardless of
-// attribute order in source.
-// Scope: applies uniformly to all binding kinds
-// (input/model/output/fragment).
-// Example:
-//   <Target @forward() user={explicit} />  -> explicit wins for `user`
-//   <Target user={explicit} @forward() />  -> explicit wins for `user`
-//
-// The tests below model compiler-normalized output where remainder keys are
-// applied first and explicit keys are applied last.
+// Explicit target bindings win over forwarded remainder, independent of
+// source order and binding kind.
 // ────────────────────────────────────────────────────────────────
 
 type FromRemainder = {
@@ -1041,60 +1031,59 @@ type _ExplicitThenForwardKeepsOthers = Assert<
 // ────────────────────────────────────────────────────────────────
 // 14. DIRECTIVE — forwarding compatibility
 //
-// A directive can attach to a forwarded element only if the
-// forwarded element type is assignable to the directive host type.
+// Directive host must accept the component's proxy surface.
 // ────────────────────────────────────────────────────────────────
 
-type ForwardedElement<C extends ComponentInstance<any, any, any>> =
+type ProxySurface<C extends ComponentInstance<any, any, any>> =
   C extends ComponentInstance<any, any, infer S> ? S : never;
 type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
   D extends DirectiveInstance<infer H, any, any> ? H : never;
-type DirectiveFitsForwardedElement<
+type DirectiveFitsProxySurface<
   C extends ComponentInstance<any, any, any>,
   D extends DirectiveInstance<any, any, any>,
 > =
-  ForwardedElement<C> extends never
+  ProxySurface<C> extends never
     ? true
-    : ForwardedElement<C> extends DirectiveHost<D>
+    : ProxySurface<C> extends DirectiveHost<D>
       ? true
       : false;
 
-type _ButtonForwardingAcceptsButtonDirective = Assert<
+type _ButtonProxyAcceptsButtonDirective = Assert<
   IsEqual<
-    DirectiveFitsForwardedElement<typeof ButtonForwarding, typeof buttonOnly>,
+    DirectiveFitsProxySurface<typeof ButtonProxy, typeof buttonOnly>,
     true
   >
 >;
-type _ButtonForwardingAcceptsGenericDirective = Assert<
+type _ButtonProxyAcceptsGenericDirective = Assert<
   IsEqual<
-    DirectiveFitsForwardedElement<typeof ButtonForwarding, typeof tooltip>,
+    DirectiveFitsProxySurface<typeof ButtonProxy, typeof tooltip>,
     true
   >
 >;
-// @ts-expect-error input-host directive cannot attach to a forwarded button
-const _negButtonForwardingRejectsInputDirective: DirectiveFitsForwardedElement<
-  typeof ButtonForwarding,
+// @ts-expect-error input-host directive cannot attach to a button proxy surface
+const _negButtonProxyRejectsInputDirective: DirectiveFitsProxySurface<
+  typeof ButtonProxy,
   typeof inputOnly
 > = true;
 
-type _InputForwardingWrapperAcceptsInputDirective = Assert<
+type _InputProxyWrapperAcceptsInputDirective = Assert<
   IsEqual<
-    DirectiveFitsForwardedElement<
-      typeof InputForwardingWrapper,
+    DirectiveFitsProxySurface<
+      typeof InputProxyWrapper,
       typeof inputOnly
     >,
     true
   >
 >;
-type _InputForwardingWrapperAcceptsGenericDirective = Assert<
+type _InputProxyWrapperAcceptsGenericDirective = Assert<
   IsEqual<
-    DirectiveFitsForwardedElement<typeof InputForwardingWrapper, typeof tooltip>,
+    DirectiveFitsProxySurface<typeof InputProxyWrapper, typeof tooltip>,
     true
   >
 >;
-// @ts-expect-error button-host directive cannot attach to a forwarded input
-const _negInputForwardingWrapperRejectsButtonDirective: DirectiveFitsForwardedElement<
-  typeof InputForwardingWrapper,
+// @ts-expect-error button-host directive cannot attach to an input proxy surface
+const _negInputProxyWrapperRejectsButtonDirective: DirectiveFitsProxySurface<
+  typeof InputProxyWrapper,
   typeof buttonOnly
 > = true;
 
@@ -1621,13 +1610,6 @@ const _NegMissingExpose = component({
 // Keep these checks at the end: they validate the shape of type-level
 // diagnostics, not core API behavior.
 // ────────────────────────────────────────────────────────────────
-
-type UserDetailBindings = {
-  user: InputSignal<User>;
-  email: ModelSignal<string>;
-  makeAdmin: OutputEmitterRef<void>;
-  children: OptionalFragmentBinding<void>;
-};
 
 type _NoWrapDiag = __WrapSelectionDiagnostics<
   { user: InputSignal<User> },

@@ -88,7 +88,9 @@ export interface ElementNode extends BaseNode {
   /**
    * Raw tag name from the template. For native elements, the type checker
    * resolves this name through the Angular DSL IntrinsicElements map.
-   * Component names resolve through lexical scope instead.
+   * Component names resolve through lexical scope instead. If this element
+   * carries @forward(), the checker validates that the resolved node can
+   * consume the enclosing component's forwarding payload.
    */
   name: string;
   forwardMarker?: ForwardMarkerNode;

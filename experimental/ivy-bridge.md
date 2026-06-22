@@ -98,13 +98,13 @@ Template-scoped reactive computations with native DI support.
 
 ---
 
-### 6. Directive Forwarding (Instruction-Based Late Binding)
+### 6. Proxy Surfaces (Instruction-Based Late Binding)
 Allows directives to "tunnel" through hostless components without requiring global compiler knowledge.
 
 - **Change Class:** Compiler + Runtime.
-- **Analogy with Fragments:** The pattern mirrors fragments: the consuming compiler (CompB) prepares a compile-time artifact — a recipe of directive defs and binding functions — and passes it across the component boundary. The child (CompA) receives an opaque, typed blob and executes it at the `@forward()` site. Just as `@render(frag(args))` executes a pre-compiled template function without the child knowing anything about its contents, `ɵɵapplyForwardedDirectives` executes a pre-compiled directive recipe without the child knowing which directives are in it.
+- **Analogy with Fragments:** The pattern mirrors fragments: the consuming compiler (CompB) prepares a compile-time artifact — a recipe of directive defs and binding functions — and passes it across the component boundary. The child (CompA) receives an opaque, typed proxy payload and places it at the `@forward()` site. Just as `@render(frag(args))` executes a pre-compiled template function without the child knowing anything about its contents, `ɵɵapplyForwardedDirectives` executes a pre-compiled directive recipe without the child knowing which directives are in it.
 - **Compile-time responsibility (CompB):** When the application compiler processes `<CompA use:ripple() use:tooltip(message={msg()}) />`, it generates the full recipe: directive defs, initial binding values, and update-pass binding functions. The directive matching and validation that Ivy does today via CSS-selector scanning at the first create pass has already been done — at compile time, by CompB’s compiler.
-- **The "Directive Forwarding" Contract (CompA):** The child defines forwarding metadata with `component.withForwarding<T>(config)`. This is the public interface CompA exposes: the forwarded host type `T` for compile-time validation. For native `@forward()` targets, the compiler resolves `T` through the Angular DSL `IntrinsicElements` map. Whether CompA's runtime `TView` has knowledge of the arriving directive defs depends on the chosen implementation option below.
+- **The "Proxy Surface" Contract (CompA):** The child defines proxy-surface metadata with `component.proxy<T>(config)`. This is the public directive-compatibility interface CompA exposes: the proxy surface type `T` for compile-time validation. For native `@forward()` placements, the compiler resolves the actual element type through the Angular DSL `IntrinsicElements` map and checks it against `T`. Whether CompA's runtime `TView` has knowledge of the arriving directive defs depends on how the proxy payload is represented by the chosen implementation option below.
 - **Runtime Execution Requirements:** A forwarded directive cannot just be an instance in arbitrary side storage unless that side storage also participates in the systems that normal directive slots participate in:
   - input/output alias lookup and update-mode writes,
   - output listener setup and teardown,
@@ -118,31 +118,31 @@ Allows directives to "tunnel" through hostless components without requiring glob
   1. **Synthetic per-site directive range:** At the `@forward()` element, allocate normal directive slots for the forwarded defs when the component instance is created. This fits Ivy's existing TView/LView machinery best, but it means CompA's shared `TView` cannot be completely static with respect to forwarded directives. It may need a per-call-site child/adaptor `TView`, or a runtime extension to attach additional directive ranges to an existing TNode.
   2. **Side-storage model:** Keep CompA's `TView` static and store forwarded directive records in per-`LView` side storage. This preserves independent compilation but requires parallel implementations of most directive-slot services listed above. It is a larger runtime change than a simple instruction.
   3. **Adapter view/component:** Lower the forwarded element into a generated adapter template owned by CompB's compilation unit. The adapter can include the exact directive defs in its `TView` while CompA only renders a fragment-like insertion point. This shifts complexity toward compiler/linker output and may preserve more existing Ivy invariants.
-- **Independent Compilation:** The type contract can remain independent: CompB only needs CompA's declared forwarded host type and forwarding metadata. Runtime independence is harder: the chosen implementation must define where directive defs, slots, host bindings, providers, outputs, and destroy hooks live.
+- **Independent Compilation:** The type contract can remain independent: CompB only needs CompA's declared proxy surface type and proxy metadata. Runtime independence is harder: the chosen implementation must define where directive defs, slots, host bindings, providers, outputs, and destroy hooks live.
 - **Delta from Ivy Today:** Current Ivy matches directives during first create pass from `tView.directiveRegistry`; instances live in TView-indexed LView expando slots; providers and host bindings are registered from those slots. The recipe model moves selection/validation to the consuming compiler, but runtime must still integrate the selected directives into Ivy's directive lifecycle machinery.
 
 ---
 
-### 7. Wrapper Components (`component.withForwarding(Target, config)`)
+### 7. Wrapper Components (`component.wrap(Target, config)`)
 A compile-time macro for structurally wrapping an existing component.
 
 - **Change Class:** Compiler-only for binding forwarding; Compiler + Runtime if directive forwarding from section 6 is involved.
-- **Mechanism:** Binding forwarding in `component.withForwarding(Target, { bindings, setup })` is processed at compile time. When the compiler encounters a wrapper, it:
+- **Mechanism:** Binding forwarding in `component.wrap(Target, { bindings, setup })` is processed at compile time. When the compiler encounters a wrapper, it:
   1. Resolves `Selected = keys(wrapper.bindings)` and type-checks `bindings` as a strict subset of `TargetBindings` (key, binding kind, and inner type preserved).
   2. Resolves `Forwarded = keyof TargetBindings - Selected`.
   3. Binds `setup` as `setup(selectedBindings)`; forwarding remainder is compiler-derived (`Forwarded`) and marker-driven via `@forward()`.
   4. Lowers `<Target @forward() />` by unrolling only `Forwarded` keys directly to target bindings.
   5. Preserves explicit prop precedence in mixed forms such as `<Target @forward() user={x} />` and `<Target user={x} @forward() />` (explicit bindings always win).
-  6. Preserves directive forwarding metadata inheritance from target to wrapper so directive forwarding remains parent → wrapper → target element. `ɵɵapplyForwardedDirectives` is emitted only at the target `@forward()` site.
+  6. Preserves proxy-surface metadata inheritance from target to wrapper so directive proxying remains parent → wrapper → target element. `ɵɵapplyForwardedDirectives` is emitted only at the target `@forward()` site.
   7. Emits no runtime forwarding object. For bindings, the generated Ivy is equivalent to explicitly writing each forwarded binding. For directives, the generated Ivy depends on the directive-forwarding implementation chosen in section 6.
 - **Provider and setup boundary:** Wrapper `providers()` can only see selected input bindings, because forwarded bindings are not part of the wrapper setup contract. This matches the type proposal. Forwarded target bindings remain parent-to-target synchronization generated by the compiler.
 - **Required binding diagnostics:** The compiler must prove that every required target binding is either selected by the wrapper API, explicitly supplied at the target site, or forwarded from the wrapper consumer. Otherwise the wrapper is invalid even if the runtime macro would lower mechanically.
 - **Dynamic component creation:** If wrappers are values that can be passed to Router/TestBed/createComponent, the compiler/linker must emit a real Angular component definition for the wrapper value, even if its template body contains only unrolled forwarding. "Compiler-only" means there is no runtime forwarding object/spread, not that no component definition is emitted.
-- **Forwarding diagnostics (wrapper binding-forwarding context):**
+- **Forwarding diagnostics (wrapper context):**
   - token/object-style forwarding usage (for example `token.foo`) is invalid.
   - spread-based forwarding derivation is invalid.
-  - binding-forwarding `@forward()` applied to non-component elements (directives, derivations, fragments) is invalid; native element `@forward()` remains valid for directive forwarding.
-- **Delta from Ivy Today:** Standard Angular has no spread syntax for forwarding component inputs. Developers must enumerate propagated bindings manually. The two-argument `component.withForwarding(Target, config)` form formalizes a strict compile-time macro for structural wrapping: binding forwarding is unrolled into normal generated input/model/output/fragment instructions, and the Ivy runtime never observes a "wrapper props object" or object-spread operation.
+  - `@forward()` applied to a node that cannot consume the wrapper payload is invalid. A wrapper binding payload must be placed on its wrapped target component; a proxy payload must be placed on a compatible native element.
+- **Delta from Ivy Today:** Standard Angular has no spread syntax for forwarding component inputs. Developers must enumerate propagated bindings manually. `component.wrap(Target, config)` formalizes a strict compile-time macro for structural wrapping: binding forwarding is unrolled into normal generated input/model/output/fragment instructions, and the Ivy runtime never observes a "wrapper props object" or object-spread operation.
 
 ---
 
@@ -169,8 +169,8 @@ Without a `:host` element, CSS encapsulation relies on **compiler-driven scoping
 | **Instruction Cursor** | Sequential `ɵɵadvance` on host. | Parent `ɵɵadvance` treats component as 1 slot; Child has a fresh cursor. |
 | **Public API** | Entire class instance exposed via default template ref and `ComponentRef.instance`. | Refs and intended component interaction expose only the `expose` object. Framework internals may retain a separate component record for metadata/debug/runtime compatibility. |
 | **Projection** | Implicitly handled by `<ng-content>`. | Passed as first-class fragment values in `children` and rendered with explicit `@render(...)` calls. Fragment values carry declaration view/capture information. |
-| **Directives** | Automatically attach to the host element or match normal elements/containers from the compilation scope. | Consumer-supplied directives are compiled into recipes and forwarded to explicit `@forward()` sites. Runtime must still integrate them with directive slots or an equivalent host-binding/output/DI/destroy system. |
+| **Directives** | Automatically attach to the host element or match normal elements/containers from the compilation scope. | `component.proxy<T>(config)` declares the public directive-compatible surface; consumer-supplied directives are compiled into recipes and placed at explicit `@forward()` sites. Runtime must still integrate them with directive slots or an equivalent host-binding/output/DI/destroy system. |
 | **CSS Scoping** | Tied to the physical host attribute. | Applied to all template elements via compiler-generated attributes. |
 | **Template Queries / Refs** | Decorator queries use query metadata and `QueryList`/query-signal refresh machinery; template refs resolve from `TNode.localNames` into native/directive slots. | `ref`/`refMany` are explicit, typed, lifecycle-aware registrations of elements/directives/component expose values. They must update on creation, destruction, and view reordering. |
 | **Transform / Memoization** | Pipe instances are per-view slots, support DI, register destroy hooks, and pure pipes memoize by input identity. | Derivations are compiler-lowered per-view slots whose inputs are signal/binding nodes and whose result is a live signal. They still need compiler lowering, update writes, dirty marking, and cleanup. |
-| **Component Wrapping** | Manual enumeration of every propagated binding; no spread syntax. | Compile-time macro (`component.withForwarding(Target, config)`) with `setup(selectedBindings)` and marker-based forwarding (`<Target @forward() />`) unrolled by the compiler. Binding forwarding has no runtime props object; forwarded directives depend on the directive-forwarding runtime design. |
+| **Component Wrapping** | Manual enumeration of every propagated binding; no spread syntax. | Compile-time macro (`component.wrap(Target, config)`) with `setup(selectedBindings)` and marker-based forwarding (`<Target @forward() />`) unrolled by the compiler. Binding forwarding has no runtime props object; forwarded directives depend on the proxy-surface runtime design. |
