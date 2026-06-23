@@ -378,16 +378,16 @@ export function refMany(): any {
 // setup receives those binding objects; providers receive inputs only.
 //
 // component.proxy<S>(...) declares a public directive-compatible surface.
-// S is explicit, must extend HTMLElement, and is realized by a compatible
-// native @forward() placement in the template.
+// S is explicit, must extend HTMLElement, and is realized by one or more
+// compatible native @forward() placements in the template.
 //
 // component.wrap(Target, ...) declares a wrapper around Target. Selected
 // bindings go to setup; the target remainder and inherited proxy payload are
-// placed on the wrapped target by @forward().
+// placed on wrapped target placement(s) by @forward().
 //
 // @forward() is marker-only: no runtime forwarding object, no spread. The
-// enclosing component API defines the payload; the marked node defines the
-// placement. Explicit bindings on a wrapped target override forwarded ones.
+// enclosing component API defines the payload; marked nodes define where it
+// lands. Explicit bindings on a wrapped target override forwarded ones.
 // ────────────────────────────────────────────────────────────────
 
 type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =

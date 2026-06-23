@@ -289,11 +289,11 @@ C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 ∀ frag ∈ node.fragments: CHECK-COMP-FRAGMENT(Γ, B, frag)
 ∀ ref ∈ node.references: CHECK-COMP-REF(Γ, E, ref)
 ∀ dir ∈ node.directives: CHECK-COMP-DIRECTIVE(Γ, C, S, dir)
-CHECK-REQUIRED(B, node)
+CHECK-REQUIRED-COMP(B, node)
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
 NO-UNKNOWN-BINDINGS(B, node)
-CHILDREN-CONFLICT(node)
+CHILDREN-IMPLICIT-ONLY(node)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ <C ...> ✓
 
@@ -333,6 +333,7 @@ B[output.name] : OutputEmitterRef<T>
 CHECK-COMP-FRAGMENT
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
+frag.name ≠ "children"
 B[frag.name] : FragmentBinding<T>
 ∀ param ∈ frag.parameters:  param matches FragmentArgs<T> positionally
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
@@ -358,19 +359,21 @@ else:
 ─────────────────────────────────────────────────
 
 
-CHECK-REQUIRED
+CHECK-REQUIRED-COMP
 ─────────────────────────────────────────────────
 ∀ k ∈ keys(B):
   B[k] : InputSignal.required<T>    → k ∈ provided_inputs ∪ forwarded
   B[k] : ModelSignal.required<T>    → k ∈ provided_models ∪ forwarded
-  B[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments ∪ forwarded
-                                      ∨ (k = "children" ∧ has_nested_content)
+  B[k] : RequiredFragmentBinding<T> →
+    if k = "children": has_nested_content ∨ k ∈ forwarded
+    else:              k ∈ provided_fragments ∪ forwarded
 ─────────────────────────────────────────────────
 
 
-CHILDREN-CONFLICT
+CHILDREN-IMPLICIT-ONLY
 ─────────────────────────────────────────────────
-has_nested_content → no explicit children binding
+No explicit component binding may target "children" → D035.
+Nested content is the only direct authoring form for a children fragment.
 ─────────────────────────────────────────────────
 
 
@@ -530,7 +533,7 @@ UNIQUE:       D appears at most once on each element in R_host
   B_D[model.name] : ModelSignal<T>
   Γ ⊢ model.value : WritableSignal<T>
 
-CHECK-REQUIRED(B_D, dir)
+CHECK-REQUIRED-DIR(B_D, dir)
 NO-UNKNOWN-BINDINGS(B_D, dir)
 
 if dir.when:
@@ -572,7 +575,19 @@ P(C) = never → directive on component tag is an error
 ─────────────────────────────────────────────────
 ```
 
-### 6.2 Resolved Host Element
+### 6.2 Required Directive Bindings
+
+```
+CHECK-REQUIRED-DIR
+─────────────────────────────────────────────────
+∀ k ∈ keys(B_D):
+  B_D[k] : InputSignal.required<T>    → k ∈ provided_inputs
+  B_D[k] : ModelSignal.required<T>    → k ∈ provided_models
+  B_D[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments
+─────────────────────────────────────────────────
+```
+
+### 6.3 Resolved Host Element
 
 A directive is unique per resolved host element. Native applications resolve to
 the element itself. Proxy and wrapped-proxy applications resolve to the native
@@ -660,7 +675,7 @@ D : DerivationInstance<B_D, T>
   B_D[input.name] : InputSignal<T_k>
   Γ ⊢ input.value : U    U ⊑ T_k
 
-CHECK-REQUIRED(B_D, node)
+CHECK-REQUIRED-DERIVE(B_D, node)
 NO-UNKNOWN-BINDINGS(B_D, node)
 
 Γ' = Γ ∪ { node.name : Signal<T> }
@@ -669,6 +684,14 @@ NO-UNKNOWN-BINDINGS(B_D, node)
 ```
 
 Scope: block-scoped to enclosing control-flow block. Not accessible outside.
+
+```
+CHECK-REQUIRED-DERIVE
+─────────────────────────────────────────────────────────────────
+∀ k ∈ keys(B_D):
+  B_D[k] : InputSignal.required<T> → k ∈ provided_inputs
+─────────────────────────────────────────────────────────────────
+```
 
 ---
 
@@ -681,9 +704,9 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
-Parent component P has binding name: FragmentBinding<T>
-No explicit fragment binding with the same name exists on P
-No other inline @fragment with the same name exists under the same P
+Parent component P has binding name: FragmentBinding<T>; otherwise D036
+No explicit fragment binding with the same name exists on P; otherwise D036
+No other inline @fragment with the same name exists under the same P; otherwise D037
 Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
 Γ' ⊢ children ✓
 
@@ -823,7 +846,7 @@ LET
 | D001 | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
 | D002 | Unknown attribute/property on native element | Error |
 | D003 | Unknown binding on component | Error |
-| D004 | Duplicate binding identity | Error |
+| D004 | Duplicate binding identity, including duplicate refs or fragments | Error |
 | D005 | Static attribute + dynamic binding clash (same name) | Error |
 | D006 | Missing required input/model/fragment | Error |
 | D007 | Type mismatch (expression not assignable to binding type) | Error |
@@ -852,6 +875,11 @@ LET
 | D032 | Wrapper selected binding type is not exactly the target type | Error |
 | D033 | `providers` reads model/output/fragment bindings | Error |
 | D034 | Component setup does not return `TemplateMarkup` or `{ template }` | Error |
+| D035 | Explicit `children` binding on a component element | Error |
+| D036 | Inline `@fragment` has no matching parent fragment binding or conflicts with explicit same-name binding | Error |
+| D037 | Duplicate inline `@fragment` name under the same parent component | Error |
+
+`D019` and `D022` are retired and intentionally unused.
 
 ### 13.1 Diagnostic Examples
 

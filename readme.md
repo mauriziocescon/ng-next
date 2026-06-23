@@ -516,7 +516,7 @@ export const Menu = component({
 
 ### Proxying directives to an internal element
 
-`Button` exposes an `HTMLButtonElement` proxy surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the internal `@forward()` element. The same directive cannot be applied more than once to the same final element.
+`Button` exposes an `HTMLButtonElement` proxy surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on active `@forward()` target(s). The same directive cannot be applied more than once to the same final element.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -561,7 +561,7 @@ export const Button = component.proxy<HTMLButtonElement>({
   setup: ({ type, class: className, style, disabled, click, children }) => {
     const innerStyle = computed(() => `${style()}; color: red;`);
 
-    // Directives applied to <Button /> are forwarded to this element
+    // Directives applied to <Button /> are forwarded here
     return @{
       <button
         @forward()
@@ -855,11 +855,11 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native elements, `component.proxy` components, wrapped proxy components | Yes (different directives) | Attaches a directive. On proxy / wrapped components, directives are placed at `@forward()`. Same directive cannot appear twice on the same final element. |
+| `use:` | native elements, `component.proxy` components, wrapped proxy components | Yes (different directives) | Attaches a directive. On proxy / wrapped components, directives are placed at active `@forward()` target(s). Same directive cannot appear twice on the same final element. |
 | `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. |
-| `@forward()` | compatible native or wrapped component nodes | No | Places the forwarding payload declared by `component.proxy` or `component.wrap`. |
+| `@forward()` | compatible native or wrapped component nodes | Yes, if each placement conforms | Places the forwarding payload declared by `component.proxy` or `component.wrap`. |
 
 `ref` and `@forward()` are special attributes, not binding prefixes — included here for completeness.
 
