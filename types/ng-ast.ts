@@ -103,6 +103,7 @@ export interface ElementNode extends BaseNode {
   animations: AnimateBindingNode[];
   references: RefNode[];
   directives: DirectiveBindingNode[];
+  children: TemplateNode[];
   fragments: FragmentNode[];
   i18n?: I18nMeta;
 }
@@ -743,6 +744,7 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
           for (const param of frag.parameters) visitor.visitFragmentParameter(param, context);
           walkAll(frag.children, visitor, context);
         }
+        walkAll(node.children, visitor, context);
         break;
       case 'Text':
         visitor.visitText(node, context);
