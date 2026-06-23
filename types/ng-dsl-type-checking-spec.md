@@ -527,7 +527,7 @@ FORWARD-PROXY
 Enclosing component declared by component.proxy<S>(...)
 For each native element with @forward(): H = I(tag)
 H ⊑ S → D023 on failure
-If no @forward() placement exists → error
+If no @forward() placement exists → D040
 ProxyDirectivePayload broadcast to every @forward() target
 Alternative control-flow branches checked independently
 ─────────────────────────────────────────────────────────────────
@@ -700,6 +700,10 @@ Any non-input binding form → D039
 Block-scoped to enclosing control-flow block. Each `@for` iteration owns an
 independent instance.
 
+Note: D039 is a parse-time diagnostic. The AST `DeriveNode` only carries
+`inputs: DerivationInputNode[]` — non-input binding forms are rejected before
+the tree reaches the type checker.
+
 ---
 
 ## 10. Fragment & @render
@@ -777,6 +781,8 @@ LET
 ─────────────────────────────────────────────────
 Γ ⊢ @let name = expr;   producing Γ'
 ```
+
+`name` is visible to subsequent siblings and their descendants only (forward-scoped).
 
 ---
 
@@ -865,7 +871,8 @@ BindingKind<V> =
 | D036 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
 | D037 | Animate | `on:animate:` handler type mismatch | Error |
 | D038 | Derivation | Missing required derivation input | Error |
-| D039 | Derivation | Derivation uses non-input binding form | Error |
+| D039 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
+| D040 | Forwarding | No `@forward()` in proxy component | Error |
 ### 14.1 Diagnostic Examples
 
 One example per diagnostic — just enough to show the violation.
@@ -998,4 +1005,9 @@ const child = ref<HTMLDivElement>();
 
 // D039 — derivation non-input binding
 @derive total = price(model:item={x}); // ❌ D039
+
+// D040 — proxy component missing @forward()
+const Button = component.proxy<HTMLButtonElement>({
+  setup: () => @{ <span>no forward</span> }, // ❌ D040
+});
 ```
