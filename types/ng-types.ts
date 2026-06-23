@@ -343,6 +343,8 @@ export type __ReservedBindingsConstraint<
 //     setup() return value.
 //   - refMany<typeof Type>(): collects multiple instances
 //     (e.g. inside @for) into Signal<expose[]>.
+//   - refMany<H>(): collects multiple native element instances
+//     into Signal<H[]>.
 // ────────────────────────────────────────────────────────────────
 
 // Native element
@@ -358,6 +360,8 @@ export function ref(): any {
   return {} as any;
 }
 
+// Native element
+export function refMany<H extends HTMLElement>(): Ref<H[]>;
 // Component or Directive (expose inferred from type parameter)
 export function refMany<
   T extends

@@ -683,6 +683,14 @@ const manyChildren = refMany<typeof Child>();
 const _manyType: Ref<{ text: Signal<string> }[]> = manyChildren;
 const _manyAsSignal: Signal<{ text: Signal<string> }[]> = manyChildren;
 
+// refMany native element
+const manyDivs = refMany<HTMLDivElement>();
+const _manyDivsType: Ref<HTMLDivElement[]> = manyDivs;
+const _manyDivsAsSignal: Signal<HTMLDivElement[]> = manyDivs;
+
+const manyButtons = refMany<HTMLButtonElement>();
+const _manyButtonsType: Ref<HTMLButtonElement[]> = manyButtons;
+
 // refMany without expose
 const manyNoExpose = refMany<typeof NoExpose>();
 const _manyNoExposeType: Ref<[]> = manyNoExpose;
@@ -699,6 +707,8 @@ childRef.set({ text: signal('') });
 tooltipRef.set({ toggle: () => {} });
 // @ts-expect-error
 manyChildren.set([]);
+// @ts-expect-error
+manyDivs.set([]);
 
 // ref() must not accept runtime arguments — generic-only
 // @ts-expect-error ref does not accept a runtime argument

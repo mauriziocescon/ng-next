@@ -156,6 +156,14 @@ CHECK-NODES to those children under the node's scoped Γ.
 ## 3. Native Element
 
 ```
+ELEMENT-RESOLUTION
+─────────────────────────────────────────────────────────────────
+tag ∈ IntrinsicElements           → check with INTRINSIC-ELEMENT
+tag ∉ IntrinsicElements ∧ resolve(tag, Γ) ≠ ∅ → check with COMPONENT-ELEMENT
+tag ∉ IntrinsicElements ∧ resolve(tag, Γ) = ∅ → D041
+─────────────────────────────────────────────────────────────────
+
+
 INTRINSIC-ELEMENT
 ─────────────────────────────────────────────────────────────────
 tag ∈ IntrinsicElements
@@ -208,7 +216,7 @@ ModelableProps(H)[model.name] = T
 CHECK-NATIVE-REF
 ─────────────────────────────────────────────────
 ref.target.name = x
-x : Ref<H | undefined> ∈ Γ
+x : Ref<H | undefined> ∈ Γ  ∨  x : Ref<H[]> ∈ Γ
 ─────────────────────────────────────────────────
 ```
 
@@ -230,6 +238,9 @@ style:prop={expr}
 ```
 
 ### 3.2 Binding Identity Constraints
+
+The canonical binding prefix and modifier reference is in §12. The rules below
+define the identity constraints the checker enforces per element.
 
 ```
 NO-DUPLICATE-BINDINGS
@@ -345,7 +356,6 @@ output.name ∈ keys(B)
 B[output.name] : OutputEmitterRef<T>
 Γ ⊢ output.handler : U
 U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
-─────────────────────────────────────────────────
 ─────────────────────────────────────────────────
 
 
@@ -510,7 +520,7 @@ The checker validates that `ref={x}` and `use:dir(...):ref={x}` reference variab
 REF-ON-NATIVE-ELEMENT
 ─────────────────────────────────────────────────
 <tag ref={x}>   where H = I(tag)
-x : Ref<H | undefined> ∈ Γ
+x : Ref<H | undefined> ∈ Γ  ∨  x : Ref<H[]> ∈ Γ
 ─────────────────────────────────────────────────
 
 
@@ -999,7 +1009,7 @@ LET
 | `on:` | native, component | No (per event) | Event handler |
 | `once:` | inputs only | No (per prop) | Input only. `once:model:*` / `once:on:*` → error |
 | `class:` | native | Yes | Conditional class |
-| `style:` | native | Yes | Conditional style |
+| `style:` | native | Yes | Conditional style (`string \| number \| null`) |
 | `animate:` | native | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
 | `use:` | native, proxy comp, wrapped proxy comp | Yes (diff dirs) | Same directive only once per resolved host element |
 | `:when` | `use:` directive | No (per dir) | Condition must be `boolean` |
@@ -1051,8 +1061,11 @@ LET
 | D038 | Missing required directive input/model/fragment | Error |
 | D039 | Missing required derivation input | Error |
 | D040 | Derivation uses a non-input binding form | Error |
+| D041 | Unresolved element (tag is neither intrinsic nor resolvable in scope) | Error |
 
-`D019` and `D022` are retired and intentionally unused.
+`D019` and `D022` are retired and intentionally unused. `D019` was merged into
+`D041` (unresolved element); `D022` was superseded by `D002` (unknown native
+attribute/property).
 
 ### 13.1 Diagnostic Examples
 
@@ -1610,6 +1623,18 @@ const price = derivation({
 
 @derive total = price(model:item={item});
 //                    ~~~~~~~~~~ D040: Derivations accept input bindings only.
+```
+
+#### D041 — Unresolved element
+
+```ts
+export const App = component({
+  setup: () => @{
+    // ❌ "FancyCard" is not a known intrinsic element and not in scope
+    <FancyCard title={'hello'} />
+//   ~~~~~~~~~ D041: 'FancyCard' is not a known element. Did you forget an import?
+  },
+});
 ```
 
 ---
