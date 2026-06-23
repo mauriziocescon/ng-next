@@ -186,9 +186,9 @@ U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-frag.name ≠ "children"                              → D033
+frag.name ≠ "children"                              → D028
 B[frag.name] : FragmentBinding<T>
-frag.parameters match FragmentArgs<T> positionally  → D016
+frag.parameters match FragmentArgs<T> positionally  → D027
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
 Γ' ⊢ frag.children ✓
 ─────────────────────────────────────────────────
@@ -206,7 +206,7 @@ CHECK-REQUIRED(B, provided, context_label)
     if k = "children": has_nested_content (components only)
     else:              k ∈ provided_fragments
 
-Violation → D006 (component), D036 (directive), D037 (derivation)
+Violation → D011 (component), D012 (directive), D038 (derivation)
 ─────────────────────────────────────────────────
 ```
 
@@ -271,9 +271,9 @@ For directives, `E = E(D)` (the directive expose type).
 ONCE-BINDING
 ─────────────────────────────────────────────────
 once: applies ONLY to inputs (InputSignal)
-once:model:*  → D011
-once:on:*     → D011
-once:prop + prop on same target → D012
+once:model:*  → D016
+once:on:*     → D016
+once:prop + prop on same target → D017
 ─────────────────────────────────────────────────
 ```
 
@@ -282,7 +282,7 @@ once:prop + prop on same target → D012
 ```
 ON-PREFIX-WARNING
 ─────────────────────────────────────────────────
-∀ binding name starting with "on" in B → D020 (warning)
+∀ binding name starting with "on" in B → D018 (warning)
 ─────────────────────────────────────────────────
 ```
 
@@ -295,7 +295,7 @@ ELEMENT-RESOLUTION
 ─────────────────────────────────────────────────────────────────
 tag ∈ IntrinsicElements           → INTRINSIC-ELEMENT
 tag ∉ IntrinsicElements ∧ resolve(tag, Γ) ≠ ∅ → COMPONENT-ELEMENT (§5)
-tag ∉ IntrinsicElements ∧ resolve(tag, Γ) = ∅ → D039
+tag ∉ IntrinsicElements ∧ resolve(tag, Γ) = ∅ → D002
 ─────────────────────────────────────────────────────────────────
 
 
@@ -379,8 +379,8 @@ AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction; }
 
 ANIMATE-CONSTRAINTS
 ─────────────────────────────────────────────────
-- applies ONLY to native elements (not components → D021)
-- phase must be "enter" or "leave" → D022
+- applies ONLY to native elements (not components → D032)
+- phase must be "enter" or "leave" → D033
 - at most one animate:enter and one animate:leave (class form) per element
 - at most one on:animate:enter and one on:animate:leave per element
 - both phases and both forms (class + event) can coexist on the same element
@@ -428,7 +428,7 @@ string ⊑ T
 CHECK-COMP-DIRECTIVE
 ─────────────────────────────────────────────────
 if S = never:
-  node.directives must be ∅   → D013
+  node.directives must be ∅   → D021
 else:
   R = RESOLVED-FORWARD-HOSTS(C)
   ∀ dir: CHECK-DIRECTIVE-USE(Γ, S, R, dir)
@@ -436,7 +436,7 @@ else:
 
 CHILDREN-IMPLICIT-ONLY
 ─────────────────────────────────────────────────
-No explicit binding or explicit @fragment may target "children" → D033.
+No explicit binding or explicit @fragment may target "children" → D028.
 Only non-fragment direct child content provides children.
 ─────────────────────────────────────────────────
 ```
@@ -456,13 +456,13 @@ where M : TemplateMarkup<TAst>
 PROVIDERS-INPUTS-ONLY
 ─────────────────────────────────────────────────────────────────
 providers receives Pick<B, input keys only>.
-Models, outputs, and fragments are excluded → D031.
+Models, outputs, and fragments are excluded → D005.
 
 
 RESERVED-CHILDREN-BINDING
 ─────────────────────────────────────────────────────────────────
 if "children" ∈ keys(B):  B["children"] : FragmentBinding<T>
-otherwise → D027
+otherwise → D004
 
 
 PROXY-SURFACE
@@ -526,7 +526,7 @@ FORWARD-PROXY
 ─────────────────────────────────────────────────────────────────
 Enclosing component declared by component.proxy<S>(...)
 For each native element with @forward(): H = I(tag)
-H ⊑ S → D015 on failure
+H ⊑ S → D023 on failure
 If no @forward() placement exists → error
 ProxyDirectivePayload broadcast to every @forward() target
 Alternative control-flow branches checked independently
@@ -540,7 +540,7 @@ P(W) = P(Target)
 For each component element with @forward(): element is Target
 Explicit bindings override WrapBindingPayload for same key
 Each @forward() element receives WrapPayload
-if (WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never) ∧ no @forward() → D014
+if (WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never) ∧ no @forward() → D022
 WrapPayload broadcast to every @forward() target
 Alternative control-flow branches checked independently
 ─────────────────────────────────────────────────────────────────
@@ -577,8 +577,8 @@ CHECK-DIRECTIVE-USE(Γ, H_host, R_host, dir)
 D = resolve(dir.directiveName, Γ)
 D : DirectiveInstance<H_D, B_D, E_D>
 
-HOST-COMPAT:  H_host ⊑ H_D                         → D009
-UNIQUE:       D at most once per element in R_host  → D010
+HOST-COMPAT:  H_host ⊑ H_D                         → D019
+UNIQUE:       D at most once per element in R_host  → D020
 
 ∀ input ∈ dir.inputs:   CHECK-INPUT(Γ, B_D, input)
 ∀ output ∈ dir.outputs: CHECK-OUTPUT(Γ, B_D, output)
@@ -600,7 +600,7 @@ Directive fragments use local syntax: `use:D(@fragment name(p₁: T₁) { childr
 ```
 NATIVE-HOST:         H = I(tag)         H ⊑ H_D → compatible
 PROXY-SURFACE-HOST:  P(C) = S ≠ never   S ⊑ H_D → compatible
-NO-FORWARDING:       P(C) = never       → D013
+NO-FORWARDING:       P(C) = never       → D021
 ```
 
 ### 7.2 Resolved Host Elements and Uniqueness
@@ -628,7 +628,7 @@ DIRECTIVE-SET-UNIQUENESS
 ─────────────────────────────────────────────────
 For each resolved host element H:
   AppliedDirs(H) = LocalDirs(H) ++ ForwardedDirs(H)
-  ∀ directive identity D:  count(D, AppliedDirs(H)) ≤ 1 → D010
+  ∀ directive identity D:  count(D, AppliedDirs(H)) ≤ 1 → D020
 ─────────────────────────────────────────────────
 ```
 
@@ -690,7 +690,7 @@ D : DerivationInstance<B_D, T>
 ∀ input ∈ node.inputs:  CHECK-INPUT(Γ, B_D, input)
 CHECK-REQUIRED(B_D, provided, "derivation")
 NO-UNKNOWN-BINDINGS(B_D, node)
-Any non-input binding form → D038
+Any non-input binding form → D039
 
 Γ' = Γ ∪ { node.name : Signal<T> }
 ─────────────────────────────────────────────────────────────────
@@ -711,8 +711,8 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
-name ≠ "children"                                    → D033
-parameters match FragmentArgs<T> positionally        → D016
+name ≠ "children"                                    → D028
+parameters match FragmentArgs<T> positionally        → D027
 Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
 Γ' ⊢ children ✓
 
@@ -729,10 +729,10 @@ child-list where declared.
 
 **Implicit (inline):** `@fragment name(...) { ... }` as direct child of a
 component element — auto-passed to the matching binding. Rules:
-- Parent must have binding `name: FragmentBinding<T>` → D034
-- name ≠ "children" → D033
-- No explicit binding with the same name exists → D034
-- No duplicate implicit fragment with the same name → D035
+- Parent must have binding `name: FragmentBinding<T>` → D029
+- name ≠ "children" → D028
+- No explicit binding with the same name exists → D029
+- No duplicate implicit fragment with the same name → D030
 - Not part of implicit children
 
 **Implicit children:** Non-fragment direct child content inside
@@ -825,178 +825,177 @@ BindingKind<V> =
 
 ## 14. Diagnostic Summary
 
-| Code | Condition | Severity |
-|------|-----------|----------|
-| D001 | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
-| D002 | Unknown attribute/property on native element | Error |
-| D003 | Unknown binding on component | Error |
-| D004 | Duplicate binding identity (including duplicate refs or fragments) | Error |
-| D005 | Static attribute + dynamic binding clash (same name) | Error |
-| D006 | Missing required component input/model/fragment | Error |
-| D007 | Type mismatch (expression not assignable to binding type) | Error |
-| D008 | `model:` bound to non-writable signal | Error |
-| D009 | Directive host incompatible with element/proxy surface | Error |
-| D010 | Same directive applied twice to same resolved host element | Error |
-| D011 | `once:model:*` or `once:on:*` | Error |
-| D012 | `once:prop` + `prop` duplicate on same element | Error |
-| D013 | Directive on non-proxy component | Error |
-| D014 | No `@forward()` when wrapper has payload | Error |
-| D015 | `@forward()` element type not assignable to proxy surface S | Error |
-| D016 | Fragment argument count/type mismatch | Error |
-| D017 | `ref=` variable type incompatible with expose | Error |
-| D018 | Unresolved identifier in template expression | Error |
-| D019 | `model:` on non-modelable native element | Error |
-| D020 | `on`-prefixed binding name | Warning |
-| D021 | `animate:` on component element | Error |
-| D022 | Invalid animate phase (not `enter`/`leave`) | Error |
-| D023 | Duplicate `animate:enter` or `animate:leave` class binding | Error |
-| D024 | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
-| D025 | `animate:` expression type mismatch (not `string \| string[]`) | Error |
-| D026 | `on:animate:` handler type mismatch | Error |
-| D027 | Reserved `children` binding is not a fragment | Error |
-| D028 | Wrapper selects binding key not in target | Error |
-| D029 | Wrapper selected binding kind differs from target | Error |
-| D030 | Wrapper selected binding type not exactly target type | Error |
-| D031 | `providers` reads model/output/fragment bindings | Error |
-| D032 | Setup does not return `TemplateMarkup` or `{ template }` | Error |
-| D033 | Explicit `children` binding or explicit `@fragment children()` | Error |
-| D034 | Implicit fragment has no matching parent binding or conflicts | Error |
-| D035 | Duplicate implicit fragment name under same parent | Error |
-| D036 | Missing required directive input/model/fragment | Error |
-| D037 | Missing required derivation input | Error |
-| D038 | Derivation uses non-input binding form | Error |
-| D039 | Unresolved element (neither intrinsic nor in scope) | Error |
-
+| Code | Category | Condition | Severity |
+|------|----------|-----------|----------|
+| D001 | Resolution | Unresolved identifier in template expression | Error |
+| D002 | Resolution | Unresolved element (neither intrinsic nor in scope) | Error |
+| D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
+| D004 | Declaration | Reserved `children` binding is not a fragment | Error |
+| D005 | Declaration | `providers` reads model/output/fragment bindings | Error |
+| D006 | Declaration | Setup does not return `TemplateMarkup` or `{ template }` | Error |
+| D007 | Binding: Existence | Unknown attribute/property on native element | Error |
+| D008 | Binding: Existence | Unknown binding on component | Error |
+| D009 | Binding: Existence | Duplicate binding identity (including duplicate refs or fragments) | Error |
+| D010 | Binding: Existence | Static attribute + dynamic binding clash (same name) | Error |
+| D011 | Binding: Required | Missing required component input/model/fragment | Error |
+| D012 | Binding: Required | Missing required directive input/model/fragment | Error |
+| D013 | Binding: Types | Type mismatch (expression not assignable to binding type) | Error |
+| D014 | Binding: Types | `model:` bound to non-writable signal | Error |
+| D015 | Binding: Types | `model:` on non-modelable native element | Error |
+| D016 | Binding: Modifiers | `once:model:*` or `once:on:*` | Error |
+| D017 | Binding: Modifiers | `once:prop` + `prop` duplicate on same element | Error |
+| D018 | Binding: Modifiers | `on`-prefixed binding name | Warning |
+| D019 | Directives | Directive host incompatible with element/proxy surface | Error |
+| D020 | Directives | Same directive applied twice to same resolved host element | Error |
+| D021 | Directives | Directive on non-proxy component | Error |
+| D022 | Forwarding | No `@forward()` when wrapper has payload | Error |
+| D023 | Forwarding | `@forward()` element type not assignable to proxy surface S | Error |
+| D024 | Forwarding | Wrapper selects binding key not in target | Error |
+| D025 | Forwarding | Wrapper selected binding kind differs from target | Error |
+| D026 | Forwarding | Wrapper selected binding type not exactly target type | Error |
+| D027 | Fragments | Fragment argument count/type mismatch | Error |
+| D028 | Fragments | Explicit `children` binding or explicit `@fragment children()` | Error |
+| D029 | Fragments | Implicit fragment has no matching parent binding or conflicts | Error |
+| D030 | Fragments | Duplicate implicit fragment name under same parent | Error |
+| D031 | Refs | `ref=` variable type incompatible with expose | Error |
+| D032 | Animate | `animate:` on component element | Error |
+| D033 | Animate | Invalid animate phase (not `enter`/`leave`) | Error |
+| D034 | Animate | Duplicate `animate:enter` or `animate:leave` class binding | Error |
+| D035 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
+| D036 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
+| D037 | Animate | `on:animate:` handler type mismatch | Error |
+| D038 | Derivation | Missing required derivation input | Error |
+| D039 | Derivation | Derivation uses non-input binding form | Error |
 ### 14.1 Diagnostic Examples
 
 One example per diagnostic — just enough to show the violation.
 
 ```ts
-// D001 — binding primitive outside bindings
+// D001 — unresolved identifier
+<h1>{userName}</h1> // ❌ D001
+
+// D002 — unresolved element
+<FancyCard title={'hello'} /> // ❌ D002
+
+// D003 — binding primitive outside bindings
 const Broken = component({
   setup: () => {
-    const name = input<string>(); // ❌ D001
+    const name = input<string>(); // ❌ D003
     return @{ <span>{name()}</span> };
   },
 });
 
-// D002 — unknown native property
-<div colour="red">Hello</div> // ❌ D002
+// D004 — children is not a fragment
+bindings: { children: input<string>() } // ❌ D004
 
-// D003 — unknown component binding
-<UserDetail user={u()} role="admin" /> // ❌ D003: 'role' not in bindings
+// D005 — providers reads non-input
+providers: (inputs) => { inputs.selected; return []; } // ❌ D005
 
-// D004 — duplicate binding
-<button disabled={true} disabled={false}>Click</button> // ❌ D004
+// D006 — invalid setup return
+component({ setup: () => ({ expose: {} }) }) // ❌ D006
 
-// D005 — static + dynamic clash
-<div id="static" id={dynamicId()}>Content</div> // ❌ D005
+// D007 — unknown native property
+<div colour="red">Hello</div> // ❌ D007
 
-// D006 — missing required
-<Card><p>Body</p></Card> // ❌ D006: required 'title' missing
+// D008 — unknown component binding
+<UserDetail user={u()} role="admin" /> // ❌ D008: 'role' not in bindings
 
-// D007 — type mismatch
-<Counter count={'five'} /> // ❌ D007: string not assignable to number
+// D009 — duplicate binding
+<button disabled={true} disabled={false}>Click</button> // ❌ D009
 
-// D008 — model bound to non-writable
-<input model:value={computed(() => 'x')} /> // ❌ D008
+// D010 — static + dynamic clash
+<div id="static" id={dynamicId()}>Content</div> // ❌ D010
 
-// D009 — directive host incompatible
-<div use:inputMask(mask={'###'})>X</div> // ❌ D009: HTMLDivElement ⊄ HTMLInputElement
+// D011 — missing required component binding
+<Card><p>Body</p></Card> // ❌ D011: required 'title' missing
 
-// D010 — same directive twice
-<button use:tooltip(message={'A'}) use:tooltip(message={'B'})>X</button> // ❌ D010
+// D012 — missing required directive input
+<button use:tooltip()>Save</button> // ❌ D012: 'message' required
+
+// D038 — missing required derivation input
+@derive total = price(); // ❌ D038: 'item' required
+
+// D013 — type mismatch
+<Counter count={'five'} /> // ❌ D013: string not assignable to number
+
+// D014 — model bound to non-writable
+<input model:value={computed(() => 'x')} /> // ❌ D014
+
+// D015 — model: on non-modelable element
+<div model:value={text}>X</div> // ❌ D015
 ```
 
 ```ts
-// D010 — via proxy forwarding
+// D016 — once: on model/output
+<UserDetail once:model:email={email} user={u()} /> // ❌ D016
+
+// D017 — once:prop + prop duplicate
+<Counter once:count={5} count={n()} /> // ❌ D017
+
+// D018 — on-prefix warning
+bindings: { onSubmit: output<void>() } // ⚠️ D018
+
+// D019 — directive host incompatible
+<div use:inputMask(mask={'###'})>X</div> // ❌ D019: HTMLDivElement ⊄ HTMLInputElement
+
+// D020 — same directive twice
+<button use:tooltip(message={'A'}) use:tooltip(message={'B'})>X</button> // ❌ D020
+
+// D020 — via proxy forwarding
 const Button = component.proxy<HTMLButtonElement>({
   setup: () => @{ <button @forward() use:tooltip(message={'Internal'})>X</button> },
 });
-<Button use:tooltip(message={'External'}) /> // ❌ D010: collides on resolved host
+<Button use:tooltip(message={'External'}) /> // ❌ D020: collides on resolved host
 
-// D011 — once: on model/output
-<UserDetail once:model:email={email} user={u()} /> // ❌ D011
+// D021 — directive on non-proxy component
+<Plain label={'hi'} use:tooltip(message={'tip'}) /> // ❌ D021
 
-// D012 — once:prop + prop duplicate
-<Counter once:count={5} count={n()} /> // ❌ D012
-
-// D013 — directive on non-proxy component
-<Plain label={'hi'} use:tooltip(message={'tip'}) /> // ❌ D013
-
-// D014 — no @forward() when payload exists
+// D022 — no @forward() when payload exists
 const Broken = component.wrap(UserDetail, {
   bindings: { user: input.required<User>() },
-  setup: ({ user }) => @{ <UserDetail user={user()} /> }, // ❌ D014: missing @forward()
+  setup: ({ user }) => @{ <UserDetail user={user()} /> }, // ❌ D022: missing @forward()
 });
 
-// D015 — @forward() type mismatch
+// D023 — @forward() type mismatch
 const Button = component.proxy<HTMLButtonElement>({
-  setup: () => @{ <span @forward()>X</span> }, // ❌ D015: HTMLSpanElement ⊄ HTMLButtonElement
+  setup: () => @{ <span @forward()>X</span> }, // ❌ D023: HTMLSpanElement ⊄ HTMLButtonElement
 });
 
-// D016 — fragment arg mismatch
-// fragment.required<[string, number]>() but @render(row(item)) passes 1 arg → D016
-
-// D017 — ref type incompatible
-const child = ref<HTMLDivElement>();
-<Child ref={child} /> // ❌ D017: expects Ref<{ value: Signal<number> } | undefined>
+// D024–D026 — wrapper selection errors
+component.wrap(Target, { bindings: { role: input<string>() } })   // ❌ D024
+component.wrap(Target, { bindings: { save: input<void>() } })     // ❌ D025
+component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ D026
 ```
 
 ```ts
-// D018 — unresolved identifier
-<h1>{userName}</h1> // ❌ D018
+// D027 — fragment arg mismatch
+// fragment.required<[string, number]>() but @render(row(item)) passes 1 arg → D027
 
-// D019 — model: on non-modelable element
-<div model:value={text}>X</div> // ❌ D019
+// D028 — explicit children
+<Card children={body} />  // ❌ D028
+<Card>@fragment children() { <p>X</p> }</Card> // ❌ D028
 
-// D020 — on-prefix warning
-bindings: { onSubmit: output<void>() } // ⚠️ D020
+// D029 — no matching parent fragment binding
+<Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D029
 
-// D021–D026 — animate violations
-<Card animate:enter={'fade'} />             // ❌ D021: not native
-<div animate:show={'fade'}>X</div>          // ❌ D022: invalid phase
-<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D023
-<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D024
-<div animate:enter={42}>X</div>             // ❌ D025: number not assignable
-<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D026
-
-// D027 — children is not a fragment
-bindings: { children: input<string>() } // ❌ D027
-
-// D028–D030 — wrapper selection errors
-component.wrap(Target, { bindings: { role: input<string>() } })   // ❌ D028
-component.wrap(Target, { bindings: { save: input<void>() } })     // ❌ D029
-component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ D030
-
-// D031 — providers reads non-input
-providers: (inputs) => { inputs.selected; return []; } // ❌ D031
-
-// D032 — invalid setup return
-component({ setup: () => ({ expose: {} }) }) // ❌ D032
-
-// D033 — explicit children
-<Card children={body} />  // ❌ D033
-<Card>@fragment children() { <p>X</p> }</Card> // ❌ D033
-
-// D034 — no matching parent fragment binding
-<Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D034
-
-// D035 — duplicate inline fragment
+// D030 — duplicate inline fragment
 <List>
   @fragment row(i: Item) { <span>{i.name}</span> }
-  @fragment row(i: Item) { <b>{i.name}</b> }  // ❌ D035
+  @fragment row(i: Item) { <b>{i.name}</b> }  // ❌ D030
 </List>
 
-// D036 — missing required directive input
-<button use:tooltip()>Save</button> // ❌ D036: 'message' required
+// D031 — ref type incompatible
+const child = ref<HTMLDivElement>();
+<Child ref={child} /> // ❌ D031: expects Ref<{ value: Signal<number> } | undefined>
 
-// D037 — missing required derivation input
-@derive total = price(); // ❌ D037: 'item' required
+// D032–D037 — animate violations
+<Card animate:enter={'fade'} />             // ❌ D032: not native
+<div animate:show={'fade'}>X</div>          // ❌ D033: invalid phase
+<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D034
+<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D035
+<div animate:enter={42}>X</div>             // ❌ D036: number not assignable
+<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D037
 
-// D038 — derivation non-input binding
-@derive total = price(model:item={x}); // ❌ D038
-
-// D039 — unresolved element
-<FancyCard title={'hello'} /> // ❌ D039
+// D039 — derivation non-input binding
+@derive total = price(model:item={x}); // ❌ D039
 ```
