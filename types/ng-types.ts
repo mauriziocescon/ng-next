@@ -382,8 +382,10 @@ export function refMany(): any {
 // compatible native @forward() placements in the template.
 //
 // component.wrap(Target, ...) declares a wrapper around Target. Selected
-// bindings go to setup; the target remainder and inherited proxy payload are
-// placed on wrapped target placement(s) by @forward().
+// bindings go to setup; the target remainder is placed on wrapped target
+// placement(s) by @forward(). If Target has a proxy surface, the wrapper
+// inherits that surface and can pass directives through the same @forward()
+// chain. A non-proxy target cannot receive forwarded directives.
 //
 // @forward() is marker-only: no runtime forwarding object, no spread. The
 // enclosing component API defines the payload; marked nodes define where it

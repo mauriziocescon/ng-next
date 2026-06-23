@@ -1043,7 +1043,7 @@ type DirectiveFitsProxySurface<
   D extends DirectiveInstance<any, any, any>,
 > =
   ProxySurface<C> extends never
-    ? true
+    ? false
     : ProxySurface<C> extends DirectiveHost<D>
       ? true
       : false;
@@ -1086,6 +1086,19 @@ const _negInputProxyWrapperRejectsButtonDirective: DirectiveFitsProxySurface<
   typeof InputProxyWrapper,
   typeof buttonOnly
 > = true;
+
+type _NoProxyWrapperRejectsDirective = Assert<
+  IsEqual<
+    DirectiveFitsProxySurface<typeof NoProxyWrapper, typeof tooltip>,
+    false
+  >
+>;
+type _PlainComponentRejectsDirective = Assert<
+  IsEqual<
+    DirectiveFitsProxySurface<typeof NoForwardingTarget, typeof tooltip>,
+    false
+  >
+>;
 
 // ────────────────────────────────────────────────────────────────
 // 15. DERIVATION — only inputs, setup returns Signal<T>

@@ -361,12 +361,15 @@ else:
 
 CHECK-REQUIRED-COMP
 ─────────────────────────────────────────────────
+forwarded_* are bindings delivered to this component element by WrapBindingPayload;
+for ordinary component elements they are ∅.
+
 ∀ k ∈ keys(B):
-  B[k] : InputSignal.required<T>    → k ∈ provided_inputs ∪ forwarded, otherwise D006
-  B[k] : ModelSignal.required<T>    → k ∈ provided_models ∪ forwarded, otherwise D006
+  B[k] : InputSignal.required<T>    → k ∈ provided_inputs ∪ forwarded_inputs, otherwise D006
+  B[k] : ModelSignal.required<T>    → k ∈ provided_models ∪ forwarded_models, otherwise D006
   B[k] : RequiredFragmentBinding<T> →
-    if k = "children": has_nested_content ∨ k ∈ forwarded, otherwise D006
-    else:              k ∈ provided_fragments ∪ forwarded, otherwise D006
+    if k = "children": has_nested_content ∨ k ∈ forwarded_fragments, otherwise D006
+    else:              k ∈ provided_fragments ∪ forwarded_fragments, otherwise D006
 ─────────────────────────────────────────────────
 
 
@@ -470,6 +473,7 @@ keys(Selected) ⊆ keys(B_Target)
 setup receives SetupBindings<Selected>
 providers receives Pick<Selected, input keys only>
 result : ComponentInstance<B_Target, E, S_Target, M>
+The wrapper inherits Target's proxy surface: P(result) = P(Target).
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -667,7 +671,7 @@ WrapBindingPayload(W, Target, Selected) =
   bindings in B(Target) not selected by component.wrap(Target, ...)
 
 WrapDirectivePayload(W) =
-  ProxyDirectivePayload(W) if P(W) ≠ never, otherwise ∅
+  ProxyDirectivePayload(W) if P(W) = P(Target) ≠ never, otherwise ∅
 
 WrapPayload(W, Target, Selected) = {
   bindings: WrapBindingPayload(W, Target, Selected),
@@ -691,6 +695,7 @@ Alternative control-flow branches are checked independently
 FORWARD-WRAP
 ─────────────────────────────────────────────────────────────────
 Enclosing wrapper W declared by component.wrap(Target, ...)
+P(W) = P(Target)
 For each component element with @forward(): element is Target
 WrapPayload = {
   bindings: WrapBindingPayload(W, Target, Selected),
@@ -699,7 +704,6 @@ WrapPayload = {
 Explicit bindings on each @forward() element override WrapBindingPayload for same key
 Each @forward() element receives WrapPayload.bindings and WrapPayload.directives
 if (WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never) ∧ no @forward() → error
-if P(W) ≠ never: P(Target) ⊑ P(W)
 WrapPayload is broadcast to every @forward() target in the checked render path
 Alternative control-flow branches are checked independently
 ─────────────────────────────────────────────────────────────────
@@ -936,7 +940,7 @@ LET
 | D011 | `once:model:*` or `once:on:*` | Error |
 | D012 | `once:prop` + `prop` duplicate on same element | Error |
 | D013 | Directive on non-proxy component | Error |
-| D014 | No `@forward()` when wrapper has a binding remainder or opted-in proxy surface | Error |
+| D014 | No `@forward()` when wrapper has a binding remainder or inherited proxy surface | Error |
 | D015 | `@forward()` element type not assignable to declared proxy surface S | Error |
 | D016 | Fragment argument count/type mismatch | Error |
 | D017 | `ref=` variable type incompatible with element/component/directive expose | Error |

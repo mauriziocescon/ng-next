@@ -579,6 +579,8 @@ export const Button = component.proxy<HTMLButtonElement>({
 
 ### Wrapping components
 
+Wrappers forward the target's remaining bindings; directives pass through only if the target already exposes a proxy surface.
+
 ```ts
 import { component, signal, input, computed } from '@angular/core';
 import { tooltip } from '@mylib/tooltip';
