@@ -258,7 +258,10 @@ use: directives use CHECK-DIRECTIVE-USE uniqueness
 NO-STATIC-DYNAMIC-CLASH
 ─────────────────────────────────────────────────
 ∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}
-  UNLESS native element and name ∈ {"class", "style"}
+
+class:* and style:* prefixed bindings may coexist with either a
+static attribute (class="...") or a dynamic binding (class={...})
+for the same base name on native elements.
 ─────────────────────────────────────────────────
 ```
 
