@@ -362,6 +362,7 @@ export interface DerivationInputNode extends BaseNode {
   type: 'DerivationInput';
   name: string;
   value: AST;
+  once: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────
