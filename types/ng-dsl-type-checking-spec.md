@@ -109,12 +109,125 @@ METHOD-CALL
 Γ ⊢ e.name(arg₁, ..., argₙ) : R
 
 
+BINARY-ARITHMETIC
+─────────────────────────────────────────────────
+Γ ⊢ left : L    Γ ⊢ right : R
+op ∈ {-, *, /, %}    L ⊑ number    R ⊑ number
+─────────────────────────────────────────────────
+Γ ⊢ left op right : number
+
+
+BINARY-ADD
+─────────────────────────────────────────────────
+Γ ⊢ left : L    Γ ⊢ right : R
+L ⊑ string ∨ R ⊑ string → result = string
+L ⊑ number ∧ R ⊑ number → result = number
+─────────────────────────────────────────────────
+Γ ⊢ left + right : result
+
+
+BINARY-COMPARISON
+─────────────────────────────────────────────────
+Γ ⊢ left : L    Γ ⊢ right : R
+op ∈ {==, !=, ===, !==, <, >, <=, >=}
+─────────────────────────────────────────────────
+Γ ⊢ left op right : boolean
+
+
+BINARY-LOGICAL-AND
+─────────────────────────────────────────────────
+Γ ⊢ left : L    Γ ⊢ right : R
+─────────────────────────────────────────────────
+Γ ⊢ left && right : (L & Falsy) | R
+  where Falsy = false | 0 | "" | null | undefined
+
+
+BINARY-LOGICAL-OR
+─────────────────────────────────────────────────
+Γ ⊢ left : L    Γ ⊢ right : R
+─────────────────────────────────────────────────
+Γ ⊢ left || right : NonNullable<L> | R
+
+
+BINARY-NULLISH-COALESCING
+─────────────────────────────────────────────────
+Γ ⊢ left : L    Γ ⊢ right : R
+─────────────────────────────────────────────────
+Γ ⊢ left ?? right : NonNullable<L> | R
+
+
+UNARY-NOT
+─────────────────────────────────────────────────
+Γ ⊢ e : T
+─────────────────────────────────────────────────
+Γ ⊢ !e : boolean
+
+
+UNARY-NEGATE
+─────────────────────────────────────────────────
+Γ ⊢ e : T    T ⊑ number
+─────────────────────────────────────────────────
+Γ ⊢ -e : number
+
+
+UNARY-PLUS
+─────────────────────────────────────────────────
+Γ ⊢ e : T
+─────────────────────────────────────────────────
+Γ ⊢ +e : number
+
+
+CONDITIONAL
+─────────────────────────────────────────────────
+Γ ⊢ cond : C    Γ ⊢ trueExpr : T    Γ ⊢ falseExpr : F
+─────────────────────────────────────────────────
+Γ ⊢ cond ? trueExpr : falseExpr : T | F
+
+
+LITERAL-ARRAY
+─────────────────────────────────────────────────
+Γ ⊢ eᵢ : Tᵢ  for i ∈ 1..n
+─────────────────────────────────────────────────
+Γ ⊢ [e₁, ..., eₙ] : (T₁ | ... | Tₙ)[]
+
+
+LITERAL-MAP
+─────────────────────────────────────────────────
+Γ ⊢ vᵢ : Tᵢ  for i ∈ 1..n    keys k₁..kₙ are string literals
+─────────────────────────────────────────────────
+Γ ⊢ { k₁: v₁, ..., kₙ: vₙ } : { k₁: T₁, ..., kₙ: Tₙ }
+
+
+KEYED-READ
+─────────────────────────────────────────────────
+Γ ⊢ e : T    Γ ⊢ key : K
+K is literal ∧ K ∈ keys(T)                          → T[K]
+K ⊑ number ∧ T has [n: number]: V                   → V
+K ⊑ string ∧ T has [s: string]: V                   → V
+otherwise                                            → error
+─────────────────────────────────────────────────
+Γ ⊢ e[key] : Result
+
+
+SAFE-KEYED-READ
+─────────────────────────────────────────────────
+Γ ⊢ e : T | null | undefined    Γ ⊢ key : K
+Result follows KEYED-READ rules on T
+─────────────────────────────────────────────────
+Γ ⊢ e?.[key] : Result | undefined
+
+
 TEXT-INTERPOLATION
 ─────────────────────────────────────────────────
 Γ ⊢ e : T    (any type — coerced to string at render)
 ─────────────────────────────────────────────────
 Γ ⊢ {e} ✓
 ```
+
+Template expressions are a subset of TypeScript expressions. The following are
+**not** permitted inside `{...}`: assignments (`=`, `+=`, etc.), `await`,
+`import()`, type assertions (`as`, `<T>`), `satisfies`, `new`, and declaration
+statements. Anything not covered by the rules above is a parse error.
 
 ### 2.1 Markup Literal Typing
 
