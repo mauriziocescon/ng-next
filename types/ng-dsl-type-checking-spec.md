@@ -425,13 +425,16 @@ NO-UNKNOWN-COMP-BINDINGS
 
 ### 4.1 once: Binding
 
+`once:` is valid on any input binding — component inputs, directive inputs, and
+derivation inputs.
+
 ```
 ONCE-BINDING
 ─────────────────────────────────────────────────
-once: applies ONLY to inputs (InputSignal)
+once: applies ONLY to inputs (InputSignal) — on components, directives, or derivations
 once:model:*  → error
 once:on:*     → error
-once:prop + prop on same element → duplicate error
+once:prop + prop on same element/directive/derivation → duplicate error
 ─────────────────────────────────────────────────
 ```
 
