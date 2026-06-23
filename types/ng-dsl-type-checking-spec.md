@@ -312,6 +312,8 @@ C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 ∀ output ∈ node.outputs: CHECK-COMP-OUTPUT(Γ, B, output)
 ∀ frag ∈ node.fragments where frag.origin = "explicit":
   CHECK-COMP-FRAGMENT(Γ, B, frag)
+∀ frag ∈ node.fragments where frag.origin = "implicitChildren":
+  Γ ⊢ frag.children ✓
 ∀ ref ∈ node.references: CHECK-COMP-REF(Γ, E, ref)
 ∀ dir ∈ node.directives: CHECK-COMP-DIRECTIVE(Γ, C, S, dir)
 CHECK-REQUIRED-COMP(B, node)
