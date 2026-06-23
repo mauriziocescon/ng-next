@@ -81,11 +81,9 @@ export interface ForwardMarkerNode extends BaseNode {
 }
 
 /**
- * Nested DOM content is lowered by the parser into a synthetic
- * FragmentNode { name: 'children', parameters: [], children: [...] }
- * appended to the `fragments` array. There is no separate `children`
- * field — implicit children and explicit @fragment declarations
- * share the same representation.
+ * Nested DOM content is lowered into a synthetic FragmentNode named
+ * "children" and appended to `fragments`. Explicit @fragment declarations use
+ * the same node shape, with `origin` preserving the authoring form.
  */
 export interface ElementNode extends BaseNode {
   type: 'Element';
@@ -203,6 +201,7 @@ export interface DirectiveBindingNode extends BaseNode {
   inputs: DirectiveInputNode[];
   outputs: DirectiveOutputNode[];
   models: DirectiveModelNode[];
+  fragments: FragmentNode[];
   when?: DirectiveWhenNode;
   ref?: RefNode;
   keySpan?: SourceSpan;
@@ -372,6 +371,7 @@ export interface DerivationInputNode extends BaseNode {
 export interface FragmentNode extends BaseNode {
   type: 'Fragment';
   name: string;
+  origin: 'explicit' | 'implicitChildren';
   parameters: FragmentParameterNode[];
   children: TemplateNode[];
 }

@@ -285,13 +285,14 @@ C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 ∀ input ∈ node.inputs:   CHECK-COMP-INPUT(Γ, B, input)
 ∀ model ∈ node.models:   CHECK-COMP-MODEL(Γ, B, model)
 ∀ output ∈ node.outputs: CHECK-COMP-OUTPUT(Γ, B, output)
-∀ frag ∈ node.fragments: CHECK-COMP-FRAGMENT(Γ, B, frag)
+∀ frag ∈ node.fragments where frag.origin = "explicit":
+  CHECK-COMP-FRAGMENT(Γ, B, frag)
 ∀ ref ∈ node.references: CHECK-COMP-REF(Γ, E, ref)
 ∀ dir ∈ node.directives: CHECK-COMP-DIRECTIVE(Γ, C, S, dir)
 CHECK-REQUIRED-COMP(B, node)
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
-NO-UNKNOWN-BINDINGS(B, node)
+NO-UNKNOWN-COMP-BINDINGS(B, node)
 CHILDREN-IMPLICIT-ONLY(node)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ <C ...> ✓
@@ -371,12 +372,12 @@ CHECK-REQUIRED-COMP
 
 CHILDREN-IMPLICIT-ONLY
 ─────────────────────────────────────────────────
-No explicit component binding may target "children" → D035.
+No explicit component binding or explicit @fragment may target "children" → D035.
 Nested content is the only direct authoring form for a children fragment.
 ─────────────────────────────────────────────────
 
 
-NO-UNKNOWN-BINDINGS
+NO-UNKNOWN-COMP-BINDINGS
 ─────────────────────────────────────────────────
 ∀ attr ∈ node.attributes:  attr.name ∈ keys(B)
 ∀ input ∈ node.inputs:   input.name ∈ keys(B)
@@ -534,7 +535,7 @@ UNIQUE:       D appears at most once on each element in R_host
 
 ∀ frag ∈ dir.fragments: CHECK-DIR-FRAGMENT(Γ, B_D, frag)
 CHECK-REQUIRED-DIR(B_D, dir)
-NO-UNKNOWN-BINDINGS(B_D, dir)
+NO-UNKNOWN-DIR-BINDINGS(B_D, dir)
 
 if dir.when:
   Γ ⊢ dir.when.condition : boolean
@@ -599,10 +600,21 @@ CHECK-REQUIRED-DIR
 CHECK-DIR-FRAGMENT
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B_D)
+frag.name ≠ "children"; otherwise D035
 B_D[frag.name] : FragmentBinding<T>
 frag.parameters match FragmentArgs<T> positionally, otherwise D016
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
 Γ' ⊢ frag.children ✓
+─────────────────────────────────────────────────
+```
+
+```
+NO-UNKNOWN-DIR-BINDINGS
+─────────────────────────────────────────────────
+∀ input ∈ dir.inputs:   input.name ∈ keys(B_D)
+∀ model ∈ dir.models:   model.name ∈ keys(B_D)
+∀ output ∈ dir.outputs: output.name ∈ keys(B_D)
+∀ frag ∈ dir.fragments: frag.name ∈ keys(B_D)
 ─────────────────────────────────────────────────
 ```
 
@@ -643,6 +655,27 @@ For each directive identity D:
 
 ## 7. @forward() Marker
 
+Forwarding keeps binding payloads and directive payloads separate:
+
+```
+PAYLOAD-DEFS
+─────────────────────────────────────────────────────────────────
+ProxyDirectivePayload(C) =
+  directives written on a <C ...> call-site element where P(C) ≠ never
+
+WrapBindingPayload(W, Target, Selected) =
+  bindings in B(Target) not selected by component.wrap(Target, ...)
+
+WrapDirectivePayload(W) =
+  ProxyDirectivePayload(W) if P(W) ≠ never, otherwise ∅
+
+WrapPayload(W, Target, Selected) = {
+  bindings: WrapBindingPayload(W, Target, Selected),
+  directives: WrapDirectivePayload(W),
+}
+─────────────────────────────────────────────────────────────────
+```
+
 ```
 FORWARD-PROXY
 ─────────────────────────────────────────────────────────────────
@@ -650,21 +683,24 @@ Enclosing component declared by component.proxy<S>(...)
 For each native element with @forward(): H = I(tag)
 H ⊑ S   (each placement compatible with declared proxy surface)
 If no @forward() placement exists → error
-Forwarding payload is broadcast to every @forward() target in the checked render path
+ProxyDirectivePayload is broadcast to every @forward() target in the checked render path
 Alternative control-flow branches are checked independently
 ─────────────────────────────────────────────────────────────────
 
 
 FORWARD-WRAP
 ─────────────────────────────────────────────────────────────────
-Enclosing component declared by component.wrap(Target, ...)
+Enclosing wrapper W declared by component.wrap(Target, ...)
 For each component element with @forward(): element is Target
-Remainder = B(Target) \ Selected
-Explicit bindings on each @forward() element override Remainder for same key
-Each @forward() element receives Remainder and any inherited proxy payload
-if (|Remainder| > 0 ∨ P(Target) ≠ never) ∧ no @forward() → error
-if any @forward() exists: P(result) = P(Target)
-Forwarding payload is broadcast to every @forward() target in the checked render path
+WrapPayload = {
+  bindings: WrapBindingPayload(W, Target, Selected),
+  directives: WrapDirectivePayload(W),
+}
+Explicit bindings on each @forward() element override WrapBindingPayload for same key
+Each @forward() element receives WrapPayload.bindings and WrapPayload.directives
+if (WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never) ∧ no @forward() → error
+if P(W) ≠ never: P(Target) ⊑ P(W)
+WrapPayload is broadcast to every @forward() target in the checked render path
 Alternative control-flow branches are checked independently
 ─────────────────────────────────────────────────────────────────
 
@@ -678,7 +714,7 @@ Marked node cannot consume the enclosing component's forwarding payload
 
 COLLISION-PRECEDENCE
 ─────────────────────────────────────────────────────────────────
-∀ key ∈ (Explicit ∩ Remainder):
+∀ key ∈ (ExplicitBindings ∩ WrapBindingPayload):
   Explicit wins regardless of source order.
   Applies uniformly to all binding kinds.
 ─────────────────────────────────────────────────────────────────
@@ -688,7 +724,7 @@ FORWARD-TARGETS
 ─────────────────────────────────────────────────────────────────
 FORWARD-TARGETS(C) = @forward() placements reachable in the checked render path of T(C)
 If multiple @forward() placements are reachable in the same render path,
-the forwarding payload is delivered to all of them.
+the relevant ProxyDirectivePayload or WrapPayload is delivered to all of them.
 If @forward() placements are in alternative control-flow branches, each branch
 must independently satisfy the same compatibility and payload rules.
 ─────────────────────────────────────────────────────────────────
@@ -709,12 +745,8 @@ D : DerivationInstance<B_D, T>
   B_D[input.name] : InputSignal<T_k>
   Γ ⊢ input.value : U    U ⊑ T_k
 
-node.models = ∅, otherwise D040
-node.outputs = ∅, otherwise D040
-node.fragments = ∅, otherwise D040
-node.directives = ∅, otherwise D040
 CHECK-REQUIRED-DERIVE(B_D, node)
-NO-UNKNOWN-BINDINGS(B_D, node)
+NO-UNKNOWN-DERIVE-BINDINGS(B_D, node)
 
 Γ' = Γ ∪ { node.name : Signal<T> }
 ─────────────────────────────────────────────────────────────────
@@ -728,6 +760,14 @@ CHECK-REQUIRED-DERIVE
 ─────────────────────────────────────────────────────────────────
 ∀ k ∈ keys(B_D):
   B_D[k] : InputSignal.required<T> → k ∈ provided_inputs, otherwise D039
+─────────────────────────────────────────────────────────────────
+```
+
+```
+NO-UNKNOWN-DERIVE-BINDINGS
+─────────────────────────────────────────────────────────────────
+∀ input ∈ node.inputs: input.name ∈ keys(B_D)
+Any non-input binding form in @derive(...) source syntax → D040
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -896,7 +936,7 @@ LET
 | D011 | `once:model:*` or `once:on:*` | Error |
 | D012 | `once:prop` + `prop` duplicate on same element | Error |
 | D013 | Directive on non-proxy component | Error |
-| D014 | No `@forward()` when wrapper has a binding remainder or inherited proxy payload | Error |
+| D014 | No `@forward()` when wrapper has a binding remainder or opted-in proxy surface | Error |
 | D015 | `@forward()` element type not assignable to declared proxy surface S | Error |
 | D016 | Fragment argument count/type mismatch | Error |
 | D017 | `ref=` variable type incompatible with element/component/directive expose | Error |
@@ -915,7 +955,7 @@ LET
 | D032 | Wrapper selected binding type is not exactly the target type | Error |
 | D033 | `providers` reads model/output/fragment bindings | Error |
 | D034 | Component setup does not return `TemplateMarkup` or `{ template }` | Error |
-| D035 | Explicit `children` binding on a component element | Error |
+| D035 | Explicit `children` binding or explicit `@fragment children()` | Error |
 | D036 | Inline `@fragment` has no matching parent fragment binding or conflicts with explicit same-name binding | Error |
 | D037 | Duplicate inline `@fragment` name under the same parent component | Error |
 | D038 | Missing required directive input/model/fragment | Error |
@@ -1403,6 +1443,13 @@ component({
     <p>Body</p>
   }
 </Card>
+
+<button use:withPreview(
+  @fragment children() {
+//          ~~~~~~~~ D035: Inline @fragment cannot target reserved 'children'.
+    <span>Preview</span>
+  }
+) />
 ```
 
 #### D036 — Inline fragment has no matching parent binding
