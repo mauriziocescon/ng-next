@@ -1166,11 +1166,12 @@ const Card = component({
   },
 });
 
-// ❌ "title" is required but not provided
+// ❌ "title" is required but not provided; "content" fragment is also missing
 <Card>
   <p>Body</p>
 </Card>
 // D006: Required input 'title' is not provided for 'Card'.
+// D006: Required fragment 'content' is not provided for 'Card'.
 ```
 
 #### D007 — Type mismatch
