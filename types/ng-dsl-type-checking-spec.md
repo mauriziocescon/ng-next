@@ -186,7 +186,7 @@ U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-frag.name ≠ "children"                              → D035
+frag.name ≠ "children"                              → D033
 B[frag.name] : FragmentBinding<T>
 frag.parameters match FragmentArgs<T> positionally  → D016
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
@@ -206,7 +206,7 @@ CHECK-REQUIRED(B, provided, context_label)
     if k = "children": has_nested_content (components only)
     else:              k ∈ provided_fragments
 
-Violation → D006 (component), D038 (directive), D039 (derivation)
+Violation → D006 (component), D036 (directive), D037 (derivation)
 ─────────────────────────────────────────────────
 ```
 
@@ -282,7 +282,7 @@ once:prop + prop on same target → D012
 ```
 ON-PREFIX-WARNING
 ─────────────────────────────────────────────────
-∀ binding name starting with "on" in B → D021 (warning)
+∀ binding name starting with "on" in B → D020 (warning)
 ─────────────────────────────────────────────────
 ```
 
@@ -295,7 +295,7 @@ ELEMENT-RESOLUTION
 ─────────────────────────────────────────────────────────────────
 tag ∈ IntrinsicElements           → INTRINSIC-ELEMENT
 tag ∉ IntrinsicElements ∧ resolve(tag, Γ) ≠ ∅ → COMPONENT-ELEMENT (§5)
-tag ∉ IntrinsicElements ∧ resolve(tag, Γ) = ∅ → D041
+tag ∉ IntrinsicElements ∧ resolve(tag, Γ) = ∅ → D039
 ─────────────────────────────────────────────────────────────────
 
 
@@ -379,8 +379,8 @@ AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction; }
 
 ANIMATE-CONSTRAINTS
 ─────────────────────────────────────────────────
-- applies ONLY to native elements (not components → D023)
-- phase must be "enter" or "leave" → D024
+- applies ONLY to native elements (not components → D021)
+- phase must be "enter" or "leave" → D022
 - at most one animate:enter and one animate:leave (class form) per element
 - at most one on:animate:enter and one on:animate:leave per element
 - both phases and both forms (class + event) can coexist on the same element
@@ -436,7 +436,7 @@ else:
 
 CHILDREN-IMPLICIT-ONLY
 ─────────────────────────────────────────────────
-No explicit binding or explicit @fragment may target "children" → D035.
+No explicit binding or explicit @fragment may target "children" → D033.
 Only non-fragment direct child content provides children.
 ─────────────────────────────────────────────────
 ```
@@ -456,13 +456,13 @@ where M : TemplateMarkup<TAst>
 PROVIDERS-INPUTS-ONLY
 ─────────────────────────────────────────────────────────────────
 providers receives Pick<B, input keys only>.
-Models, outputs, and fragments are excluded → D033.
+Models, outputs, and fragments are excluded → D031.
 
 
 RESERVED-CHILDREN-BINDING
 ─────────────────────────────────────────────────────────────────
 if "children" ∈ keys(B):  B["children"] : FragmentBinding<T>
-otherwise → D029
+otherwise → D027
 
 
 PROXY-SURFACE
@@ -690,7 +690,7 @@ D : DerivationInstance<B_D, T>
 ∀ input ∈ node.inputs:  CHECK-INPUT(Γ, B_D, input)
 CHECK-REQUIRED(B_D, provided, "derivation")
 NO-UNKNOWN-BINDINGS(B_D, node)
-Any non-input binding form → D040
+Any non-input binding form → D038
 
 Γ' = Γ ∪ { node.name : Signal<T> }
 ─────────────────────────────────────────────────────────────────
@@ -711,7 +711,7 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
-name ≠ "children"                                    → D035
+name ≠ "children"                                    → D033
 parameters match FragmentArgs<T> positionally        → D016
 Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
 Γ' ⊢ children ✓
@@ -729,10 +729,10 @@ child-list where declared.
 
 **Implicit (inline):** `@fragment name(...) { ... }` as direct child of a
 component element — auto-passed to the matching binding. Rules:
-- Parent must have binding `name: FragmentBinding<T>` → D036
-- name ≠ "children" → D035
-- No explicit binding with the same name exists → D036
-- No duplicate implicit fragment with the same name → D037
+- Parent must have binding `name: FragmentBinding<T>` → D034
+- name ≠ "children" → D033
+- No explicit binding with the same name exists → D034
+- No duplicate implicit fragment with the same name → D035
 - Not part of implicit children
 
 **Implicit children:** Non-fragment direct child content inside
@@ -845,29 +845,27 @@ BindingKind<V> =
 | D016 | Fragment argument count/type mismatch | Error |
 | D017 | `ref=` variable type incompatible with expose | Error |
 | D018 | Unresolved identifier in template expression | Error |
-| D020 | `model:` on non-modelable native element | Error |
-| D021 | `on`-prefixed binding name | Warning |
-| D023 | `animate:` on component element | Error |
-| D024 | Invalid animate phase (not `enter`/`leave`) | Error |
-| D025 | Duplicate `animate:enter` or `animate:leave` class binding | Error |
-| D026 | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
-| D027 | `animate:` expression type mismatch (not `string \| string[]`) | Error |
-| D028 | `on:animate:` handler type mismatch | Error |
-| D029 | Reserved `children` binding is not a fragment | Error |
-| D030 | Wrapper selects binding key not in target | Error |
-| D031 | Wrapper selected binding kind differs from target | Error |
-| D032 | Wrapper selected binding type not exactly target type | Error |
-| D033 | `providers` reads model/output/fragment bindings | Error |
-| D034 | Setup does not return `TemplateMarkup` or `{ template }` | Error |
-| D035 | Explicit `children` binding or explicit `@fragment children()` | Error |
-| D036 | Implicit fragment has no matching parent binding or conflicts | Error |
-| D037 | Duplicate implicit fragment name under same parent | Error |
-| D038 | Missing required directive input/model/fragment | Error |
-| D039 | Missing required derivation input | Error |
-| D040 | Derivation uses non-input binding form | Error |
-| D041 | Unresolved element (neither intrinsic nor in scope) | Error |
-
-`D019` and `D022` are retired. `D019` merged into `D041`; `D022` superseded by `D002`.
+| D019 | `model:` on non-modelable native element | Error |
+| D020 | `on`-prefixed binding name | Warning |
+| D021 | `animate:` on component element | Error |
+| D022 | Invalid animate phase (not `enter`/`leave`) | Error |
+| D023 | Duplicate `animate:enter` or `animate:leave` class binding | Error |
+| D024 | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
+| D025 | `animate:` expression type mismatch (not `string \| string[]`) | Error |
+| D026 | `on:animate:` handler type mismatch | Error |
+| D027 | Reserved `children` binding is not a fragment | Error |
+| D028 | Wrapper selects binding key not in target | Error |
+| D029 | Wrapper selected binding kind differs from target | Error |
+| D030 | Wrapper selected binding type not exactly target type | Error |
+| D031 | `providers` reads model/output/fragment bindings | Error |
+| D032 | Setup does not return `TemplateMarkup` or `{ template }` | Error |
+| D033 | Explicit `children` binding or explicit `@fragment children()` | Error |
+| D034 | Implicit fragment has no matching parent binding or conflicts | Error |
+| D035 | Duplicate implicit fragment name under same parent | Error |
+| D036 | Missing required directive input/model/fragment | Error |
+| D037 | Missing required derivation input | Error |
+| D038 | Derivation uses non-input binding form | Error |
+| D039 | Unresolved element (neither intrinsic nor in scope) | Error |
 
 ### 14.1 Diagnostic Examples
 
@@ -949,56 +947,56 @@ const child = ref<HTMLDivElement>();
 // D018 — unresolved identifier
 <h1>{userName}</h1> // ❌ D018
 
-// D020 — model: on non-modelable element
-<div model:value={text}>X</div> // ❌ D020
+// D019 — model: on non-modelable element
+<div model:value={text}>X</div> // ❌ D019
 
-// D021 — on-prefix warning
-bindings: { onSubmit: output<void>() } // ⚠️ D021
+// D020 — on-prefix warning
+bindings: { onSubmit: output<void>() } // ⚠️ D020
 
-// D023–D028 — animate violations
-<Card animate:enter={'fade'} />             // ❌ D023: not native
-<div animate:show={'fade'}>X</div>          // ❌ D024: invalid phase
-<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D025
-<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D026
-<div animate:enter={42}>X</div>             // ❌ D027: number not assignable
-<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D028
+// D021–D026 — animate violations
+<Card animate:enter={'fade'} />             // ❌ D021: not native
+<div animate:show={'fade'}>X</div>          // ❌ D022: invalid phase
+<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D023
+<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D024
+<div animate:enter={42}>X</div>             // ❌ D025: number not assignable
+<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D026
 
-// D029 — children is not a fragment
-bindings: { children: input<string>() } // ❌ D029
+// D027 — children is not a fragment
+bindings: { children: input<string>() } // ❌ D027
 
-// D030–D032 — wrapper selection errors
-component.wrap(Target, { bindings: { role: input<string>() } })   // ❌ D030
-component.wrap(Target, { bindings: { save: input<void>() } })     // ❌ D031
-component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ D032
+// D028–D030 — wrapper selection errors
+component.wrap(Target, { bindings: { role: input<string>() } })   // ❌ D028
+component.wrap(Target, { bindings: { save: input<void>() } })     // ❌ D029
+component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ D030
 
-// D033 — providers reads non-input
-providers: (inputs) => { inputs.selected; return []; } // ❌ D033
+// D031 — providers reads non-input
+providers: (inputs) => { inputs.selected; return []; } // ❌ D031
 
-// D034 — invalid setup return
-component({ setup: () => ({ expose: {} }) }) // ❌ D034
+// D032 — invalid setup return
+component({ setup: () => ({ expose: {} }) }) // ❌ D032
 
-// D035 — explicit children
-<Card children={body} />  // ❌ D035
-<Card>@fragment children() { <p>X</p> }</Card> // ❌ D035
+// D033 — explicit children
+<Card children={body} />  // ❌ D033
+<Card>@fragment children() { <p>X</p> }</Card> // ❌ D033
 
-// D036 — no matching parent fragment binding
-<Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D036
+// D034 — no matching parent fragment binding
+<Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D034
 
-// D037 — duplicate inline fragment
+// D035 — duplicate inline fragment
 <List>
   @fragment row(i: Item) { <span>{i.name}</span> }
-  @fragment row(i: Item) { <b>{i.name}</b> }  // ❌ D037
+  @fragment row(i: Item) { <b>{i.name}</b> }  // ❌ D035
 </List>
 
-// D038 — missing required directive input
-<button use:tooltip()>Save</button> // ❌ D038: 'message' required
+// D036 — missing required directive input
+<button use:tooltip()>Save</button> // ❌ D036: 'message' required
 
-// D039 — missing required derivation input
-@derive total = price(); // ❌ D039: 'item' required
+// D037 — missing required derivation input
+@derive total = price(); // ❌ D037: 'item' required
 
-// D040 — derivation non-input binding
-@derive total = price(model:item={x}); // ❌ D040
+// D038 — derivation non-input binding
+@derive total = price(model:item={x}); // ❌ D038
 
-// D041 — unresolved element
-<FancyCard title={'hello'} /> // ❌ D041
+// D039 — unresolved element
+<FancyCard title={'hello'} /> // ❌ D039
 ```
