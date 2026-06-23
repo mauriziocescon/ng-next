@@ -186,9 +186,9 @@ U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-frag.name ≠ "children"                              → D028
+frag.name ≠ "children"; otherwise D028
 B[frag.name] : FragmentBinding<T>
-frag.parameters match FragmentArgs<T> positionally  → D027
+frag.parameters match FragmentArgs<T> positionally; otherwise D027
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
 Γ' ⊢ frag.children ✓
 ─────────────────────────────────────────────────
@@ -548,7 +548,7 @@ Alternative control-flow branches checked independently
 
 FORWARD-INVALID
 ─────────────────────────────────────────────────────────────────
-Marked node cannot consume enclosing component's payload → error
+Marked node cannot consume enclosing component's payload → D041
 
 
 COLLISION-PRECEDENCE
@@ -859,6 +859,8 @@ BindingKind<V> =
 | D024 | Forwarding | Wrapper selects binding key not in target | Error |
 | D025 | Forwarding | Wrapper selected binding kind differs from target | Error |
 | D026 | Forwarding | Wrapper selected binding type not exactly target type | Error |
+| D040 | Forwarding | No `@forward()` in proxy component | Error |
+| D041 | Forwarding | `@forward()` placement cannot consume enclosing payload | Error |
 | D027 | Fragments | Fragment argument count/type mismatch | Error |
 | D028 | Fragments | Explicit `children` binding or explicit `@fragment children()` | Error |
 | D029 | Fragments | Implicit fragment has no matching parent binding or conflicts | Error |
@@ -872,7 +874,7 @@ BindingKind<V> =
 | D037 | Animate | `on:animate:` handler type mismatch | Error |
 | D038 | Derivation | Missing required derivation input | Error |
 | D039 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
-| D040 | Forwarding | No `@forward()` in proxy component | Error |
+
 ### 14.1 Diagnostic Examples
 
 One example per diagnostic — just enough to show the violation.
