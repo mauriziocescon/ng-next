@@ -119,12 +119,9 @@ METHOD-CALL
 
 TEXT-INTERPOLATION
 ─────────────────────────────────────────────────
-Γ ⊢ e : T    T ⊑ Stringifiable
+Γ ⊢ e : T
 ─────────────────────────────────────────────────
 Γ ⊢ {e} ✓
-
-where Stringifiable = string | number | boolean | null | undefined
-                    | { toString(): string }
 ```
 
 ### 2.1 Markup Literal Typing
@@ -157,7 +154,7 @@ H = I(tag)
 ∀ output ∈ node.outputs:     CHECK-NATIVE-OUTPUT(Γ, H, output)
 ∀ model ∈ node.models:       CHECK-NATIVE-MODEL(Γ, H, model)
 ∀ anim ∈ node.animations:   CHECK-ANIMATE-BINDING(Γ, anim)
-∀ dir ∈ node.directives:     CHECK-DIRECTIVE-USE(Γ, H, dir)
+∀ dir ∈ node.directives:     CHECK-DIRECTIVE-USE(Γ, H, {node}, dir)
 ∀ ref ∈ node.references:     CHECK-NATIVE-REF(Γ, H, ref)
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
@@ -219,21 +216,25 @@ style:prop={expr}
 ─────────────────────────────────────────────────
 ```
 
-### 3.2 Native Binding Constraints
+### 3.2 Binding Identity Constraints
 
 ```
 NO-DUPLICATE-BINDINGS
 ─────────────────────────────────────────────────
 ∀ name: |{b ∈ inputs ∪ models | b.name = name}| ≤ 1
 ∀ name: |{b ∈ outputs | b.name = name}| ≤ 1
-class: and style: bindings are EXEMPT (repeatable)
+∀ name: |{b ∈ fragments | b.name = name}| ≤ 1
+|references| ≤ 1
+class: and style: bindings are repeatable
+animate: and on:animate: use ANIMATE-CONSTRAINTS
+use: directives use CHECK-DIRECTIVE-USE uniqueness
 ─────────────────────────────────────────────────
 
 
 NO-STATIC-DYNAMIC-CLASH
 ─────────────────────────────────────────────────
 ∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}
-  UNLESS name ∈ {"class", "style"}
+  UNLESS native element and name ∈ {"class", "style"}
 ─────────────────────────────────────────────────
 ```
 
@@ -287,10 +288,12 @@ C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 ∀ output ∈ node.outputs: CHECK-COMP-OUTPUT(Γ, B, output)
 ∀ frag ∈ node.fragments: CHECK-COMP-FRAGMENT(Γ, B, frag)
 ∀ ref ∈ node.references: CHECK-COMP-REF(Γ, E, ref)
-∀ dir ∈ node.directives: CHECK-COMP-DIRECTIVE(Γ, S, dir)
+∀ dir ∈ node.directives: CHECK-COMP-DIRECTIVE(Γ, C, S, dir)
 CHECK-REQUIRED(B, node)
 NO-DUPLICATE-BINDINGS(node)
+NO-STATIC-DYNAMIC-CLASH(node)
 NO-UNKNOWN-BINDINGS(B, node)
+CHILDREN-CONFLICT(node)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ <C ...> ✓
 
@@ -350,7 +353,8 @@ CHECK-COMP-DIRECTIVE
 if S = never:
   node.directives must be ∅   (error: no forwarding support)
 else:
-  ∀ dir: CHECK-DIRECTIVE-USE(Γ, S, dir)
+  R = FORWARD-TARGETS(C)
+  ∀ dir: CHECK-DIRECTIVE-USE(Γ, S, R, dir)
 ─────────────────────────────────────────────────
 
 
@@ -361,6 +365,12 @@ CHECK-REQUIRED
   B[k] : ModelSignal.required<T>    → k ∈ provided_models ∪ forwarded
   B[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments ∪ forwarded
                                       ∨ (k = "children" ∧ has_nested_content)
+─────────────────────────────────────────────────
+
+
+CHILDREN-CONFLICT
+─────────────────────────────────────────────────
+has_nested_content → no explicit children binding
 ─────────────────────────────────────────────────
 
 
@@ -503,7 +513,7 @@ D = resolve(dir.directiveName, Γ)
 D : DirectiveInstance<H_D, B_D, E_D>
 
 HOST-COMPAT:  H_host ⊑ H_D
-UNIQUE:       D not already applied to this element/component
+UNIQUE:       D appears at most once on each element in R_host
 
 ∀ input ∈ dir.inputs:
   input.name ∈ keys(B_D)
@@ -534,6 +544,9 @@ if dir.ref:
 Γ ⊢ use:D(...) ✓
 ```
 
+`H_host` is the resolved host type from `NATIVE-HOST` or `PROXY-SURFACE-HOST`.
+`R_host` is the resolved host element set.
+
 ### 6.1 Host Compatibility
 
 ```
@@ -559,6 +572,27 @@ P(C) = never → directive on component tag is an error
 ─────────────────────────────────────────────────
 ```
 
+### 6.2 Resolved Host Element
+
+A directive is unique per resolved host element. Native applications resolve to
+the element itself. Proxy and wrapped-proxy applications resolve to the native
+`@forward()` placement(s). Directives written directly on that native element
+and directives delivered through a proxy all participate in the same uniqueness
+check.
+
+```
+RESOLVED-HOSTS
+─────────────────────────────────────────────────
+Native element N:
+  H_host = I(tag(N))
+  R_host = {N}
+
+Component element C:
+  H_host = P(C)
+  R_host = FORWARD-TARGETS(C)
+─────────────────────────────────────────────────
+```
+
 ---
 
 ## 7. @forward() Marker
@@ -567,20 +601,24 @@ P(C) = never → directive on component tag is an error
 FORWARD-PROXY
 ─────────────────────────────────────────────────────────────────
 Enclosing component declared by component.proxy<S>(...)
-Template has exactly one native element with @forward()
-That element is native: H = I(tag)
-H ⊑ S   (actual element compatible with declared proxy surface)
+For each native element with @forward(): H = I(tag)
+H ⊑ S   (each placement compatible with declared proxy surface)
+If no @forward() placement exists → error
+Forwarding payload is broadcast to every active @forward() target
 ─────────────────────────────────────────────────────────────────
 
 
 FORWARD-WRAP
 ─────────────────────────────────────────────────────────────────
 Enclosing component declared by component.wrap(Target, ...)
-Template has at most one <Target @forward() .../>
+For each component element with @forward(): element is Target
 Remainder = B(Target) \ Selected
-Explicit bindings on @forward() element override Remainder for same key
-if |Remainder| > 0 ∧ no @forward() → error
-if @forward() exists: P(result) = P(Target)
+Explicit bindings on each @forward() element override Remainder for same key
+Each @forward() element receives Remainder and any inherited proxy payload
+if (|Remainder| > 0 ∨ P(Target) ≠ never) ∧ no @forward() → error
+if any @forward() exists: P(result) = P(Target)
+Forwarding payload is broadcast to every active @forward() target
+Alternative control-flow branches are checked independently
 ─────────────────────────────────────────────────────────────────
 
 
@@ -596,6 +634,14 @@ COLLISION-PRECEDENCE
 ∀ key ∈ (Explicit ∩ Remainder):
   Explicit wins regardless of source order.
   Applies uniformly to all binding kinds.
+─────────────────────────────────────────────────────────────────
+
+
+FORWARD-TARGETS
+─────────────────────────────────────────────────────────────────
+FORWARD-TARGETS(C) = active @forward() placements in T(C)
+If multiple @forward() placements are active in the same render path,
+the forwarding payload is delivered to all of them.
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -635,10 +681,13 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
+Parent component P has binding name: FragmentBinding<T>
+No explicit fragment binding with the same name exists on P
+No other inline @fragment with the same name exists under the same P
 Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
 Γ' ⊢ children ✓
 
-Fragment is auto-passed to matching fragment binding on parent component.
+The fragment is auto-passed to P[name].
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -648,6 +697,7 @@ Fragment is auto-passed to matching fragment binding on parent component.
 IMPLICIT-CHILDREN
 ─────────────────────────────────────────────────────────────────
 Nested content inside <Component>...</Component>
+No explicit children binding exists on the same component element
 Lowered to FragmentNode { name: "children", parameters: [] }
 Satisfies `children: fragment<void>()` or `children: fragment.required<void>()`
 ─────────────────────────────────────────────────────────────────
@@ -758,11 +808,11 @@ LET
 | `class:` | native | Yes | Conditional class |
 | `style:` | native | Yes | Conditional style |
 | `animate:` | native | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native, proxy comp, wrapped proxy comp | Yes (diff dirs) | Same directive only once per final element |
+| `use:` | native, proxy comp, wrapped proxy comp | Yes (diff dirs) | Same directive only once per resolved host element |
 | `:when` | `use:` directive | No (per dir) | Condition must be `boolean` |
 | `:ref` | `use:` directive | No (per dir) | Target must match directive expose |
 | `ref` | native, component | No | Target must match element/component expose |
-| `@forward()` | compatible native or wrapped component target | No | Forwarding payload placement marker |
+| `@forward()` | compatible native or wrapped component target | Yes, if each placement conforms | Forwarding payload placement marker |
 
 ---
 
@@ -773,25 +823,23 @@ LET
 | D001 | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
 | D002 | Unknown attribute/property on native element | Error |
 | D003 | Unknown binding on component | Error |
-| D004 | Duplicate binding (same name, same kind) | Error |
+| D004 | Duplicate binding identity | Error |
 | D005 | Static attribute + dynamic binding clash (same name) | Error |
 | D006 | Missing required input/model/fragment | Error |
 | D007 | Type mismatch (expression not assignable to binding type) | Error |
 | D008 | `model:` bound to non-writable signal | Error |
-| D009 | Directive host incompatible with element/forwarded type | Error |
-| D010 | Same directive applied twice to same element | Error |
+| D009 | Directive host incompatible with element/proxy surface | Error |
+| D010 | Same directive applied twice to same resolved host element | Error |
 | D011 | `once:model:*` or `once:on:*` | Error |
 | D012 | `once:prop` + `prop` duplicate on same element | Error |
 | D013 | Directive on non-proxy component | Error |
-| D014 | No `@forward()` when wrapper remainder is non-empty | Error |
+| D014 | No `@forward()` when wrapper has a binding remainder or inherited proxy payload | Error |
 | D015 | `@forward()` element type not assignable to declared proxy surface S | Error |
 | D016 | Fragment argument count/type mismatch | Error |
 | D017 | `ref=` variable type incompatible with element/component/directive expose | Error |
 | D018 | Unresolved identifier in template expression | Error |
-| D019 | Text interpolation `{e}` where e is not Stringifiable | Error |
 | D020 | `model:` on native element that is not input/select/textarea | Error |
 | D021 | `on`-prefixed input/model/output binding name | Warning |
-| D022 | Multiple `@forward()` in same template | Error |
 | D023 | `animate:` used on component element (not native) | Error |
 | D024 | `animate:` with invalid phase (not `enter` or `leave`) | Error |
 | D025 | Duplicate `animate:enter` or `animate:leave` class binding on same element | Error |
@@ -883,7 +931,7 @@ const UserDetail = component({
 //                      ~~~~ D003: 'role' is not a known binding of 'UserDetail'.
 ```
 
-#### D004 — Duplicate binding (same name, same kind)
+#### D004 — Duplicate binding identity
 
 ```ts
 // ❌ "disabled" bound twice
@@ -964,13 +1012,25 @@ const inputMask = directive({
 #### D010 — Same directive applied twice
 
 ```ts
-// ❌ tooltip appears twice on the same element
+// ❌ tooltip appears twice on the same resolved host element
 <button
   use:tooltip(message={'First'})
   use:tooltip(message={'Second'})>
-//~~~~~~~~~~~~ D010: Directive 'tooltip' is already applied to this element.
+//~~~~~~~~~~~~ D010: Directive 'tooltip' is already applied to this resolved host element.
   Click
 </button>
+```
+
+Proxying is just another path to the same resolved host element:
+
+```ts
+const Button = component.proxy<HTMLButtonElement>({
+  setup: () => @{ <button @forward()>Click</button> },
+});
+
+// ❌ both tooltip instances land on Button's internal <button>
+<Button use:tooltip(message={'First'}) use:tooltip(message={'Second'}) />
+//      ~~~~~~~~~~~~~ D010: Directive 'tooltip' is already applied to this resolved host element.
 ```
 
 #### D011 — once:model: or once:on:
@@ -1005,16 +1065,16 @@ const Plain = component({
 //                  ~~~~~~~~~~~~ D013: Cannot apply directive to 'Plain': component does not expose a proxy surface.
 ```
 
-#### D014 — No @forward() when wrapper remainder is non-empty
+#### D014 — No @forward() when wrapper has a payload
 
 ```ts
 // ❌ Wrapper selects "user" but Target has "email" and "makeAdmin" that need forwarding
 const Broken = component.wrap(UserDetail, {
   bindings: { user: input.required<User>() },
   setup: ({ user }) => @{
-    // Missing @forward() — remaining bindings have nowhere to go
+    // Missing @forward() — wrapper payload has nowhere to go
     <UserDetail user={user()} />
-//  D014: Component wraps 'UserDetail' but template has no '@forward()' target for remaining bindings: 'email', 'makeAdmin'.
+//  D014: Component wraps 'UserDetail' but template has no '@forward()' target for payload: 'email', 'makeAdmin'.
   },
 });
 ```
@@ -1080,16 +1140,6 @@ export const App = component({
 });
 ```
 
-#### D019 — Text interpolation with non-Stringifiable type
-
-```ts
-const data = signal({ x: 1, y: 2 });
-
-// ❌ {x: number, y: number} has no toString() override — not Stringifiable
-<p>{data()}</p>
-//  ~~~~~~ D019: Type '{ x: number; y: number }' is not assignable to 'Stringifiable'.
-```
-
 #### D020 — model: on non-modelable native element
 
 ```ts
@@ -1110,20 +1160,6 @@ const Form = component({
   },
 });
 // D021 (warning): Binding name 'onSubmit' starts with 'on'. Consider renaming to 'submit' to avoid confusion with event syntax.
-```
-
-#### D022 — Multiple @forward() in same template
-
-```ts
-const Broken = component.proxy<HTMLElement>({
-  bindings: { label: input.required<string>() },
-  setup: ({ label }) => @{
-    // ❌ Two @forward() markers
-    <div @forward()>{label()}</div>
-    <span @forward()>extra</span>
-//        ~~~~~~~~~~ D022: Only one '@forward()' is allowed per component template.
-  },
-});
 ```
 
 #### D023 — `animate:` on component element
@@ -1273,11 +1309,6 @@ FragmentArgs<T> =
 
 Narrow(T) = Exclude<T, null | undefined | false | 0 | "">
 
-
-Stringifiable = string | number | boolean | null | undefined
-              | { toString(): string }
-
-
 BindingKind<V> =
   V extends ModelSignal<any>         → model
   V extends InputSignal<any>         → input
@@ -1295,7 +1326,8 @@ BindingKind<V> =
    property values inside a `bindings` object. The compiler rejects them in any
    other syntactic position (setup body, providers factory, file scope, helper
    functions).
-2. **Single @forward()**: At most one per component template.
+2. **Forward placement conformance**: Every `@forward()` placement must be able
+   to consume the forwarding payload declared by the enclosing component API.
 3. **Scope containment**: `@derive` and `@let` names are block-scoped to their
    enclosing control-flow block.
 4. **Ref availability**: Refs resolve after `afterNextRender` — reading before yields `undefined`.
