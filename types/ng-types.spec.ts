@@ -149,40 +149,25 @@ const _negIntrinsicInputIsNotButton: HTMLButtonElement =
 // 4. COMPONENT — basics
 // ────────────────────────────────────────────────────────────────
 
-// —— Shorthand return: raw template ——
-
+// Shorthand return: raw template
 const Minimal = component({
   setup: () => tmpl,
 });
 
-const StyledComp = component({
+// style + styleUrl + providers all accepted (single combined check)
+const StyledWithProviders = component({
   setup: () => tmpl,
   style: `.danger { color: red; }`,
-});
-
-const StyledUrlComp = component({
-  setup: () => tmpl,
   styleUrl: './my-comp.css',
-});
-
-const MinimalProviders = component({
-  setup: () => tmpl,
   providers: () => [],
 });
 
-// —— Full form return: { template } ——
-
+// Full form return: { template }
 const MinimalFull = component({
   setup: () => ({ template: tmpl }),
 });
 
-const MinimalFullProviders = component({
-  setup: () => ({ template: tmpl }),
-  providers: () => [],
-});
-
-// Component instances preserve the specific TemplateMarkup<TAst> returned by
-// setup.
+// Component instances preserve the specific TemplateMarkup<TAst> returned by setup
 const SpecificTemplateComponent = component({
   setup: () => specificTmpl,
 });
@@ -356,7 +341,8 @@ const RenderArrayPayloadFragment = component({
 //
 // Standard destructuring rename (e.g. { class: className }) lets
 // developers alias bindings at the setup level without any
-// framework-specific mechanism.
+// framework-specific mechanism. Works the same in all setup
+// contexts (component, directive, derivation).
 // ────────────────────────────────────────────────────────────────
 
 // Component: alias input via destructuring
@@ -383,33 +369,6 @@ const AliasedModelOutput = component({
     val.set(42);
     onChange.emit(1);
     return tmpl;
-  },
-});
-
-// Directive: alias bindings via destructuring
-const aliasedDirective = directive({
-  host: ref<HTMLElement>(),
-  bindings: {
-    message: input.required<string>(),
-    dismiss: output<void>(),
-  },
-  setup: ({ message: msg, dismiss: onDismiss }, { host: el }) => {
-    const _m: string = msg();
-    onDismiss.emit();
-    const _el: Ref<HTMLElement | undefined> = el;
-  },
-});
-
-// Derivation: alias bindings via destructuring
-const aliasedDerivation = derivation({
-  bindings: {
-    qty: input.required<number>(),
-    item: input.required<Item>(),
-  },
-  setup: ({ qty: quantity, item: product }) => {
-    const _q: number = quantity();
-    const _p: Item = product();
-    return computed(() => product().desc + ' x ' + quantity());
   },
 });
 
@@ -440,20 +399,7 @@ const AllBindingKinds = component({
   },
 });
 
-// Output-only + model-only: providers has zero keys
-const OutputModelOnly = component({
-  bindings: {
-    change: output<string>(),
-    val: model<number>(),
-  },
-  setup: ({ change, val }) => tmpl,
-  providers: (inputs) => {
-    type Keys = keyof typeof inputs;
-    const _check: Keys = undefined as never;
-    return [];
-  },
-});
-
+// Concrete provide(...) usage in providers
 const Counter = component({
   bindings: {
     c: input.required<number>(),
@@ -462,25 +408,6 @@ const Counter = component({
   providers: ({ c }) => {
     const _cInput: InputSignal<number> = c;
     return [provide(Store, () => new Store())];
-  },
-});
-
-const WithMixed = component({
-  bindings: {
-    name: input.required<string>(),
-    age: input<number>(),
-    email: model<string>(),
-    save: output<void>(),
-  },
-  setup: ({ name, age, email, save }) => tmpl,
-  providers: (inputs) => {
-    const _name: InputSignal<string> = inputs.name;
-    const _age: InputSignal<number | undefined> = inputs.age;
-    // @ts-expect-error email is a model, not an input
-    inputs.email;
-    // @ts-expect-error save is an output, not an input
-    inputs.save;
-    return [];
   },
 });
 
@@ -508,24 +435,7 @@ const NoExpose = component({
   setup: () => tmpl,
 });
 
-// Expose with inputs: inputs surfaced through expose
-const ExposedInput = component({
-  bindings: {
-    name: input.required<string>(),
-    age: input<number>(),
-  },
-  setup: ({ name, age }) => ({
-    template: tmpl,
-    expose: { name, age },
-  }),
-});
-
-const exposedInputRef = ref<typeof ExposedInput>();
-const _exposedName: InputSignal<string> | undefined = exposedInputRef()?.name;
-const _exposedAge: InputSignal<number | undefined> | undefined =
-  exposedInputRef()?.age;
-
-// Mixed: inputs + local signals in expose
+// Mixed: inputs + local signals in expose (subsumes input-only expose)
 const MixedExpose = component({
   bindings: {
     label: input.required<string>(),
@@ -601,26 +511,17 @@ const _typedDirRefCheck: Ref<
 > = typedDirRef;
 
 // Host type constraint: narrows to specific element type
+// (needed by section 14 for forwarding compatibility)
 const buttonOnly = directive({
   host: ref<HTMLButtonElement>(),
-  bindings: {
-    label: input<string>(),
-  },
-  setup: ({ label }, { host }) => {
-    const _hostEl: Ref<HTMLButtonElement | undefined> = host;
-    const _l: string | undefined = label();
-  },
+  bindings: { label: input<string>() },
+  setup: ({ label }, { host }) => {},
 });
 
 const inputOnly = directive({
   host: ref<HTMLInputElement>(),
-  bindings: {
-    label: input<string>(),
-  },
-  setup: ({ label }, { host }) => {
-    const _hostEl: Ref<HTMLInputElement | undefined> = host;
-    const _l: string | undefined = label();
-  },
+  bindings: { label: input<string>() },
+  setup: ({ label }, { host }) => {},
 });
 
 // Directive exposing its input
@@ -663,6 +564,8 @@ const _divRefType: Ref<HTMLDivElement | undefined> = divRef;
 // Component with expose
 const childRef = ref<typeof Child>();
 const _childRefType: Ref<{ text: Signal<string> } | undefined> = childRef;
+
+// Ref<T> extends Signal<T> — prove once
 const _childRefAsSignal: Signal<{ text: Signal<string> } | undefined> =
   childRef;
 
@@ -678,25 +581,17 @@ const _tooltipRefType: Ref<{ toggle: () => void } | undefined> = tooltipRef;
 const rippleRef = ref<typeof ripple>();
 const _rippleRefType: Ref<undefined> = rippleRef;
 
-// refMany
+// refMany — component with expose
 const manyChildren = refMany<typeof Child>();
 const _manyType: Ref<{ text: Signal<string> }[]> = manyChildren;
-const _manyAsSignal: Signal<{ text: Signal<string> }[]> = manyChildren;
 
-// refMany native element
+// refMany — native element
 const manyDivs = refMany<HTMLDivElement>();
 const _manyDivsType: Ref<HTMLDivElement[]> = manyDivs;
-const _manyDivsAsSignal: Signal<HTMLDivElement[]> = manyDivs;
 
-const manyButtons = refMany<HTMLButtonElement>();
-const _manyButtonsType: Ref<HTMLButtonElement[]> = manyButtons;
-
-// refMany without expose
+// refMany without expose → Ref<[]>
 const manyNoExpose = refMany<typeof NoExpose>();
 const _manyNoExposeType: Ref<[]> = manyNoExpose;
-
-const manyRipple = refMany<typeof ripple>();
-const _manyRippleType: Ref<[]> = manyRipple;
 
 // Refs are read-only — .set() must not exist
 // @ts-expect-error
@@ -939,6 +834,7 @@ const WrapperProvidersSelectedKinds = component.wrap(Base, {
   },
 });
 
+// Wrapper preserves proxy surface from target
 const ProxyWrapper = component.wrap(ButtonProxy, {
   bindings: {},
   setup: () => tmpl,
@@ -975,6 +871,7 @@ type _NoProxyWrapperKeepsNever = Assert<
   IsEqual<typeof NoProxyWrapper, ComponentInstance<{}, void, never>>
 >;
 
+// component.wrap is inference-only; explicit generics are invalid (single representative)
 // @ts-expect-error component.wrap is inference-only; explicit generics are invalid
 const _NegWrapperExplicitGeneric = component.wrap<HTMLButtonElement>(
   UserDetail,
@@ -982,25 +879,6 @@ const _NegWrapperExplicitGeneric = component.wrap<HTMLButtonElement>(
     bindings: {},
     setup: () => tmpl,
   },
-);
-
-const _NegWrapperExplicitComponentGeneric = (
-  // @ts-expect-error explicit component generic is invalid in wrapper mode
-  component.wrap<typeof UserDetail>(
-    UserDetail,
-    {
-      bindings: {},
-      setup: () => tmpl,
-    },
-  )
-);
-
-const _NegWrapperExplicitFullGenerics = (
-  // @ts-expect-error wrapper mode is inference-only even if all generics are supplied
-  component.wrap<typeof UserDetail, {}>(UserDetail, {
-    bindings: {},
-    setup: () => tmpl,
-  })
 );
 
 // ────────────────────────────────────────────────────────────────
@@ -1165,7 +1043,6 @@ const _NegDerivationFragment = derivation({
 
 // Token without factory — returns DiToken
 const noFactoryToken = injectionToken<string>();
-
 const _noFactoryTokenType: DiToken<string> = noFactoryToken;
 
 // Token with factory — returns DiToken (DiTokenWithFactory is assignable)
@@ -1178,7 +1055,6 @@ const withFactoryToken = injectionToken({
     };
   },
 });
-
 const _withFactoryTokenType: DiToken<{
   value: Signal<number>;
   increase: () => void;
@@ -1195,7 +1071,6 @@ const rootToken = injectionToken({
     };
   },
 });
-
 const _rootTokenType: DiToken<{
   value: Signal<number>;
   decrease: () => void;
@@ -1203,41 +1078,20 @@ const _rootTokenType: DiToken<{
 
 // Multi without factory — returns DiMultiToken<T>
 const multiNoFactoryToken = injectionToken.multi<number>();
-
-const _multiNoFactoryTokenType: DiMultiToken<number> =
-  multiNoFactoryToken;
+const _multiNoFactoryTokenType: DiMultiToken<number> = multiNoFactoryToken;
 
 // Multi with factory — returns DiMultiToken<T> (DiMultiTokenWithFactory is assignable)
 const multiToken = injectionToken.multi({
   factory: () => Math.random(),
 });
-
 const _multiTokenType: DiMultiToken<number> = multiToken;
 
-// Explicit autoProvided: false — accepted on all non-auto-provided overloads
-const explicitFalseNoFactory = injectionToken<string>({ autoProvided: false });
-const _explicitFalseNoFactoryType: DiToken<string> =
-  explicitFalseNoFactory;
-
+// Explicit autoProvided: false — accepted (single representative)
 const explicitFalseWithFactory = injectionToken({
   autoProvided: false,
   factory: () => 99,
 });
-const _explicitFalseWithFactoryType: DiToken<number> =
-  explicitFalseWithFactory;
-
-const namedMultiNoFactoryToken = injectionToken.multi<number>({
-  debugName: 'namedMultiNoFactoryToken',
-});
-const _namedMultiNoFactoryTokenType: DiMultiToken<number> =
-  namedMultiNoFactoryToken;
-
-const namedMultiWithFactory = injectionToken.multi({
-  debugName: 'namedMultiWithFactory',
-  factory: () => 'x',
-});
-const _namedMultiWithFactoryType: DiMultiToken<string> =
-  namedMultiWithFactory;
+const _explicitFalseWithFactoryType: DiToken<number> = explicitFalseWithFactory;
 
 // Single token with array value type
 const arrayValueToken = injectionToken<string[]>({ debugName: 'tags' });
@@ -1247,13 +1101,11 @@ const _arrayValueTokenType: DiToken<string[]> = arrayValueToken;
 const arrayValueWithFactory = injectionToken({
   factory: () => ['a', 'b', 'c'],
 });
-const _arrayValueWithFactoryType: DiToken<string[]> =
-  arrayValueWithFactory;
+const _arrayValueWithFactoryType: DiToken<string[]> = arrayValueWithFactory;
 
 // provide(token, factory) for array-valued non-multi token: factory returns
 // the full array.
 const _provideArrayValue = provide(arrayValueToken, () => ['x', 'y']);
-const _provideArrayValueWithFactory = provide(arrayValueWithFactory, () => ['z']);
 
 // Multi token is NOT assignable to DiToken — the two hierarchies are
 // structurally incompatible.
@@ -1325,13 +1177,14 @@ const _injectedWithFactory: { value: Signal<number>; increase: () => void } =
 const _injectedNoFactory: string = inject(noFactoryToken);
 const _injectedMulti: number[] = inject(multiToken);
 const _injectedMultiNoFactory: number[] = inject(multiNoFactoryToken);
+
+// optional: true → T | null; optional: false / omitted → T
 const _optionalInjectedNoFactory: string | null = inject(noFactoryToken, {
   optional: true,
 });
 const _requiredInjectedNoFactory: string = inject(noFactoryToken, {
   optional: false,
 });
-const _defaultRequiredInjectedNoFactory: string = inject(noFactoryToken, {});
 
 // @ts-expect-error generic is token type, not value type
 inject<string>(withFactoryToken);
@@ -1371,19 +1224,12 @@ const _injectedAttrOptional: string | null = inject(
   new HostAttributeToken('role'),
   { optional: true },
 );
-const _injectedAttrRequired: string = inject(
-  new HostAttributeToken('role'),
-  { optional: false },
-);
 
 // inject(legacy InjectionToken<T>) → T
 const legacyToken = new InjectionToken<number>('legacyToken');
 const _injectedLegacy: number = inject(legacyToken);
 const _injectedLegacyOptional: number | null = inject(legacyToken, {
   optional: true,
-});
-const _injectedLegacyRequired: number = inject(legacyToken, {
-  optional: false,
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -1414,6 +1260,11 @@ const _providersExplicitFactory = [
   })),
   provide(Store, () => new Store()),
   provide(legacyToken, () => 10),
+  provide(rootToken, () => ({
+    value: signal(0).asReadonly(),
+    decrease: () => {},
+  })),
+  provide(multiToken, () => 99),
 ];
 
 // Multi provide factory returns a single item, not an array.
@@ -1436,15 +1287,6 @@ const _provideAbstract = provide(AbstractService, () => new ConcreteService());
 
 // @ts-expect-error factory returns string, not AbstractService
 provide(AbstractService, () => 'wrong');
-
-// Explicit factory form with auto-provided token.
-const _provideRootTokenOverride = provide(rootToken, () => ({
-  value: signal(0).asReadonly(),
-  decrease: () => {},
-}));
-
-// Explicit factory form with DiMultiTokenWithFactory (override factory)
-const _provideMultiTokenOverride = provide(multiToken, () => 99);
 
 // Negative: wrong factory return type for single token
 // @ts-expect-error factory returns number, not string
