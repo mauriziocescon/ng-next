@@ -64,8 +64,8 @@ Lookup priority: Γ_template > Γ_setup > Γ_module > Γ_global
 First match wins.
 ```
 
-- `Γ_template`: `@let`, `@derive`, `@for` item + context variables,
-  `@fragment` parameters, `@if` aliases
+- `Γ_template`: `@let`, `@derive`, `@fragment` declarations and parameters,
+  `@for` item + context variables, `@if` aliases
 - `Γ_setup`: variables/functions in the lexical setup scope captured by the
   `@{ ... }` markup literal
 - `Γ_module`: top-level imports, constants, enums, interfaces
@@ -137,6 +137,19 @@ TAst : TemplateAST
 `TemplateMarkup<TAst>` is opaque nominal markup. It is assignable to the
 generic `TemplateMarkup` API, but a generic `TemplateMarkup` must not be
 treated as a specific `TemplateMarkup<TAst>`.
+
+### 2.2 Template Tree Traversal
+
+```
+CHECK-NODES
+─────────────────────────────────────────────────────────────────
+∀ node ∈ nodes:
+  Γ ⊢ node ✓
+
+Whenever a node owns child TemplateNode[] lists, the checker applies
+CHECK-NODES to those children under the node's scoped Γ.
+─────────────────────────────────────────────────────────────────
+```
 
 ---
 
@@ -309,8 +322,11 @@ string ⊑ T
 CHECK-COMP-INPUT
 ─────────────────────────────────────────────────
 input.name ∈ keys(B)
-B[input.name] : InputSignal<T>
-Γ ⊢ input.value : U    U ⊑ T
+if B[input.name] : InputSignal<T>:
+  Γ ⊢ input.value : U    U ⊑ T
+if B[input.name] : FragmentBinding<T>:
+  input.name ≠ "children"
+  Γ ⊢ input.value : U    U ⊑ FragmentBinding<T>
 ─────────────────────────────────────────────────
 
 
@@ -354,7 +370,7 @@ CHECK-COMP-DIRECTIVE
 if S = never:
   node.directives must be ∅   (error: no forwarding support)
 else:
-  R = FORWARD-TARGETS(C)
+  R = RESOLVED-FORWARD-HOSTS(C)
   ∀ dir: CHECK-DIRECTIVE-USE(Γ, S, R, dir)
 ─────────────────────────────────────────────────
 
@@ -363,6 +379,8 @@ CHECK-REQUIRED-COMP
 ─────────────────────────────────────────────────
 forwarded_* are bindings delivered to this component element by WrapBindingPayload;
 for ordinary component elements they are ∅.
+provided_fragments includes explicit fragment prop bindings and direct-child
+implicit fragment props.
 
 ∀ k ∈ keys(B):
   B[k] : InputSignal.required<T>    → k ∈ provided_inputs ∪ forwarded_inputs, otherwise D006
@@ -376,7 +394,7 @@ for ordinary component elements they are ∅.
 CHILDREN-IMPLICIT-ONLY
 ─────────────────────────────────────────────────
 No explicit component binding or explicit @fragment may target "children" → D035.
-Nested content is the only direct authoring form for a children fragment.
+Non-fragment direct child content is the only authoring form for children.
 ─────────────────────────────────────────────────
 
 
@@ -625,10 +643,10 @@ NO-UNKNOWN-DIR-BINDINGS
 ### 6.3 Resolved Host Element
 
 A directive is unique per resolved host element. Native applications resolve to
-the element itself. Proxy and wrapped-proxy applications resolve to the native
-`@forward()` placement(s). Directives written directly on that native element
-and directives delivered through a proxy all participate in the same uniqueness
-check.
+the element itself. Proxy and wrapped-proxy applications resolve to the final
+native `@forward()` placement(s), following every wrapper hop. Directives
+written directly on that native element and directives delivered through a proxy
+all participate in the same uniqueness check.
 
 ```
 RESOLVED-HOSTS
@@ -639,7 +657,25 @@ Native element N:
 
 Component element C:
   H_host = P(C)
-  R_host = FORWARD-TARGETS(C)
+  R_host = RESOLVED-FORWARD-HOSTS(C)
+─────────────────────────────────────────────────
+
+
+RESOLVED-FORWARD-HOSTS
+─────────────────────────────────────────────────
+Native element N:
+  RESOLVED-FORWARD-HOSTS(N) = {N}
+
+Component C declared by component.proxy<S>(...):
+  FORWARD-TARGETS(C) are native elements
+  ∀ N ∈ FORWARD-TARGETS(C): I(tag(N)) ⊑ S
+  RESOLVED-FORWARD-HOSTS(C) = FORWARD-TARGETS(C)
+
+Wrapper W declared by component.wrap(Target, ...):
+  P(W) = P(Target)
+  FORWARD-TARGETS(W) are component elements whose element is Target
+  RESOLVED-FORWARD-HOSTS(W) =
+    ⋃ RESOLVED-FORWARD-HOSTS(Target) for each target placement
 ─────────────────────────────────────────────────
 
 
@@ -677,6 +713,9 @@ WrapPayload(W, Target, Selected) = {
   bindings: WrapBindingPayload(W, Target, Selected),
   directives: WrapDirectivePayload(W),
 }
+
+Directive payloads must pass through every wrapper hop in the chain and
+ultimately resolve to native hosts in RESOLVED-FORWARD-HOSTS(Target).
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -711,7 +750,7 @@ Alternative control-flow branches are checked independently
 
 FORWARD-INVALID
 ─────────────────────────────────────────────────────────────────
-Marked node cannot consume the enclosing component's forwarding payload
+Marked node cannot consume the enclosing component's binding/directive payload
 → error
 ─────────────────────────────────────────────────────────────────
 
@@ -731,6 +770,8 @@ If multiple @forward() placements are reachable in the same render path,
 the relevant ProxyDirectivePayload or WrapPayload is delivered to all of them.
 If @forward() placements are in alternative control-flow branches, each branch
 must independently satisfy the same compatibility and payload rules.
+Directive host checks use RESOLVED-FORWARD-HOSTS(C), not the intermediate
+component placements.
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -779,7 +820,7 @@ Any non-input binding form in @derive(...) source syntax → D040
 
 ## 9. Fragment & @render
 
-### 9.1 Inline @fragment Definition
+### 9.1 @fragment Declaration and Scope
 
 ```
 FRAGMENT-DEF
@@ -787,30 +828,70 @@ FRAGMENT-DEF
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
 name ≠ "children"; otherwise D035
-Parent component P has binding name: FragmentBinding<T>; otherwise D036
-No explicit fragment binding with the same name exists on P; otherwise D036
-No other inline @fragment with the same name exists under the same P; otherwise D037
 parameters match FragmentArgs<T> positionally, otherwise D016
 Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
 Γ' ⊢ children ✓
 
-The fragment is auto-passed to P[name].
+The declaration introduces name : FragmentBinding<T> in its lexical template scope.
+The name is visible to sibling nodes in that scope and to their descendants.
+It is not visible outside the child-list where it is declared.
 ─────────────────────────────────────────────────────────────────
 ```
 
-### 9.2 Implicit children
+`@fragment` declarations may be rendered locally with `@render(name(...))` or
+passed explicitly as component fragment bindings.
+
+### 9.2 Explicit Fragment Props
+
+```
+EXPLICIT-FRAGMENT-PROP
+─────────────────────────────────────────────────────────────────
+<Component fragmentName={fragmentValue} />
+
+Component has binding fragmentName: FragmentBinding<T>
+fragmentName ≠ "children"; otherwise D035
+Γ ⊢ fragmentValue : U
+U ⊑ FragmentBinding<T>
+─────────────────────────────────────────────────────────────────
+```
+
+### 9.3 Implicit Fragment Props
+
+```
+IMPLICIT-FRAGMENT-PROP
+─────────────────────────────────────────────────────────────────
+@fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
+appears as a direct child of component element P
+
+P has binding name: FragmentBinding<T>; otherwise D036
+name ≠ "children"; otherwise D035
+No explicit fragment binding with the same name exists on P; otherwise D036
+No other direct-child @fragment with the same name exists under P; otherwise D037
+parameters match FragmentArgs<T> positionally, otherwise D016
+
+The fragment is auto-passed to P[name].
+It is not part of P["children"].
+─────────────────────────────────────────────────────────────────
+```
+
+### 9.4 Implicit Children
 
 ```
 IMPLICIT-CHILDREN
 ─────────────────────────────────────────────────────────────────
-Nested content inside <Component>...</Component>
+Non-fragment direct child content inside <Component>...</Component>
+P has binding children: FragmentBinding<void>; otherwise D036
 No explicit children binding exists on the same component element
-Lowered to FragmentNode { name: "children", parameters: [] }
+Lowered to FragmentNode { name: "children", origin: "implicitChildren", parameters: [] }
 Satisfies `children: fragment<void>()` or `children: fragment.required<void>()`
+
+Direct-child inline @fragment declarations are separate explicit fragment
+bindings. They never become implicit children. Only non-fragment direct child
+content contributes to the implicit children fragment.
 ─────────────────────────────────────────────────────────────────
 ```
 
-### 9.3 @render Invocation
+### 9.5 @render Invocation
 
 ```
 RENDER
@@ -960,8 +1041,8 @@ LET
 | D033 | `providers` reads model/output/fragment bindings | Error |
 | D034 | Component setup does not return `TemplateMarkup` or `{ template }` | Error |
 | D035 | Explicit `children` binding or explicit `@fragment children()` | Error |
-| D036 | Inline `@fragment` has no matching parent fragment binding or conflicts with explicit same-name binding | Error |
-| D037 | Duplicate inline `@fragment` name under the same parent component | Error |
+| D036 | Implicit fragment prop has no matching parent fragment binding or conflicts with explicit same-name binding | Error |
+| D037 | Duplicate implicit fragment prop name under the same parent component | Error |
 | D038 | Missing required directive input/model/fragment | Error |
 | D039 | Missing required derivation input | Error |
 | D040 | Derivation uses a non-input binding form | Error |
@@ -1558,12 +1639,13 @@ BindingKind<V> =
    other syntactic position (setup body, providers factory, file scope, helper
    functions).
 2. **Forward placement conformance**: Every `@forward()` placement must be able
-   to consume the forwarding payload declared by the enclosing component API.
+   to consume the binding payload and/or directive payload declared by the
+   enclosing component API.
 3. **Scope containment**: `@derive` and `@let` names are block-scoped to their
    enclosing control-flow block.
 4. **Ref availability**: Refs resolve after `afterNextRender` — reading before yields `undefined`.
-5. **Implicit children**: Nested content auto-satisfies `children` fragment
-   binding. Cannot also bind `children=` explicitly.
+5. **Implicit children**: Non-fragment direct child content auto-satisfies
+   `children` fragment binding. Cannot also bind `children=` explicitly.
 6. **Derivation is view-scoped**: Each `@derive` instance follows the lifecycle
    of its enclosing embedded view. In `@for`, each iteration owns an independent
    instance.
