@@ -118,7 +118,7 @@ METHOD-CALL
 
 TEXT-INTERPOLATION
 ─────────────────────────────────────────────────
-Γ ⊢ e : T
+Γ ⊢ e : T    (any type — coerced to string at render time)
 ─────────────────────────────────────────────────
 Γ ⊢ {e} ✓
 ```
@@ -191,7 +191,8 @@ input.name ∈ Props(H)    Props(H)[input.name] = T
 CHECK-NATIVE-OUTPUT
 ─────────────────────────────────────────────────
 output.name ∈ Events(H)    Events(H)[output.name] = Event<T>
-Γ ⊢ output.handler : (e: T) → void
+Γ ⊢ output.handler : U
+U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 ─────────────────────────────────────────────────
 
 
@@ -342,7 +343,9 @@ CHECK-COMP-OUTPUT
 ─────────────────────────────────────────────────
 output.name ∈ keys(B)
 B[output.name] : OutputEmitterRef<T>
-Γ ⊢ output.handler : (e: T) → void
+Γ ⊢ output.handler : U
+U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
+─────────────────────────────────────────────────
 ─────────────────────────────────────────────────
 
 
@@ -548,7 +551,7 @@ UNIQUE:       D appears at most once on each element in R_host
 ∀ output ∈ dir.outputs:
   output.name ∈ keys(B_D)
   B_D[output.name] : OutputEmitterRef<T>
-  Γ ⊢ output.handler : (e: T) → void
+  Γ ⊢ output.handler : U    U ⊑ ((e: T) → void)
 
 ∀ model ∈ dir.models:
   model.name ∈ keys(B_D)
@@ -984,6 +987,8 @@ LET
 ─────────────────────────────────────────────────
 Γ ⊢ @let name = expr;   producing Γ'
 ```
+
+---
 
 ## 12. Binding Prefix & Modifier Validation
 
