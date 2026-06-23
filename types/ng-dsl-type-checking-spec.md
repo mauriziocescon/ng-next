@@ -35,7 +35,6 @@ for conformance, while **may** describes implementation freedom.
 | `T(C)` | Template markup type of component C |
 | `H(D)` | Host element type of directive D |
 | `P(C)` | Proxy surface type of component C (`never` if none) |
-| `W(C)` | Wrapped target of component C (`never` if not a wrapper) |
 | `I(tag)` | Intrinsic element host type (e.g. `I("button") = HTMLButtonElement`) |
 | `⊑` | Assignability (subtype) |
 | `≡` | Exact type equality |
@@ -362,11 +361,11 @@ else:
 CHECK-REQUIRED-COMP
 ─────────────────────────────────────────────────
 ∀ k ∈ keys(B):
-  B[k] : InputSignal.required<T>    → k ∈ provided_inputs ∪ forwarded
-  B[k] : ModelSignal.required<T>    → k ∈ provided_models ∪ forwarded
+  B[k] : InputSignal.required<T>    → k ∈ provided_inputs ∪ forwarded, otherwise D006
+  B[k] : ModelSignal.required<T>    → k ∈ provided_models ∪ forwarded, otherwise D006
   B[k] : RequiredFragmentBinding<T> →
-    if k = "children": has_nested_content ∨ k ∈ forwarded
-    else:              k ∈ provided_fragments ∪ forwarded
+    if k = "children": has_nested_content ∨ k ∈ forwarded, otherwise D006
+    else:              k ∈ provided_fragments ∪ forwarded, otherwise D006
 ─────────────────────────────────────────────────
 
 
@@ -533,6 +532,7 @@ UNIQUE:       D appears at most once on each element in R_host
   B_D[model.name] : ModelSignal<T>
   Γ ⊢ model.value : WritableSignal<T>
 
+∀ frag ∈ dir.fragments: CHECK-DIR-FRAGMENT(Γ, B_D, frag)
 CHECK-REQUIRED-DIR(B_D, dir)
 NO-UNKNOWN-BINDINGS(B_D, dir)
 
@@ -549,6 +549,14 @@ if dir.ref:
 
 `H_host` is the resolved host type from `NATIVE-HOST` or `PROXY-SURFACE-HOST`.
 `R_host` is the resolved host element set.
+
+Directive fragment syntax is local to the directive application:
+
+```
+use:D(
+  @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
+)
+```
 
 ### 6.1 Host Compatibility
 
@@ -581,9 +589,20 @@ P(C) = never → directive on component tag is an error
 CHECK-REQUIRED-DIR
 ─────────────────────────────────────────────────
 ∀ k ∈ keys(B_D):
-  B_D[k] : InputSignal.required<T>    → k ∈ provided_inputs
-  B_D[k] : ModelSignal.required<T>    → k ∈ provided_models
-  B_D[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments
+  B_D[k] : InputSignal.required<T>    → k ∈ provided_inputs, otherwise D038
+  B_D[k] : ModelSignal.required<T>    → k ∈ provided_models, otherwise D038
+  B_D[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments, otherwise D038
+─────────────────────────────────────────────────
+```
+
+```
+CHECK-DIR-FRAGMENT
+─────────────────────────────────────────────────
+frag.name ∈ keys(B_D)
+B_D[frag.name] : FragmentBinding<T>
+frag.parameters match FragmentArgs<T> positionally, otherwise D016
+Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
+Γ' ⊢ frag.children ✓
 ─────────────────────────────────────────────────
 ```
 
@@ -606,6 +625,18 @@ Component element C:
   H_host = P(C)
   R_host = FORWARD-TARGETS(C)
 ─────────────────────────────────────────────────
+
+
+DIRECTIVE-SET-UNIQUENESS
+─────────────────────────────────────────────────
+For each resolved host element H:
+  LocalDirs(H)    = directives written directly on H
+  ForwardedDirs(H) = directives delivered from proxy/wrapped component call sites to H
+  AppliedDirs(H) = LocalDirs(H) ++ ForwardedDirs(H)   (ordered multiset)
+
+For each directive identity D:
+  count(D, AppliedDirs(H)) ≤ 1, otherwise D010
+─────────────────────────────────────────────────
 ```
 
 ---
@@ -619,7 +650,8 @@ Enclosing component declared by component.proxy<S>(...)
 For each native element with @forward(): H = I(tag)
 H ⊑ S   (each placement compatible with declared proxy surface)
 If no @forward() placement exists → error
-Forwarding payload is broadcast to every active @forward() target
+Forwarding payload is broadcast to every @forward() target in the checked render path
+Alternative control-flow branches are checked independently
 ─────────────────────────────────────────────────────────────────
 
 
@@ -632,7 +664,7 @@ Explicit bindings on each @forward() element override Remainder for same key
 Each @forward() element receives Remainder and any inherited proxy payload
 if (|Remainder| > 0 ∨ P(Target) ≠ never) ∧ no @forward() → error
 if any @forward() exists: P(result) = P(Target)
-Forwarding payload is broadcast to every active @forward() target
+Forwarding payload is broadcast to every @forward() target in the checked render path
 Alternative control-flow branches are checked independently
 ─────────────────────────────────────────────────────────────────
 
@@ -654,9 +686,11 @@ COLLISION-PRECEDENCE
 
 FORWARD-TARGETS
 ─────────────────────────────────────────────────────────────────
-FORWARD-TARGETS(C) = active @forward() placements in T(C)
-If multiple @forward() placements are active in the same render path,
+FORWARD-TARGETS(C) = @forward() placements reachable in the checked render path of T(C)
+If multiple @forward() placements are reachable in the same render path,
 the forwarding payload is delivered to all of them.
+If @forward() placements are in alternative control-flow branches, each branch
+must independently satisfy the same compatibility and payload rules.
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -675,6 +709,10 @@ D : DerivationInstance<B_D, T>
   B_D[input.name] : InputSignal<T_k>
   Γ ⊢ input.value : U    U ⊑ T_k
 
+node.models = ∅, otherwise D040
+node.outputs = ∅, otherwise D040
+node.fragments = ∅, otherwise D040
+node.directives = ∅, otherwise D040
 CHECK-REQUIRED-DERIVE(B_D, node)
 NO-UNKNOWN-BINDINGS(B_D, node)
 
@@ -689,7 +727,7 @@ Scope: block-scoped to enclosing control-flow block. Not accessible outside.
 CHECK-REQUIRED-DERIVE
 ─────────────────────────────────────────────────────────────────
 ∀ k ∈ keys(B_D):
-  B_D[k] : InputSignal.required<T> → k ∈ provided_inputs
+  B_D[k] : InputSignal.required<T> → k ∈ provided_inputs, otherwise D039
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -704,9 +742,11 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
+name ≠ "children"; otherwise D035
 Parent component P has binding name: FragmentBinding<T>; otherwise D036
 No explicit fragment binding with the same name exists on P; otherwise D036
 No other inline @fragment with the same name exists under the same P; otherwise D037
+parameters match FragmentArgs<T> positionally, otherwise D016
 Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
 Γ' ⊢ children ✓
 
@@ -848,7 +888,7 @@ LET
 | D003 | Unknown binding on component | Error |
 | D004 | Duplicate binding identity, including duplicate refs or fragments | Error |
 | D005 | Static attribute + dynamic binding clash (same name) | Error |
-| D006 | Missing required input/model/fragment | Error |
+| D006 | Missing required component input/model/fragment | Error |
 | D007 | Type mismatch (expression not assignable to binding type) | Error |
 | D008 | `model:` bound to non-writable signal | Error |
 | D009 | Directive host incompatible with element/proxy surface | Error |
@@ -878,6 +918,9 @@ LET
 | D035 | Explicit `children` binding on a component element | Error |
 | D036 | Inline `@fragment` has no matching parent fragment binding or conflicts with explicit same-name binding | Error |
 | D037 | Duplicate inline `@fragment` name under the same parent component | Error |
+| D038 | Missing required directive input/model/fragment | Error |
+| D039 | Missing required derivation input | Error |
+| D040 | Derivation uses a non-input binding form | Error |
 
 `D019` and `D022` are retired and intentionally unused.
 
@@ -979,7 +1022,7 @@ const UserDetail = component({
 //                ~~ D005: 'id' is already set as a static attribute.
 ```
 
-#### D006 — Missing required input/model/fragment
+#### D006 — Missing required component input/model/fragment
 
 ```ts
 const Card = component({
@@ -1061,6 +1104,18 @@ const Button = component.proxy<HTMLButtonElement>({
 //      ~~~~~~~~~~~~~ D010: Directive 'tooltip' is already applied to this resolved host element.
 ```
 
+The same check includes directives already written on the forwarded element:
+
+```ts
+const Button = component.proxy<HTMLButtonElement>({
+  setup: () => @{ <button @forward() use:tooltip(message={'Internal'})>Click</button> },
+});
+
+// ❌ forwarded tooltip collides with the internal tooltip
+<Button use:tooltip(message={'External'}) />
+//      ~~~~~~~~~~~~~ D010: Directive 'tooltip' is already applied to this resolved host element.
+```
+
 #### D011 — once:model: or once:on:
 
 ```ts
@@ -1135,6 +1190,19 @@ const List = component({
 //              ~~~~~~~~ D016: Fragment 'row' expects 2 arguments [string, number], but got 1.
   },
 });
+
+const withPreview = directive({
+  host: ref<HTMLElement>(),
+  bindings: { preview: fragment.required<[Item]>() },
+  setup: () => {},
+});
+
+<button use:withPreview(
+  @fragment preview() {
+//          ~~~~~~~ D016: Fragment 'preview' expects 1 argument [Item], but got 0.
+    <span>Preview</span>
+  }
+) />
 ```
 
 #### D017 — ref variable type incompatible
@@ -1320,6 +1388,90 @@ component({
   setup: () => ({ expose: {} }),
 //          ~~~~~~~~~~~~~~~~~~ D034: setup must return TemplateMarkup or { template }.
 });
+```
+
+#### D035 — Explicit children fragment
+
+```ts
+// ❌ children is implicit-only
+<Card children={body} />
+//    ~~~~~~~~ D035: 'children' is provided by nested content, not by an explicit binding.
+
+<Card>
+  @fragment children() {
+//          ~~~~~~~~ D035: Inline @fragment cannot target reserved 'children'.
+    <p>Body</p>
+  }
+</Card>
+```
+
+#### D036 — Inline fragment has no matching parent binding
+
+```ts
+const Card = component({
+  bindings: { title: input.required<string>() },
+  setup: () => tmpl,
+});
+
+<Card title={'Hello'}>
+  @fragment footer() {
+//          ~~~~~~ D036: 'Card' has no fragment binding named 'footer'.
+    <small>Footer</small>
+  }
+</Card>
+```
+
+#### D037 — Duplicate inline fragment
+
+```ts
+const List = component({
+  bindings: { row: fragment.required<[Item]>() },
+  setup: () => tmpl,
+});
+
+<List>
+  @fragment row(item: Item) { <span>{item.name}</span> }
+  @fragment row(item: Item) { <strong>{item.name}</strong> }
+//          ~~~ D037: Inline fragment 'row' is already provided for 'List'.
+</List>
+```
+
+#### D038 — Missing required directive binding
+
+```ts
+const tooltip = directive({
+  host: ref<HTMLElement>(),
+  bindings: { message: input.required<string>() },
+  setup: () => {},
+});
+
+// ❌ required directive input missing
+<button use:tooltip()>Save</button>
+//      ~~~~~~~~~~~~~ D038: Required input 'message' is not provided for directive 'tooltip'.
+```
+
+#### D039 — Missing required derivation input
+
+```ts
+const price = derivation({
+  bindings: { item: input.required<Item>() },
+  setup: ({ item }) => computed(() => item().price),
+});
+
+@derive total = price();
+//              ~~~~~ D039: Required input 'item' is not provided for derivation 'price'.
+```
+
+#### D040 — Derivation uses non-input binding
+
+```ts
+const price = derivation({
+  bindings: { item: input.required<Item>() },
+  setup: ({ item }) => computed(() => item().price),
+});
+
+@derive total = price(model:item={item});
+//                    ~~~~~~~~~~ D040: Derivations accept input bindings only.
 ```
 
 ---
