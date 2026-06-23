@@ -535,7 +535,8 @@ CHECK-COMP-TEXT-INPUT
 ─────────────────────────────────────────────────
 attr.name ∈ keys(B)
 B[attr.name] : InputSignal<T>
-string ⊑ T
+attr.value is string literal V    V : literal type
+V ⊑ T
 
 
 CHECK-COMP-DIRECTIVE
