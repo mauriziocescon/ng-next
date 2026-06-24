@@ -146,8 +146,7 @@ BINARY-LOGICAL-AND
 ─────────────────────────────────────────────────
 Γ ⊢ left : L    Γ ⊢ right : R
 ─────────────────────────────────────────────────
-Γ ⊢ left && right : (L & Falsy) | R
-  where Falsy = false | 0 | "" | null | undefined
+Γ ⊢ left && right : L | R
 
 
 BINARY-LOGICAL-OR
