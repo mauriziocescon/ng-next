@@ -395,10 +395,8 @@ export type AST =
   | Binary
   | Conditional
   | PropertyRead
-  | PropertyWrite
   | SafePropertyRead
   | KeyedRead
-  | KeyedWrite
   | FunctionCall
   | SafeMethodCall
   | MethodCall
@@ -452,13 +450,6 @@ export interface PropertyRead extends BaseAST {
   name: string;
 }
 
-export interface PropertyWrite extends BaseAST {
-  type: 'PropertyWrite';
-  receiver: AST;
-  name: string;
-  value: AST;
-}
-
 export interface SafePropertyRead extends BaseAST {
   type: 'SafePropertyRead';
   receiver: AST;
@@ -469,13 +460,6 @@ export interface KeyedRead extends BaseAST {
   type: 'KeyedRead';
   receiver: AST;
   key: AST;
-}
-
-export interface KeyedWrite extends BaseAST {
-  type: 'KeyedWrite';
-  receiver: AST;
-  key: AST;
-  value: AST;
 }
 
 export interface FunctionCall extends BaseAST {
