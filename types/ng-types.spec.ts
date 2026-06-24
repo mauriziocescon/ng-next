@@ -216,7 +216,7 @@ const UserDetail = component.proxy<HTMLElement, UserDetailBindings>({
     const _u: User = user();
     const _e: string = email();
     const _children: OptionalFragmentBinding<void> | undefined = children;
-    const _rendered = children?.();
+    const _rendered: TemplateMarkup | undefined = children?.();
     email.set('new');
     makeAdmin.emit();
     return tmpl;
@@ -230,7 +230,7 @@ const RequiredChildren = component({
   },
   setup: ({ children }) => {
     const _c: RequiredFragmentBinding<void> = children;
-    const _rendered = children();
+    const _rendered: TemplateMarkup = children();
     // @ts-expect-error required fragment is not assignable to optional fragment shape
     const _mustBeOptional: OptionalFragmentBinding<void> | undefined = children;
     return tmpl;

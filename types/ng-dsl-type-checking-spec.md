@@ -869,25 +869,12 @@ origin: "implicitChildren" }`. Parent must have `children: FragmentBinding<void>
 ```
 RENDER
 ─────────────────────────────────────────────────────────────────
-Γ ⊢ expr : FragmentBinding<T>
-
-Arguments follow FragmentArgs<T>:
-  T = void              → args = []
-  T = tuple [T₁,…,Tₙ]  → args = [e₁,…,eₙ] where eᵢ ⊑ Tᵢ
-  T = array A[]         → args = [e] where e ⊑ A[]
-  otherwise             → args = [e] where e ⊑ T
+Γ ⊢ expr : TemplateMarkup | undefined
 
 Optional: if options.injector present:
-  Γ ⊢ options.injector : Injector | 'outlet' | null | undefined
+  Γ ⊢ options.injector : Injector | null | undefined
 ─────────────────────────────────────────────────────────────────
-Γ ⊢ @render(expr(args), { injector? }) ✓
-
-
-RENDER-OPTIONAL-GUARD
-─────────────────────────────────────────────────────────────────
-Γ ⊢ expr : OptionalFragmentBinding<T> | undefined
-Must guard: @render(expr?.(...))  or  @if (expr) { @render(expr(...)) }
-─────────────────────────────────────────────────────────────────
+Γ ⊢ @render(expr, { injector? }) ✓
 ```
 
 ---
