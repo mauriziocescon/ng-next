@@ -109,6 +109,14 @@ METHOD-CALL
 Γ ⊢ e.name(arg₁, ..., argₙ) : R
 
 
+SAFE-METHOD-CALL
+─────────────────────────────────────────────────
+Γ ⊢ e : T | null | undefined    T has method name : (a₁: A₁, ..., aₙ: Aₙ) → R
+Γ ⊢ argᵢ : Tᵢ    Tᵢ ⊑ Aᵢ  for i ∈ 1..n
+─────────────────────────────────────────────────
+Γ ⊢ e?.name(arg₁, ..., argₙ) : R | undefined
+
+
 BINARY-ARITHMETIC
 ─────────────────────────────────────────────────
 Γ ⊢ left : L    Γ ⊢ right : R
@@ -146,7 +154,7 @@ BINARY-LOGICAL-OR
 ─────────────────────────────────────────────────
 Γ ⊢ left : L    Γ ⊢ right : R
 ─────────────────────────────────────────────────
-Γ ⊢ left || right : NonNullable<L> | R
+Γ ⊢ left || right : L | R
 
 
 BINARY-NULLISH-COALESCING
@@ -299,9 +307,9 @@ U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-frag.name ≠ "children"; otherwise D028
+frag.name ≠ "children"                                    → D028
 B[frag.name] : FragmentBinding<T>
-frag.parameters match FragmentArgs<T> positionally; otherwise D027
+frag.parameters match FragmentArgs<T> positionally         → D027
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
 Γ' ⊢ frag.children ✓
 ─────────────────────────────────────────────────
