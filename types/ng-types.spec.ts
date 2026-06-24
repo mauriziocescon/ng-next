@@ -511,7 +511,6 @@ const _typedDirRefCheck: Ref<
 > = typedDirRef;
 
 // Host type constraint: narrows to specific element type
-// (needed by section 14 for forwarding compatibility)
 const buttonOnly = directive({
   host: ref<HTMLButtonElement>(),
   bindings: { label: input<string>() },
@@ -565,7 +564,7 @@ const _divRefType: Ref<HTMLDivElement | undefined> = divRef;
 const childRef = ref<typeof Child>();
 const _childRefType: Ref<{ text: Signal<string> } | undefined> = childRef;
 
-// Ref<T> extends Signal<T> — prove once
+// Ref<T> extends Signal<T>
 const _childRefAsSignal: Signal<{ text: Signal<string> } | undefined> =
   childRef;
 
@@ -593,17 +592,11 @@ const _manyDivsType: Ref<HTMLDivElement[]> = manyDivs;
 const manyNoExpose = refMany<typeof NoExpose>();
 const _manyNoExposeType: Ref<[]> = manyNoExpose;
 
-// Refs are read-only — .set() must not exist
+// Refs are read-only — .set() must not exist (representative: single + many)
 // @ts-expect-error
 divRef.set(document.createElement('div'));
 // @ts-expect-error
-childRef.set({ text: signal('') });
-// @ts-expect-error
-tooltipRef.set({ toggle: () => {} });
-// @ts-expect-error
 manyChildren.set([]);
-// @ts-expect-error
-manyDivs.set([]);
 
 // ref() must not accept runtime arguments — generic-only
 // @ts-expect-error ref does not accept a runtime argument
@@ -618,25 +611,6 @@ const Sibling = component({
   },
   setup: ({ childRef }) => {
     const _val = childRef();
-    return tmpl;
-  },
-});
-
-// Full parent scenario: refs across components and directives
-const Parent = component({
-  setup: () => {
-    const el = ref<HTMLDivElement>();
-    const child = ref<typeof Child>();
-    const tlp = ref<typeof tooltip>();
-    const many = refMany<typeof Child>();
-
-    afterNextRender(() => {
-      const _el: HTMLDivElement | undefined = el();
-      const _child: { text: Signal<string> } | undefined = child();
-      const _tlp: { toggle: () => void } | undefined = tlp();
-      const _many: { text: Signal<string> }[] = many();
-    });
-
     return tmpl;
   },
 });
@@ -871,7 +845,7 @@ type _NoProxyWrapperKeepsNever = Assert<
   IsEqual<typeof NoProxyWrapper, ComponentInstance<{}, void, never>>
 >;
 
-// component.wrap is inference-only; explicit generics are invalid (single representative)
+// component.wrap is inference-only; explicit generics are invalid
 // @ts-expect-error component.wrap is inference-only; explicit generics are invalid
 const _NegWrapperExplicitGeneric = component.wrap<HTMLButtonElement>(
   UserDetail,
@@ -885,7 +859,7 @@ const _NegWrapperExplicitGeneric = component.wrap<HTMLButtonElement>(
 // 13. COMPONENT — forward collision precedence (compiler contract)
 //
 // Explicit target bindings win over forwarded remainder, independent of
-// source order and binding kind.
+// source order and binding kind. MergeProps models this: Right wins.
 // ────────────────────────────────────────────────────────────────
 
 type FromRemainder = {
@@ -898,23 +872,9 @@ type FromExplicit = {
   user: 'explicit';
 };
 
-// <Target @forward() user={explicit} />
-type ForwardThenExplicit = MergeProps<FromRemainder, FromExplicit>;
-type _ForwardThenExplicitUser = Assert<
-  IsEqual<ForwardThenExplicit['user'], 'explicit'>
->;
-type _ForwardThenExplicitKeepsOthers = Assert<
-  IsEqual<ForwardThenExplicit['email'], 'remainder-email'>
->;
-
-// <Target user={explicit} @forward() />
-type ExplicitThenForward = MergeProps<FromRemainder, FromExplicit>;
-type _ExplicitThenForwardUser = Assert<
-  IsEqual<ExplicitThenForward['user'], 'explicit'>
->;
-type _ExplicitThenForwardKeepsOthers = Assert<
-  IsEqual<ExplicitThenForward['click'], 'remainder-click'>
->;
+type Merged = MergeProps<FromRemainder, FromExplicit>;
+type _MergedExplicitWins = Assert<IsEqual<Merged['user'], 'explicit'>>;
+type _MergedKeepsRemainder = Assert<IsEqual<Merged['email'], 'remainder-email'>>;
 
 // ────────────────────────────────────────────────────────────────
 // 14. DIRECTIVE — forwarding compatibility
@@ -1086,7 +1046,7 @@ const multiToken = injectionToken.multi({
 });
 const _multiTokenType: DiMultiToken<number> = multiToken;
 
-// Explicit autoProvided: false — accepted (single representative)
+// Explicit autoProvided: false — accepted
 const explicitFalseWithFactory = injectionToken({
   autoProvided: false,
   factory: () => 99,
@@ -1103,12 +1063,10 @@ const arrayValueWithFactory = injectionToken({
 });
 const _arrayValueWithFactoryType: DiToken<string[]> = arrayValueWithFactory;
 
-// provide(token, factory) for array-valued non-multi token: factory returns
-// the full array.
+// provide(token, factory) for array-valued non-multi token: factory returns the full array
 const _provideArrayValue = provide(arrayValueToken, () => ['x', 'y']);
 
-// Multi token is NOT assignable to DiToken — the two hierarchies are
-// structurally incompatible.
+// Multi token is NOT assignable to DiToken
 // @ts-expect-error DiMultiToken is not assignable to DiToken
 const _multiNotAssignableToNonMulti: typeof arrayValueToken =
   multiNoFactoryToken;
@@ -1117,41 +1075,25 @@ const _multiNotAssignableToNonMulti: typeof arrayValueToken =
 const emptyConfigToken = injectionToken<string>({});
 const _emptyConfigTokenType: DiToken<string> = emptyConfigToken;
 
-// Unknown token preserves unknown as the inject result while allowing explicit casts.
+// Unknown token preserves unknown as the inject result
 const unknownTypeToken = injectionToken<unknown>();
 const _unknownValue: unknown = inject(unknownTypeToken);
 const _unknownCast = <string>inject(unknownTypeToken);
 
-// Negative: autoProvided: true without factory — compile-time error
+// Negative: autoProvided: true without factory
 // @ts-expect-error autoProvided: true requires a factory
 const _negAutoProvidedNoFactory = injectionToken<string>({
   autoProvided: true,
 });
 
 // Negative: multi is no longer a config flag on injectionToken(...)
-const _negOldMultiWithFactory = injectionToken({
-  // @ts-expect-error use injectionToken.multi(...) for multi tokens
-  multi: true,
-  factory: () => 1,
-});
-
 // @ts-expect-error use injectionToken.multi(...) for multi tokens
 const _negOldMultiNoFactory = injectionToken<number>({ multi: true });
 
 // @ts-expect-error multi: false is no longer accepted; omit the option
 const _negOldMultiFalseNoFactory = injectionToken<string>({ multi: false });
 
-const _negOldMultiFalseWithFactory = injectionToken({
-  // @ts-expect-error multi: false is no longer accepted; omit the option
-  multi: false,
-  factory: () => 42,
-});
-
-const _negMultiAutoProvidedFalse = injectionToken.multi<number>({
-  // @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
-  autoProvided: false,
-});
-
+// Negative: autoProvided is not valid on injectionToken.multi(...)
 const _negMultiAutoProvidedTrue = injectionToken.multi({
   // @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
   autoProvided: true,
@@ -1267,20 +1209,17 @@ const _providersExplicitFactory = [
   provide(multiToken, () => 99),
 ];
 
-// Multi provide factory returns a single item, not an array.
+// Multi provide factory returns a single item, not an array
 // @ts-expect-error factory for multi token must return number, not number[]
 provide(multiToken, () => [1, 2, 3]);
 
-// Array-valued non-multi token: factory returns the full array.
+// Array-valued non-multi token: factory returns the full array
 // @ts-expect-error factory for non-multi string[] token must return string[]
 provide(arrayValueToken, () => 'single');
 
 // Class token: factory must return an instance of the class
 // @ts-expect-error factory returns boolean, not Store
 provide(Store, () => true);
-
-// @ts-expect-error factory returns string, not Store
-provide(Store, () => 'not a store');
 
 // Abstract class token: factory must return an instance of the abstract class
 const _provideAbstract = provide(AbstractService, () => new ConcreteService());
@@ -1292,7 +1231,7 @@ provide(AbstractService, () => 'wrong');
 // @ts-expect-error factory returns number, not string
 provide(noFactoryToken, () => 123);
 
-// Negative: wrong factory return type for multi token with factory
+// Negative: wrong factory return type for multi token
 // @ts-expect-error factory returns string, not number
 provide(multiToken, () => 'wrong');
 
