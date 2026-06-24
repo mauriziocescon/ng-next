@@ -306,7 +306,7 @@ U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-frag.name ≠ "children"                                    → D028
+frag.name = "children"                                    → D028
 B[frag.name] : FragmentBinding<T>
 frag.parameters match FragmentArgs<T> positionally         → D027
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
