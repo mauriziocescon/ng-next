@@ -397,6 +397,7 @@ export type AST =
   | PropertyRead
   | SafePropertyRead
   | KeyedRead
+  | SafeKeyedRead
   | FunctionCall
   | SafeMethodCall
   | MethodCall
@@ -458,6 +459,12 @@ export interface SafePropertyRead extends BaseAST {
 
 export interface KeyedRead extends BaseAST {
   type: 'KeyedRead';
+  receiver: AST;
+  key: AST;
+}
+
+export interface SafeKeyedRead extends BaseAST {
+  type: 'SafeKeyedRead';
   receiver: AST;
   key: AST;
 }
