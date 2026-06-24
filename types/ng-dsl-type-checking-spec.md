@@ -314,6 +314,10 @@ frag.parameters match FragmentArgs<T> positionally         → D027
 ─────────────────────────────────────────────────
 ```
 
+The `children` constraint (D028) is the single canonical rule: no explicit
+binding, explicit `@fragment`, or explicit prop may target the reserved name
+`"children"`. Only non-fragment direct child content provides it implicitly.
+
 ### 3.5 Required Bindings Check
 
 ```
@@ -356,8 +360,8 @@ NO-DUPLICATE-BINDINGS(node)
 ∀ name: |{b ∈ fragments | b.name = name}| ≤ 1
 |references| ≤ 1
 class: and style: are repeatable
-animate: uses ANIMATE-CONSTRAINTS
-use: uniqueness per DIRECTIVE-SET-UNIQUENESS
+animate: uses ANIMATE-CONSTRAINTS (§4.2)
+use: uniqueness per DIRECTIVE-SET-UNIQUENESS (§7.1)
 ─────────────────────────────────────────────────
 
 
@@ -436,8 +440,8 @@ NO-STATIC-DYNAMIC-CLASH(node)
 Γ ⊢ <tag ...> ✓
 ```
 
-Native-specific binding rules (not shared because native elements resolve
-properties/events from the DOM type system rather than a `bindings` record):
+Native-specific binding rules (resolve properties/events from the DOM type
+system rather than a `bindings` record):
 
 ```
 CHECK-NATIVE-TEXT-ATTR
@@ -525,17 +529,18 @@ C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 ∀ frag ∈ node.fragments where frag.origin = "implicitChildren":
   Γ ⊢ frag.children ✓
 ∀ ref ∈ node.references:   CHECK-REF(Γ, E, ref)
-∀ dir ∈ node.directives:   CHECK-COMP-DIRECTIVE(Γ, C, S, dir)
+∀ dir ∈ node.directives:
+  P(C) = never → D021
+  else: CHECK-DIRECTIVE-USE(Γ, P(C), RESOLVED-FORWARD-HOSTS(C), dir)
 CHECK-REQUIRED(B, provided ∪ forwarded, "component")
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
 NO-UNKNOWN-BINDINGS(B, node)
-CHILDREN-IMPLICIT-ONLY(node)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ <C ...> ✓
 ```
 
-Component-specific rules:
+Component-specific rule:
 
 ```
 CHECK-COMP-TEXT-INPUT
@@ -544,21 +549,6 @@ attr.name ∈ keys(B)
 B[attr.name] : InputSignal<T>
 attr.value is string literal V    V : literal type
 V ⊑ T
-
-
-CHECK-COMP-DIRECTIVE
-─────────────────────────────────────────────────
-if S = never:
-  node.directives must be ∅   → D021
-else:
-  R = RESOLVED-FORWARD-HOSTS(C)
-  ∀ dir: CHECK-DIRECTIVE-USE(Γ, S, R, dir)
-
-
-CHILDREN-IMPLICIT-ONLY
-─────────────────────────────────────────────────
-No explicit binding or explicit @fragment may target "children" → D028.
-Only non-fragment direct child content provides children.
 ─────────────────────────────────────────────────
 ```
 
@@ -636,11 +626,11 @@ WrapPayload(W, Target, Selected) = {
 }
 
 Directive payloads pass through every wrapper hop and resolve to
-native hosts via RESOLVED-FORWARD-HOSTS(Target).
+native hosts via RESOLVED-FORWARD-HOSTS.
 ─────────────────────────────────────────────────────────────────
 ```
 
-### 6.2 Placement Rules
+### 6.2 Placement Rules and Resolved Hosts
 
 ```
 FORWARD-PROXY
@@ -679,12 +669,24 @@ COLLISION-PRECEDENCE
 ─────────────────────────────────────────────────────────────────
 
 
-FORWARD-TARGETS
+RESOLVED-FORWARD-HOSTS
 ─────────────────────────────────────────────────────────────────
-FORWARD-TARGETS(C) = @forward() placements reachable in checked render path of T(C)
+Native element N:
+  RESOLVED-FORWARD-HOSTS(N) = {N}
+
+component.proxy<S>(...) C:
+  targets = @forward() placements reachable in checked render path of T(C)
+  ∀ N ∈ targets: I(tag(N)) ⊑ S
+  RESOLVED-FORWARD-HOSTS(C) = targets
+
+component.wrap(Target, ...) W:
+  P(W) = P(Target)
+  RESOLVED-FORWARD-HOSTS(W) =
+    ⋃ RESOLVED-FORWARD-HOSTS(Target) for each target placement
+
 Multiple placements → payload delivered to all.
 Alternative branches → each must independently satisfy rules.
-Directive host checks use RESOLVED-FORWARD-HOSTS(C).
+Directive host checks use RESOLVED-FORWARD-HOSTS.
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -716,35 +718,11 @@ if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 
 Directive fragments use local syntax: `use:D(@fragment name(p₁: T₁) { children })`.
 
-### 7.1 Host Compatibility
-
-```
-NATIVE-HOST:         H = I(tag)         H ⊑ H_D → compatible
-PROXY-SURFACE-HOST:  P(C) = S ≠ never   S ⊑ H_D → compatible
-NO-FORWARDING:       P(C) = never       → D021
-```
-
-### 7.2 Resolved Host Elements and Uniqueness
+### 7.1 Uniqueness
 
 A directive is unique per resolved host element — not per syntactic position.
 
 ```
-RESOLVED-FORWARD-HOSTS
-─────────────────────────────────────────────────
-Native element N:
-  RESOLVED-FORWARD-HOSTS(N) = {N}
-
-component.proxy<S>(...) C:
-  FORWARD-TARGETS(C) are native elements
-  ∀ N ∈ FORWARD-TARGETS(C): I(tag(N)) ⊑ S
-  RESOLVED-FORWARD-HOSTS(C) = FORWARD-TARGETS(C)
-
-component.wrap(Target, ...) W:
-  P(W) = P(Target)
-  RESOLVED-FORWARD-HOSTS(W) =
-    ⋃ RESOLVED-FORWARD-HOSTS(Target) for each target placement
-
-
 DIRECTIVE-SET-UNIQUENESS
 ─────────────────────────────────────────────────
 For each resolved host element H:
@@ -836,10 +814,12 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
-name ≠ "children"                                    → D028
-parameters match FragmentArgs<T> positionally        → D027
-Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
-Γ' ⊢ children ✓
+Checked via CHECK-FRAGMENT(Γ, B_parent, frag) when passed to a component.
+
+When standalone (not passed as prop):
+  parameters match FragmentArgs<T> positionally        → D027
+  Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
+  Γ' ⊢ children ✓
 
 Introduces name : FragmentBinding<T> in its lexical template scope.
 Visible to sibling nodes and descendants; not visible outside the
@@ -850,15 +830,16 @@ child-list where declared.
 ### 10.2 Fragment Props
 
 **Explicit:** `<Component fragmentName={fragmentValue} />` — checks
-`fragmentValue ⊑ FragmentBinding<T>`, name ≠ "children".
+`fragmentValue ⊑ FragmentBinding<T>`.
 
 **Implicit (inline):** `@fragment name(...) { ... }` as direct child of a
 component element — auto-passed to the matching binding. Rules:
 - Parent must have binding `name: FragmentBinding<T>` → D029
-- name ≠ "children" → D028
 - No explicit binding with the same name exists → D029
 - No duplicate implicit fragment with the same name → D030
 - Not part of implicit children
+
+All fragment props are subject to the `children` reservation (§3.4 D028).
 
 **Implicit children:** Non-fragment direct child content inside
 `<Component>...</Component>` — lowered to `FragmentNode { name: "children",
@@ -894,26 +875,7 @@ LET
 
 ---
 
-## 12. Binding Prefix & Modifier Reference
-
-| Prefix / Modifier | Target | Repeatable | Description |
-|---|---|---|---|
-| `bind:` (or omitted) | native, component | No (per prop) | One-way input |
-| `model:` | native, component | No (per prop) | Two-way. Native: `input`/`select`/`textarea` only |
-| `on:` | native, component | No (per event) | Event handler |
-| `once:` | inputs only | No (per prop) | Freeze at creation. `once:model:*`/`once:on:*` → error |
-| `class:` | native | Yes | Conditional class (`boolean`) |
-| `style:` | native | Yes | Conditional style (`string \| number \| null`) |
-| `animate:` | native | Yes (enter + leave) | Enter/leave animation. `on:animate:` for callback |
-| `use:` | native, proxy comp, wrapped proxy | Yes (diff dirs) | Same directive once per resolved host |
-| `:when` | `use:` directive | No (per dir) | Condition (`boolean`) |
-| `:ref` | `use:` directive | No (per dir) | Capture directive expose |
-| `ref` | native, component | No | Capture element/component expose |
-| `@forward()` | compatible native or wrapped target | Yes | Forwarding payload placement |
-
----
-
-## 13. Auxiliary Definitions
+## 12. Auxiliary Definitions
 
 ```
 FragmentArgs<T> =
@@ -937,7 +899,7 @@ BindingKind<V> =
 
 ---
 
-## 14. Diagnostic Summary
+## 13. Diagnostic Summary
 
 | Code | Category | Condition | Severity |
 |------|----------|-----------|----------|
@@ -983,7 +945,7 @@ BindingKind<V> =
 | D038 | Derivation | Missing required derivation input | Error |
 | D039 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
 
-### 14.1 Diagnostic Examples
+### 13.1 Diagnostic Examples
 
 One example per diagnostic — just enough to show the violation.
 
