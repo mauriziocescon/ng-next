@@ -986,6 +986,9 @@ component({ setup: () => ({ expose: {} }) }) // ❌ D006
 // D009 — duplicate binding
 <button disabled={true} disabled={false}>Click</button> // ❌ D009
 
+// D009 — duplicate children (explicit prop + implicit nested content)
+<Card children={body}><p>Also children</p></Card> // ❌ D009
+
 // D010 — static + dynamic clash
 <div id="static" id={dynamicId()}>Content</div> // ❌ D010
 
@@ -995,9 +998,6 @@ component({ setup: () => ({ expose: {} }) }) // ❌ D006
 // D012 — missing required directive input
 <button use:tooltip()>Save</button> // ❌ D012: 'message' required
 
-// D038 — missing required derivation input
-@derive total = price(); // ❌ D038: 'item' required
-
 // D013 — type mismatch
 <Counter count={'five'} /> // ❌ D013: string not assignable to number
 
@@ -1006,9 +1006,7 @@ component({ setup: () => ({ expose: {} }) }) // ❌ D006
 
 // D015 — model: on non-modelable element
 <div model:value={text}>X</div> // ❌ D015
-```
 
-```ts
 // D016 — once: on model/output
 <UserDetail once:model:email={email} user={u()} /> // ❌ D016
 
@@ -1017,6 +1015,10 @@ component({ setup: () => ({ expose: {} }) }) // ❌ D006
 
 // D018 — on-prefix warning
 bindings: { onSubmit: output<void>() } // ⚠️ D018
+
+// D042 — class:/style: on component element
+<UserDetail class:active={true} user={u()} /> // ❌ D042
+<UserDetail style:color={'red'} user={u()} /> // ❌ D042
 
 // D019 — directive host incompatible
 <div use:inputMask(mask={'###'})>X</div> // ❌ D019: HTMLDivElement ⊄ HTMLInputElement
@@ -1048,14 +1050,14 @@ const Button = component.proxy<HTMLButtonElement>({
 component.wrap(Target, { bindings: { role: input<string>() } })   // ❌ D024
 component.wrap(Target, { bindings: { save: input<void>() } })     // ❌ D025
 component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ D026
-```
 
-```ts
+// D040 — proxy component missing @forward()
+const Button = component.proxy<HTMLButtonElement>({
+  setup: () => @{ <span>no forward</span> }, // ❌ D040
+});
+
 // D027 — fragment arg mismatch
 // fragment.required<[string, number]>() but @render(row(item)) passes 1 arg → D027
-
-// D009 — duplicate children (explicit prop + implicit nested content)
-<Card children={body}><p>Also children</p></Card> // ❌ D009
 
 // D029 — no matching parent fragment binding
 <Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D029
@@ -1070,23 +1072,27 @@ component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ 
 const child = ref<HTMLDivElement>();
 <Child ref={child} /> // ❌ D031: expects Ref<{ value: Signal<number> } | undefined>
 
-// D032–D037 — animate violations
-<Card animate:enter={'fade'} />             // ❌ D032: not native
-<div animate:show={'fade'}>X</div>          // ❌ D033: invalid phase
-<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D034
-<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D035
-<div animate:enter={42}>X</div>             // ❌ D036: number not assignable
-<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D037
+// D038 — missing required derivation input
+@derive total = price(); // ❌ D038: 'item' required
 
 // D039 — derivation non-input binding
 @derive total = price(model:item={x}); // ❌ D039
 
-// D040 — proxy component missing @forward()
-const Button = component.proxy<HTMLButtonElement>({
-  setup: () => @{ <span>no forward</span> }, // ❌ D040
-});
+// D032 — animate: on component element
+<Card animate:enter={'fade'} /> // ❌ D032
 
-// D042 — class:/style: on component element
-<UserDetail class:active={true} user={u()} /> // ❌ D042
-<UserDetail style:color={'red'} user={u()} /> // ❌ D042
+// D033 — invalid animate phase
+<div animate:show={'fade'}>X</div> // ❌ D033
+
+// D034 — duplicate animate:enter class binding
+<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D034
+
+// D035 — duplicate on:animate:leave event binding
+<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D035
+
+// D036 — animate: expression type mismatch
+<div animate:enter={42}>X</div> // ❌ D036: number not assignable
+
+// D037 — on:animate: handler type mismatch
+<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D037
 ```
