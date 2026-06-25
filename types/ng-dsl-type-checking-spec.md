@@ -306,7 +306,6 @@ U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-frag.name = "children"                                    → D028
 B[frag.name] : FragmentBinding<T>
 frag.parameters match FragmentArgs<T> positionally         → D027
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
@@ -314,9 +313,12 @@ frag.parameters match FragmentArgs<T> positionally         → D027
 ─────────────────────────────────────────────────
 ```
 
-The `children` constraint (D028) is the single canonical rule: no explicit
-binding, explicit `@fragment`, or explicit prop may target the reserved name
-`"children"`. Only non-fragment direct child content provides it implicitly.
+The `children` binding name is reserved at **declaration** time (D004): if
+present in `bindings`, it must be a `FragmentBinding<void>`. At the **call site**,
+`children` may be provided through any of the standard fragment delivery
+mechanisms (explicit prop, inline `@fragment children()`, or implicit nested
+content). Duplicate delivery is rejected by the same rules as any other
+fragment (D009 for duplicate bindings, D030 for duplicate inline fragments).
 
 ### 3.5 Required Bindings Check
 
@@ -326,13 +328,15 @@ CHECK-REQUIRED(B, provided, context_label)
 ∀ k ∈ keys(B):
   B[k] : InputSignal.required<T>    → k ∈ provided_inputs
   B[k] : ModelSignal.required<T>    → k ∈ provided_models
-  B[k] : RequiredFragmentBinding<T> →
-    if k = "children": has_nested_content (components only)
-    else:              k ∈ provided_fragments
+  B[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments
 
 Violation → D011 (component), D012 (directive), D038 (derivation)
 ─────────────────────────────────────────────────
 ```
+
+`provided_fragments` includes fragments delivered by any mechanism: explicit
+prop (`children={expr}`), inline `@fragment children() { ... }`, or implicit
+nested content (lowered to `FragmentNode { origin: "implicitChildren" }`).
 
 For components, `provided_*` includes both explicit bindings and
 `forwarded_*` bindings delivered by `WrapBindingPayload`.
@@ -572,7 +576,7 @@ Models, outputs, and fragments are excluded → D005.
 
 RESERVED-CHILDREN-BINDING
 ─────────────────────────────────────────────────────────────────
-if "children" ∈ keys(B):  B["children"] : FragmentBinding<T>
+if "children" ∈ keys(B):  B["children"] : FragmentBinding<void>
 otherwise → D004
 
 
@@ -835,15 +839,16 @@ child-list where declared.
 **Implicit (inline):** `@fragment name(...) { ... }` as direct child of a
 component element — auto-passed to the matching binding. Rules:
 - Parent must have binding `name: FragmentBinding<T>` → D029
-- No explicit binding with the same name exists → D029
+- No explicit binding with the same name exists → D009
 - No duplicate implicit fragment with the same name → D030
-- Not part of implicit children
-
-All fragment props are subject to the `children` reservation (§3.4 D028).
 
 **Implicit children:** Non-fragment direct child content inside
 `<Component>...</Component>` — lowered to `FragmentNode { name: "children",
 origin: "implicitChildren" }`. Parent must have `children: FragmentBinding<void>`.
+
+All three delivery mechanisms work for `children` (explicit prop, inline
+`@fragment children()`, or implicit nested content). Providing the same
+fragment name through multiple mechanisms is a duplicate error (D009/D030).
 
 ### 10.3 @render Invocation
 
@@ -932,8 +937,7 @@ BindingKind<V> =
 | D040 | Forwarding | No `@forward()` in proxy component | Error |
 | D041 | Forwarding | `@forward()` placement cannot consume enclosing payload | Error |
 | D027 | Fragments | Fragment argument count/type mismatch | Error |
-| D028 | Fragments | Explicit `children` binding or explicit `@fragment children()` | Error |
-| D029 | Fragments | Implicit fragment has no matching parent binding or conflicts | Error |
+| D029 | Fragments | Implicit fragment has no matching parent binding or conflicts with explicit | Error |
 | D030 | Fragments | Duplicate implicit fragment name under same parent | Error |
 | D031 | Refs | `ref=` variable type incompatible with expose | Error |
 | D032 | Animate | `animate:` on component element | Error |
@@ -1050,9 +1054,8 @@ component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ 
 // D027 — fragment arg mismatch
 // fragment.required<[string, number]>() but @render(row(item)) passes 1 arg → D027
 
-// D028 — explicit children
-<Card children={body} />  // ❌ D028
-<Card>@fragment children() { <p>X</p> }</Card> // ❌ D028
+// D009 — duplicate children (explicit prop + implicit nested content)
+<Card children={body}><p>Also children</p></Card> // ❌ D009
 
 // D029 — no matching parent fragment binding
 <Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D029

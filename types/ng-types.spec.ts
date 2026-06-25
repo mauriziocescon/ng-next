@@ -1469,7 +1469,7 @@ type _ReservedChildrenDiag = __ReservedBindingsConstraint<{
 type _ReservedChildrenMsg = Assert<
   IsEqual<
     _ReservedChildrenDiag['__reserved_children_error__'],
-    'children binding must use fragment(...) or fragment.required(...)'
+    'children binding must use fragment<void>() or fragment.required<void>()'
   >
 >;
 

@@ -303,11 +303,11 @@ type SetupBindings<B> = {
 type ReservedBindingsConstraint<
   B extends Record<string, ComponentBindingValue>,
 > = 'children' extends keyof B
-  ? B['children'] extends FragmentBinding<unknown>
+  ? B['children'] extends FragmentBinding<void>
     ? {}
     : {
         __reserved_children_error__:
-          'children binding must use fragment(...) or fragment.required(...)';
+          'children binding must use fragment<void>() or fragment.required<void>()';
       }
   : unknown;
 
