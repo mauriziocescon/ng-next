@@ -226,7 +226,8 @@ Result follows KEYED-READ rules on T
 
 TEXT-INTERPOLATION
 ─────────────────────────────────────────────────
-Γ ⊢ e : T    (any type — coerced to string at render)
+Γ ⊢ e : T    (any type — stringified at render;
+              null/undefined render as empty string)
 ─────────────────────────────────────────────────
 Γ ⊢ {e} ✓
 ```
