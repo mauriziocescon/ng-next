@@ -249,7 +249,7 @@ export const PriceSimulator = component({
 
 ## Binding syntax helpers
 
-- Literal form equivalence for inputs: literal attributes and literal expressions are equivalent for inputs: `prop="value"` and `prop={'value'}` produce the same input value.
+- Literal form equivalence for inputs: `prop="value"` is always a string literal — equivalent to `prop={'value'}`. Non-string inputs require expression syntax: `count={5}`, not `count="5"`.
 - `:when`: conditionally applies a `use:` binding; sits outside the directive's inputs and cannot clash with them.
 
 ```ts
