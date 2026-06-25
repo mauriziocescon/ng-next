@@ -724,6 +724,8 @@ When directives are forwarded through `@forward()`, `AppliedDirs(H) =
 LocalDirs(H) ∪ ForwardedDirs(H)` — duplicates across local and forwarded
 sets are rejected.
 
+Directives do not declare `providers`.
+
 ---
 
 ## 8. Control Flow
