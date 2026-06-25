@@ -477,6 +477,9 @@ ModelableProps(H)[model.name] = T
 
 ### 4.1 class: and style: Typing
 
+`class:` and `style:` apply **only** to native elements. Using them on component
+elements is a compile-time error (D042).
+
 ```
 CLASS-BINDING
 ─────────────────────────────────────────────────
@@ -922,6 +925,7 @@ BindingKind<V> =
 | D016 | Binding: Modifiers | `once:model:*` or `once:on:*` | Error |
 | D017 | Binding: Modifiers | `once:prop` + `prop` duplicate on same element | Error |
 | D018 | Binding: Modifiers | `on`-prefixed binding name | Warning |
+| D042 | Binding: Scope | `class:` or `style:` on component element | Error |
 | D019 | Directives | Directive host incompatible with element/proxy surface | Error |
 | D020 | Directives | Same directive applied twice to same resolved host element | Error |
 | D021 | Directives | Directive on non-proxy component | Error |
@@ -936,14 +940,14 @@ BindingKind<V> =
 | D029 | Fragments | Implicit fragment has no matching parent binding or conflicts with explicit | Error |
 | D030 | Fragments | Duplicate implicit fragment name under same parent | Error |
 | D031 | Refs | `ref=` variable type incompatible with expose | Error |
+| D038 | Derivation | Missing required derivation input | Error |
+| D039 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
 | D032 | Animate | `animate:` on component element | Error |
 | D033 | Animate | Invalid animate phase (not `enter`/`leave`) | Error |
 | D034 | Animate | Duplicate `animate:enter` or `animate:leave` class binding | Error |
 | D035 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
 | D036 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
 | D037 | Animate | `on:animate:` handler type mismatch | Error |
-| D038 | Derivation | Missing required derivation input | Error |
-| D039 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1081,4 +1085,8 @@ const child = ref<HTMLDivElement>();
 const Button = component.proxy<HTMLButtonElement>({
   setup: () => @{ <span>no forward</span> }, // ❌ D040
 });
+
+// D042 — class:/style: on component element
+<UserDetail class:active={true} user={u()} /> // ❌ D042
+<UserDetail style:color={'red'} user={u()} /> // ❌ D042
 ```
