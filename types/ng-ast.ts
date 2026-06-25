@@ -355,7 +355,7 @@ export interface RenderOptionsNode extends BaseNode {
 export interface DeriveNode extends BaseNode {
   type: 'Derive';
   name: string;
-  derivation: AST;
+  derivation: Variable;
   inputs: DerivationInputNode[];
 }
 

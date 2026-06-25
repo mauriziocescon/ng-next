@@ -65,6 +65,10 @@ First match wins.
 - `Γ_module`: top-level imports, constants, enums, interfaces
 - `Γ_global`: DOM globals, built-in JS types
 
+Derivation, component, and directive references must be simple identifiers (single
+lexical name resolved through the scope chain). Dot-notation, conditional
+expressions, or any non-identifier forms are parse errors.
+
 ---
 
 ## 2. Expression Typing
