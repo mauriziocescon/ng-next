@@ -314,11 +314,8 @@ frag.parameters match FragmentArgs<T> positionally         → D027
 ```
 
 The `children` binding name is reserved at **declaration** time (D004): if
-present in `bindings`, it must be a `FragmentBinding<void>`. At the **call site**,
-`children` may be provided through any of the standard fragment delivery
-mechanisms (explicit prop, inline `@fragment children()`, or implicit nested
-content). Duplicate delivery is rejected by the same rules as any other
-fragment (D009 for duplicate bindings, D030 for duplicate inline fragments).
+present in `bindings`, it must be a `FragmentBinding<void>`. Call-site delivery
+rules for all fragments (including `children`) are in §10.2.
 
 ### 3.5 Required Bindings Check
 
@@ -334,9 +331,7 @@ Violation → D011 (component), D012 (directive), D038 (derivation)
 ─────────────────────────────────────────────────
 ```
 
-`provided_fragments` includes fragments delivered by any mechanism: explicit
-prop (`children={expr}`), inline `@fragment children() { ... }`, or implicit
-nested content (lowered to `FragmentNode { origin: "implicitChildren" }`).
+`provided_fragments` includes all delivery mechanisms defined in §10.2.
 
 For components, `provided_*` includes both explicit bindings and
 `forwarded_*` bindings delivered by `WrapBindingPayload`.
@@ -464,7 +459,7 @@ CHECK-NATIVE-OUTPUT
 ─────────────────────────────────────────────────
 output.name ∈ Events(H)    Events(H)[output.name] = Event<T>
 Γ ⊢ output.handler : U
-U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
+U ⊑ ((e: T) → void)    (same arity-safe rule as §3.3)
 
 
 CHECK-NATIVE-MODEL
@@ -722,18 +717,12 @@ if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 
 Directive fragments use local syntax: `use:D(@fragment name(p₁: T₁) { children })`.
 
-### 7.1 Uniqueness
+### 7.1 Uniqueness Note
 
-A directive is unique per resolved host element — not per syntactic position.
-
-```
-DIRECTIVE-SET-UNIQUENESS
-─────────────────────────────────────────────────
-For each resolved host element H:
-  AppliedDirs(H) = LocalDirs(H) ++ ForwardedDirs(H)
-  ∀ directive identity D:  count(D, AppliedDirs(H)) ≤ 1 → D020
-─────────────────────────────────────────────────
-```
+Uniqueness (D020) is per resolved host element, not per syntactic position.
+When directives are forwarded through `@forward()`, `AppliedDirs(H) =
+LocalDirs(H) ∪ ForwardedDirs(H)` — duplicates across local and forwarded
+sets are rejected.
 
 ---
 
@@ -818,16 +807,15 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
-Checked via CHECK-FRAGMENT(Γ, B_parent, frag) when passed to a component.
+When passed to a component: checked via CHECK-FRAGMENT(Γ, B_parent, frag).
 
 When standalone (not passed as prop):
-  parameters match FragmentArgs<T> positionally        → D027
   Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
   Γ' ⊢ children ✓
 
-Introduces name : FragmentBinding<T> in its lexical template scope.
-Visible to sibling nodes and descendants; not visible outside the
-child-list where declared.
+In both cases introduces name : FragmentBinding<T> in its lexical
+template scope (T derived per FragmentArgs in §12). Visible to sibling
+nodes and descendants; not visible outside the child-list where declared.
 ─────────────────────────────────────────────────────────────────
 ```
 
