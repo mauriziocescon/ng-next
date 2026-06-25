@@ -813,9 +813,10 @@ When standalone (not passed as prop):
   Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
   Γ' ⊢ children ✓
 
-In both cases introduces name : FragmentBinding<T> in its lexical
-template scope (T derived per FragmentArgs in §12). Visible to sibling
-nodes and descendants; not visible outside the child-list where declared.
+In both cases introduces name : RequiredFragmentBinding<T> in its lexical
+template scope. T is derived from declared parameters: 0 params → void,
+n params → [T₁, ..., Tₙ]. Visible to sibling nodes and descendants;
+not visible outside the child-list where declared.
 ─────────────────────────────────────────────────────────────────
 ```
 
