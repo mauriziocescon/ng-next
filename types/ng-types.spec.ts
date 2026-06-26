@@ -247,6 +247,15 @@ const _NegChildrenMustBeFragment = component({
   setup: () => tmpl,
 });
 
+// - ref cannot be used as a binding name in components
+// @ts-expect-error reserved name 'ref' cannot be a component binding
+const _NegRefReserved = component({
+  bindings: {
+    ref: input<string>(),
+  },
+  setup: () => tmpl,
+});
+
 // Parameterized fragment: callable with declared arguments
 const RenderItem = component({
   bindings: {
@@ -1477,3 +1486,14 @@ type _ReservedOk = __ReservedBindingsConstraint<{
   children: OptionalFragmentBinding<void>;
 }>;
 type _ReservedOkKeys = Assert<IsEqual<keyof _ReservedOk, never>>;
+
+// ref is reserved — any binding named 'ref' on a component is an error
+type _ReservedRefDiag = __ReservedBindingsConstraint<{
+  ref: InputSignal<string>;
+}>;
+type _ReservedRefMsg = Assert<
+  IsEqual<
+    _ReservedRefDiag['__reserved_ref_error__'],
+    'ref is a reserved attribute for components and cannot be declared as a binding'
+  >
+>;
