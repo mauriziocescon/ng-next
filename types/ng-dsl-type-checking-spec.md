@@ -577,10 +577,13 @@ providers receives Pick<B, input keys only>.
 Models, outputs, and fragments are excluded → D005.
 
 
-RESERVED-CHILDREN-BINDING
+RESERVED-COMPONENT-BINDINGS
 ─────────────────────────────────────────────────────────────────
 if "children" ∈ keys(B):  B["children"] : FragmentBinding<void>
 otherwise → D004
+
+if "ref" ∈ keys(B) (component only):  → D030
+─────────────────────────────────────────────────────────────────
 
 
 PROXY-SURFACE
@@ -911,6 +914,7 @@ BindingKind<V> =
 | D002 | Resolution | Unresolved element (neither intrinsic nor in scope) | Error |
 | D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
 | D004 | Declaration | Reserved `children` binding is not a fragment | Error |
+| D030 | Declaration | Reserved `ref` binding declared on a component | Error |
 | D005 | Declaration | `providers` reads model/output/fragment bindings | Error |
 | D006 | Declaration | Setup does not return `TemplateMarkup` or `{ template }` | Error |
 | D007 | Binding: Existence | Unknown attribute/property on native element | Error |

@@ -302,14 +302,20 @@ type SetupBindings<B> = {
 
 type ReservedBindingsConstraint<
   B extends Record<string, ComponentBindingValue>,
-> = 'children' extends keyof B
+> = ('children' extends keyof B
   ? B['children'] extends FragmentBinding<void>
     ? {}
     : {
         __reserved_children_error__:
           'children binding must use fragment<void>() or fragment.required<void>()';
       }
-  : unknown;
+  : unknown) &
+  ('ref' extends keyof B
+    ? {
+        __reserved_ref_error__:
+          'ref is a reserved attribute for components and cannot be declared as a binding';
+      }
+    : unknown);
 
 // Test-only exports for diagnostic contract checks in ng-types.spec.ts
 export type __WrapSelectionDiagnostics<
