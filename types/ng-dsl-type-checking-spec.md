@@ -571,6 +571,19 @@ where M : TemplateMarkup<TAst>
 → component(...) : ComponentInstance<B, E, S, M>
 
 
+SINGLE-TEMPLATE-RULE
+─────────────────────────────────────────────────────────────────
+setup body contains exactly one @{ } literal (markup literal).
+That literal must appear only at the tail position:
+  - Direct return: setup: () => @{ ... }
+  - Block return:  setup: () => { ...; return @{ ... }; }
+  - Object return: setup: () => { ...; return { template: @{ ... }, expose }; }
+
+Multiple @{ } literals in setup → D042
+@{ } inside branches, loops, or non-tail position → D042
+─────────────────────────────────────────────────────────────────
+
+
 PROVIDERS-INPUTS-ONLY
 ─────────────────────────────────────────────────────────────────
 providers receives Pick<B, input keys only>.
@@ -917,6 +930,7 @@ BindingKind<V> =
 | D030 | Declaration | Reserved `ref` binding declared on a component | Error |
 | D005 | Declaration | `providers` reads model/output/fragment bindings | Error |
 | D006 | Declaration | Setup does not return `TemplateMarkup` or `{ template }` | Error |
+| D042 | Declaration | Multiple `@{ }` literals in setup or `@{ }` not in tail position | Error |
 | D007 | Binding: Existence | Unknown attribute/property on native element | Error |
 | D008 | Binding: Existence | Unknown binding on component | Error |
 | D009 | Binding: Existence | Duplicate binding identity (including duplicate refs or fragments) | Error |
@@ -980,6 +994,24 @@ providers: (inputs) => { inputs.selected; return []; } // ❌ D005
 
 // D006 — invalid setup return
 component({ setup: () => ({ expose: {} }) }) // ❌ D006
+
+// D042 — multiple @{ } literals / early return with markup
+const Bad = component({
+  setup: ({ flag }) => {
+    if (flag()) {
+      return @{ <span>A</span> }; // ❌ D042: @{ } not in tail position
+    }
+    return @{ <span>B</span> };
+  },
+});
+
+// D042 — @{ } inside a branch (even without early return)
+const AlsoBad = component({
+  setup: () => {
+    const tmpl = condition ? @{ <span>A</span> } : @{ <span>B</span> }; // ❌ D042
+    return tmpl;
+  },
+});
 
 // D007 — unknown native property
 <div colour="red">Hello</div> // ❌ D007
