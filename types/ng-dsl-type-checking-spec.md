@@ -730,7 +730,7 @@ UNIQUE:       D at most once per element in R_host  → D023
 CHECK-REQUIRED(B_D, provided, "directive")
 NO-UNKNOWN-BINDINGS(B_D, dir)
 
-if dir.when:  Γ ⊢ dir.when.condition : boolean
+if dir.when:  Γ ⊢ dir.when.condition : T    (any type — truthiness)
 if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ use:D(...) ✓
