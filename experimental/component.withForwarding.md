@@ -264,25 +264,6 @@ export const UserCard = component.wrap(UserDetail, {
 
 ---
 
-## Constraints and Diagnostics
-
-| Rule | Diagnostic |
-| :--- | :--- |
-| `omitBindings` contains an unknown target key | `WRAP001` — invalid omitted key |
-| `omitBindings` marks a key with non-`true` value | `WRAP002` — omit marker must be literal `true` |
-| `addBindings` reuses an existing target key | `WRAP003` — duplicate binding key |
-| `addBindings` key appears in target remainder expanded by `@forward()` | `WRAP004` — wrapper-local binding cannot be propagated implicitly |
-| Omitted key is still consumed from wrapper call-site | `WRAP005` — binding is not part of wrapper public API |
-| `bindings` includes an omitted key | `WRAP006` — cannot override omitted target key |
-| Omitted required target input is not set internally | `WRAP007` — required target input missing |
-| token-style forwarding inspection is attempted (`token.foo`, `Object.keys(token)`, etc.) | `WRAP008` — forwarding is marker-only via `@forward()` |
-| JS destructuring with spread used to derive forwarding (`...rest` / `...token`) | `WRAP009` — spread-based forwarding is unsupported; use `@forward()` |
-| `@forward()` placed on a node that cannot consume the wrapper payload | `WRAP010` — invalid wrapper forwarding placement |
-
-`component.wrap` diagnostics should refer to the wrapped target by name whenever possible. Example: "`@forward()` for this wrapper must be placed on `<UserDetail>` or an approved wrapper target."
-
----
-
 ## Migration and Compatibility
 
 This can be introduced as a backward-compatible extension:
