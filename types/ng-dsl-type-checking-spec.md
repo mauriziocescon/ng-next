@@ -659,11 +659,11 @@ native hosts via RESOLVED-FORWARD-HOSTS.
 FORWARD-PROXY
 ─────────────────────────────────────────────────────────────────
 Enclosing component declared by component.proxy<S>(...)
-For each native element with @forward(): H = I(tag)
+Exactly one native element with @forward() must exist → D044 on multiple
+H = I(tag of that element)
 H ⊑ S → D026 on failure
 If no @forward() placement exists → D030
-ProxyDirectivePayload broadcast to every @forward() target
-Alternative control-flow branches checked independently
+ProxyDirectivePayload delivered to that single target
 ─────────────────────────────────────────────────────────────────
 
 
@@ -671,12 +671,11 @@ FORWARD-WRAP
 ─────────────────────────────────────────────────────────────────
 Enclosing wrapper W declared by component.wrap(Target, ...)
 P(W) = P(Target)
-For each component element with @forward(): element is Target
+Exactly one component element with @forward() must exist → D044 on multiple
+That element must be Target
 Explicit bindings override WrapBindingPayload for same key
-Each @forward() element receives WrapPayload
 if (WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never) ∧ no @forward() → D025
-WrapPayload broadcast to every @forward() target
-Alternative control-flow branches checked independently
+WrapPayload delivered to that single target
 ─────────────────────────────────────────────────────────────────
 
 
@@ -698,17 +697,15 @@ Native element N:
   RESOLVED-FORWARD-HOSTS(N) = {N}
 
 component.proxy<S>(...) C:
-  targets = @forward() placements reachable in checked render path of T(C)
-  ∀ N ∈ targets: I(tag(N)) ⊑ S
-  RESOLVED-FORWARD-HOSTS(C) = targets
+  target = the single @forward() placement in T(C)
+  I(tag(target)) ⊑ S
+  RESOLVED-FORWARD-HOSTS(C) = {target}
 
 component.wrap(Target, ...) W:
   P(W) = P(Target)
-  RESOLVED-FORWARD-HOSTS(W) =
-    ⋃ RESOLVED-FORWARD-HOSTS(Target) for each target placement
+  RESOLVED-FORWARD-HOSTS(W) = RESOLVED-FORWARD-HOSTS(Target)
 
-Multiple placements → payload delivered to all.
-Alternative branches → each must independently satisfy rules.
+Exactly one placement per component (D044).
 Directive host checks use RESOLVED-FORWARD-HOSTS.
 ─────────────────────────────────────────────────────────────────
 ```
@@ -953,6 +950,7 @@ BindingKind<V> =
 | D028 | Forwarding | Wrapper selected binding kind differs from target | Error |
 | D029 | Forwarding | Wrapper selected binding type not exactly target type | Error |
 | D030 | Forwarding | No `@forward()` in proxy component | Error |
+| D044 | Forwarding | Multiple `@forward()` placements in one component | Error |
 | D031 | Forwarding | `@forward()` placement cannot consume enclosing payload | Error |
 | D032 | Fragments | Fragment argument count/type mismatch | Error |
 | D033 | Fragments | Implicit fragment has no matching parent binding or conflicts with explicit | Error |
@@ -1090,6 +1088,14 @@ component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ 
 // D030 — proxy component missing @forward()
 const Button = component.proxy<HTMLButtonElement>({
   setup: () => @{ <span>no forward</span> }, // ❌ D030
+});
+
+// D044 — multiple @forward() placements
+const SplitPanel = component.proxy<HTMLDivElement>({
+  setup: () => @{
+    <div @forward()>Left</div>
+    <div @forward()>Right</div>  // ❌ D044
+  },
 });
 
 // D032 — fragment arg mismatch
