@@ -167,7 +167,7 @@ Compiler contract:
 5. The compiler `SHOULD` preserve proxy-surface metadata inheritance by inheriting the target proxy surface type in wrappers. For native proxy placements, that surface type comes from the Angular DSL `IntrinsicElements` map.
 6. The compiler `MUST` treat `@forward()` as marker-only: no forwarding object, property reads, or enumeration.
 7. The compiler `MUST` reject `@forward()` placed on a node that cannot consume the wrapper payload.
-8. The compiler `MUST` reject more than one `@forward()` placement per component template (D044).
+8. The compiler `MUST` reject more than one `@forward()` placement per component template.
 
 No runtime forwarding object is required; the same strategy as current `component.wrap(Target, config)` is retained.
 
