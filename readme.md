@@ -524,7 +524,7 @@ import { Button } from '@mylib/button';
 import { ripple } from '@mylib/ripple';
 import { tooltip } from '@mylib/tooltip';
 
-export const ButtonConsumer = component({
+export const Consumer = component({
   setup: () => {
     const tooltipMsg = signal('');
     const valid = signal(false);
@@ -584,9 +584,9 @@ Wrappers forward the target's remaining bindings; directives pass through only i
 ```ts
 import { component, signal, input, computed } from '@angular/core';
 import { tooltip } from '@mylib/tooltip';
-import { UserDetail, User } from './user-detail.ng';
+import { Target, User } from './target.ng';
 
-export const UserDetailConsumer = component({
+export const Consumer = component({
   setup: () => {
     const user = signal<User>(/** ... **/);
     const email = signal<string>(/** ... **/);
@@ -594,7 +594,7 @@ export const UserDetailConsumer = component({
     function makeAdmin() {/** ... **/}
 
     return @{
-      <UserDetailWrapper
+      <Wrapper
         user={user()}
         model:email={email}
         on:makeAdmin={makeAdmin} />
@@ -602,8 +602,8 @@ export const UserDetailConsumer = component({
   },
 });
 
-// Select user locally; forward the remaining UserDetail bindings.
-export const UserDetailWrapper = component.wrap(UserDetail, {
+// Select user locally; forward the remaining Target bindings.
+export const Wrapper = component.wrap(Target, {
   bindings: {
     user: input.required<User>(),
   },
@@ -611,7 +611,7 @@ export const UserDetailWrapper = component.wrap(UserDetail, {
     const other = computed(() => /** something depending on user() or a default value **/);
 
     return @{
-      <UserDetail
+      <Target
         @forward()
         use:tooltip(message={'Tooltip message'})
         user={other()} />
@@ -619,7 +619,7 @@ export const UserDetailWrapper = component.wrap(UserDetail, {
   },
 });
 
-// -- UserDetail -----------------------------------
+// -- Target -----------------------------------
 import { component, input, model, output, fragment } from '@angular/core';
 
 export interface User {
@@ -627,7 +627,7 @@ export interface User {
   role: string;
 }
 
-export const UserDetail = component.proxy<HTMLDivElement>({
+export const Target = component.proxy<HTMLDivElement>({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
