@@ -5,13 +5,13 @@ title: DI Enhancements — Interactive Tour
 
 ## Dependency Injection Enhancements
 
-<p class="subtitle">Small ergonomic improvements to tokens and providers — nothing revolutionary.</p>
+<p class="subtitle">Some ergonomic tweaks to tokens and providers — mostly about reducing ceremony.</p>
 
 `injectionToken` creates a typed DI token. Four flavours:
 
-- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default.
-- **With factory + `autoProvided: true`** — factory registered unconditionally at root scope.
-- **Without factory** — must use `provide(token, factory)` with an explicit factory.
+- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default; the factory is only invoked when a component explicitly lists `provide(token)` in its `providers`. Throws if missing from the injector tree.
+- **With factory + `autoProvided: true`** — factory registered unconditionally at root scope; no explicit `provide` needed.
+- **Without factory** — must use `provide(token, factory)` with an explicit factory. The `provide(token)` shorthand would be a compile-time error.
 - **Multi** (`injectionToken.multi`) — each `provide` call contributes one item; `inject` returns the collected array.
 
 ```typescript
@@ -47,6 +47,9 @@ const rootToken = injectionToken({
   },
 });
 
+// Without factory — explicit provide(token, factory) required
+const otherCompToken = injectionToken<string>({ debugName: 'otherCompToken' });
+
 // Multi token with factory
 const multiToken = injectionToken.multi({
   debugName: 'multiToken',
@@ -68,16 +71,17 @@ export const Counter = component({
     return @{ ... };
   },
   providers: ({ initialValue }) => [
-    provide(compToken),
-    provide(multiToken),
-    provide(multiToken),
-    provide(multiToken, () => 10),
+    provide(compToken),                     // shorthand — uses token's factory
+    provide(multiToken),                    // shorthand
+    provide(multiToken),                    // multiple contributions
+    provide(multiToken, () => 10),          // explicit factory override
     provide(multiToken, () => initialValue()),
-    provide(Store, () => new Store()),
+    provide(otherCompToken, () => ''),      // no factory on token — explicit required
+    provide(Store, () => new Store()),      // class
   ],
 });
 ```
 
 <div class="annotation">
-  <strong>Input-driven providers:</strong> Inputs are hoisted to the component level for use in provider initialization. <code>providers</code> receives only inputs — not models or outputs. Provider factories run in an injection context.
+  <strong>Input-driven providers:</strong> Inputs are hoisted to the component level for use in provider initialization. <code>providers</code> receives only inputs — not models or outputs. Provider factories run in an injection context — <code>inject()</code> works inside them.
 </div>

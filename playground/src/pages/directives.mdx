@@ -9,7 +9,7 @@ title: Directives — Interactive Tour
 
 Directives change the appearance or behavior of DOM elements. Apply them with `use:directive(...)` — any directive can be used directly in the template.
 
-The `host` property constrains which elements a directive can attach to.
+The `host` property constrains which elements a directive can attach to. When applied to a native tag, the compiler checks the tag's `IntrinsicElements` type against the directive's `host` ref type — ensuring type-safe attachment.
 
 ```typescript
 import { component, signal } from '@angular/core';
@@ -65,3 +65,7 @@ export const tooltip = directive({
   },
 });
 ```
+
+<div class="annotation">
+  <strong>Conditional application:</strong> The <code>:when</code> modifier conditionally applies a <code>use:</code> binding. It sits outside the directive's inputs and cannot clash with them — e.g. <code>use:tooltip(message={'{tip()}'}):when={'{showTip()}'}</code>.
+</div>

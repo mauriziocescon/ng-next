@@ -5,11 +5,18 @@ title: Forwarding — Interactive Tour
 
 ## Forwarding: Proxy & Wrap
 
-<p class="subtitle">How would you build a wrapper component without runtime props spreading?</p>
+<p class="subtitle">How might you build wrapper components without runtime props spreading?</p>
 
-Two component APIs and one marker: `component.proxy<T>()` exposes a directive-compatible native surface, `component.wrap(Target)` forwards a wrapped component's remaining API, and `@forward()` marks the placement site.
+Two component APIs and one marker:
+- `component.proxy<T>()` exposes a directive-compatible native surface
+- `component.wrap(Target)` forwards a wrapped component's remaining API
+- `@forward()` marks the placement site
+
+There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings and directive instructions.
 
 ### Proxying directives to an internal element
+
+`Button` exposes an `HTMLButtonElement` proxy surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the `@forward()` target.
 
 ```typescript
 import { component, signal } from '@angular/core';
@@ -72,6 +79,33 @@ export const Button = component.proxy<HTMLButtonElement>({
 });
 ```
 
+### Wrapping components
+
+Wrappers forward the target's remaining bindings. Directives pass through only if the target already exposes a proxy surface.
+
+```typescript
+import { component, signal, input, computed } from '@angular/core';
+import { tooltip } from '@mylib/tooltip';
+import { UserDetail, User } from './user-detail.ng';
+
+// Select user locally; forward the remaining UserDetail bindings.
+export const UserDetailWrapper = component.wrap(UserDetail, {
+  bindings: {
+    user: input.required<User>(),
+  },
+  setup: ({ user }) => {
+    const other = computed(() => /** something depending on user() **/);
+
+    return @{
+      <UserDetail
+        @forward()
+        use:tooltip(message={'Tooltip message'})
+        user={other()} />
+    };
+  },
+});
+```
+
 <div class="annotation">
-  <strong>No runtime spread:</strong> There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings and directive instructions.
+  <strong>Constraint:</strong> The same directive cannot be applied more than once to the same final element. The compiler enforces this at build time.
 </div>

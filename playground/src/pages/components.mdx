@@ -5,14 +5,14 @@ title: Components — Interactive Tour
 
 ## Component Structure & Bindings
 
-<p class="subtitle">What if components were just function calls with a strict shape?</p>
+<p class="subtitle">What if components were function calls with a strict shape — setup, bindings, providers?</p>
 
 `setup` runs once in an injection context. Bindings are immediately available; destructuring is optional.
 
-Native elements resolve through `IntrinsicElements` — the compiler knows valid attributes, properties, and events. Binding syntax:
+Native elements resolve through `IntrinsicElements` — the compiler would know valid attributes, properties, and events for each tag. Binding syntax:
 
-- **1-way:** `bind:property={var}` (`bind:` can be omitted)
-- **2-way:** `model:property={var}` (input / select / textarea)
+- **1-way:** `bind:property={expr}` (`bind:` can be omitted)
+- **2-way:** `model:property={signal}` (input / select / textarea)
 - **events:** `on:event_name={handler}`
 
 ```typescript
@@ -50,7 +50,7 @@ export const TextSearch = component({
 
 ### Using components in templates
 
-Any component can be used in the template; `bind:`, `model:`, and `on:` behave the same as for native elements.
+Any component can be used directly in the template; `bind:`, `model:`, and `on:` work the same as for native elements. All required inputs and models must be provided.
 
 ```typescript
 import { component, signal } from '@angular/core';
@@ -75,7 +75,7 @@ export const UserDetailConsumer = component({
 
 ### Lexical scoping
 
-Template → setup → file-level imports (functions, constants, enums, interfaces) → global.
+Resolution order: template → setup → file-level imports (functions, constants, enums, interfaces) → global.
 
 ```typescript
 import { component } from '@angular/core';
@@ -98,3 +98,7 @@ export const Counter = component({
   },
 });
 ```
+
+<div class="annotation">
+  <strong>Note:</strong> <code>setup</code> returns either a template (<code>@{'{ }'}</code>) or an object <code>{'{ template, expose }'}</code>. The latter makes a public API available through refs — see <a href="https://github.com/mauriziocescon/ng-next/blob/main/readme.md#expose-and-template-refs">Expose and Template Refs</a> in the full README.
+</div>

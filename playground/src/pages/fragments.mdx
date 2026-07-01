@@ -7,9 +7,11 @@ title: Fragments — Interactive Tour
 
 <p class="subtitle">What if ng-content and ng-template were unified into typed functions?</p>
 
-Fragments are functions that return HTML markup — similar to Svelte snippets. The returned markup is opaque and cannot be manipulated.
+Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like React Children or Solid children.
 
 ### Implicit children fragment
+
+Markup inside a component tag implicitly becomes a `children` fragment. `children` is a reserved name — provided by Angular from nested content, not directly bindable.
 
 ```typescript
 import { component, signal } from '@angular/core';
@@ -37,6 +39,7 @@ import { component, fragment } from '@angular/core';
 
 export const Menu = component({
   bindings: {
+    // Provided by Angular from nested content (not bindable directly). Reserved name.
     children: fragment<void>(),
   },
   setup: ({ children }) => {
@@ -52,6 +55,8 @@ export const Menu = component({
 ```
 
 ### Custom fragment slots
+
+Inline `@fragment` declarations are auto-passed as the matching fragment input by name.
 
 ```typescript
 import { component, signal, input, fragment } from '@angular/core';
@@ -76,3 +81,7 @@ export const MenuConsumer = component({
   },
 });
 ```
+
+<div class="annotation">
+  <strong>Rendering:</strong> <code>@render(fragment())</code> renders a fragment. No <code>ng-container</code> needed. The full form supports an optional injector: <code>@render(fragment(), {'{ injector }'})</code>.
+</div>
