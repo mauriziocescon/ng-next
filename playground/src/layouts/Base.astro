@@ -14,7 +14,7 @@ const props = Astro.props;
 const title = props.title || props.frontmatter?.title || '';
 const description = props.description || props.frontmatter?.description || 'Exploring Angular templates for an agentic future — explicit contracts, typed template surfaces, and structures easier for humans, tooling, and AI agents to reason about.';
 
-const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const base = import.meta.env.BASE_URL;
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
 
 const sections = [
@@ -33,7 +33,7 @@ const sections = [
   { href: `${base}quiz/1/`, label: 'Quiz' },
 ];
 
-const currentPath = Astro.url.pathname.replace(/\/?$/, '/');
+const currentPath = Astro.url.pathname;
 const currentIndex = sections.findIndex(s =>
   currentPath === s.href || (s.href.includes('quiz/') && currentPath.startsWith(`${base}quiz/`))
 );
@@ -285,7 +285,7 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--backdrop);
     z-index: 999;
   }
 
@@ -354,7 +354,7 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
   .main h2 {
     font-size: 2rem;
     margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    background: linear-gradient(135deg, var(--accent-light), var(--accent-lighter));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

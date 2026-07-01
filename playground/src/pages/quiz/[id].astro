@@ -13,12 +13,12 @@ const { id } = Astro.params;
 const index = Number(id) - 1;
 const question = questions[index];
 const total = questions.length;
-const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const base = import.meta.env.BASE_URL;
 const prevHref = index > 0 ? `${base}quiz/${index}/` : null;
 const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
 ---
 
-<Base title={`Quiz ${id}/${total} — ${question.category}`}>
+<Base title={`Quiz ${id}/${total} — ${question.category}`} description={question.description}>
   <h2>Quiz: Valid or Invalid?</h2>
   <p class="subtitle">Question {id} of {total} — {question.description}</p>
 
