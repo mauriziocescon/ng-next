@@ -72,6 +72,36 @@
     "explanation": "Correct. @derive is used inside @for — each row gets an independent instance that follows the embedded view's lifecycle. Bindings are passed as named pairs."
   },
   {
+    "category": "Expose & Refs",
+    "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. Setup returns { template, expose } — the expose object becomes the public API available through ref<typeof TextBadge>(). Everything else stays private."
+  },
+  {
+    "category": "Expose & Refs",
+    "code": "export const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    afterNextRender(() => {\n      badge()?.text();\n    });\n\n    return @{\n      <TextBadge ref={badge} />\n    };\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. ref<typeof TextBadge>() gives a Signal<expose | undefined>. It's readable after afterNextRender, and .text() is the exposed readonly signal."
+  },
+  {
+    "category": "Expose & Refs",
+    "code": "export const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    // Access ref immediately\n    const val = badge()?.text();\n\n    return @{\n      <TextBadge ref={badge} />\n      <p>{val}</p>\n    };\n  },\n});",
+    "valid": false,
+    "explanation": "Invalid. Refs are readable only after afterNextRender — accessing them synchronously in setup will always yield undefined. The read must happen inside afterNextRender or in a reactive context."
+  },
+  {
+    "category": "Expose & Refs",
+    "code": "export const App = component({\n  setup: () => {\n    const tip = ref<typeof tooltip>();\n\n    return @{\n      <div use:tooltip():ref={tip}>Target</div>\n      <button on:click={() => tip()?.toggle()}>Toggle</button>\n    };\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. Directive expose is captured with :ref={variable} on the use: binding. The tooltip directive exposes a toggle() method, accessed through the ref signal."
+  },
+  {
+    "category": "Expose & Refs",
+    "code": "export const App = component({\n  setup: () => {\n    const items = refMany<typeof TextBadge>();\n\n    afterNextRender(() => {\n      items().forEach(api => api.text());\n    });\n\n    return @{\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n    };\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. refMany collects multiple component instances into a Signal<expose[]>. Each TextBadge ref={items} contributes to the same collection."
+  },
+  {
     "category": "Fragments",
     "code": "export const List = component({\n  bindings: {\n    items: input.required<Item[]>(),\n    row: fragment.required<[Item]>(),\n  },\n  setup: ({ items, row }) => @{\n    @for (item of items(); track item.id) {\n      @render(row(item))\n    }\n  },\n});",
     "valid": true,

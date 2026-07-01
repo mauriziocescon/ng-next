@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { Code } from 'astro:components';
 import questions from '../data/quiz-questions.json';
 ---
 
@@ -13,7 +14,13 @@ import questions from '../data/quiz-questions.json';
         <span class="quiz-counter"><span id="quiz-current">1</span> / <span id="quiz-total">{questions.length}</span></span>
         <span class="quiz-category" id="quiz-category"></span>
       </div>
-      <pre class="quiz-code"><code id="quiz-code"></code></pre>
+      <div class="quiz-code" id="quiz-code">
+        {questions.map((q, i) => (
+          <div class="quiz-code-item" data-index={i} hidden={i !== 0}>
+            <Code code={q.code} lang="typescript" theme="github-dark" />
+          </div>
+        ))}
+      </div>
       <div class="quiz-buttons">
         <button id="btn-valid" class="quiz-btn valid">✓ Valid</button>
         <button id="btn-invalid" class="quiz-btn invalid">✗ Invalid</button>
@@ -34,6 +41,7 @@ import questions from '../data/quiz-questions.json';
     const quizEl = document.getElementById('quiz')!;
     const questions = JSON.parse(quizEl.dataset.questions!);
     const codeEl = document.getElementById('quiz-code')!;
+    const codeItems = codeEl.querySelectorAll('.quiz-code-item');
     const currentEl = document.getElementById('quiz-current')!;
     const totalEl = document.getElementById('quiz-total')!;
     const categoryEl = document.getElementById('quiz-category')!;
@@ -60,7 +68,10 @@ import questions from '../data/quiz-questions.json';
 
     function render() {
       const q = questions[index];
-      codeEl.textContent = q.code;
+      // Show/hide code items
+      codeItems.forEach((item, i) => {
+        (item as HTMLElement).hidden = i !== index;
+      });
       categoryEl.textContent = q.category;
       currentEl.textContent = String(index + 1);
       totalEl.textContent = String(questions.length);
@@ -145,15 +156,6 @@ import questions from '../data/quiz-questions.json';
 
   .quiz-code {
     margin: 0 0 1.5rem 0;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    padding: 1.25rem;
-    overflow-x: auto;
-    font-size: 0.85rem;
-    line-height: 1.6;
-    background: var(--bg);
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    white-space: pre;
   }
 
   .quiz-buttons {
