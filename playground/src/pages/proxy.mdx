@@ -34,7 +34,7 @@ export const Button = component.proxy<HTMLButtonElement>({
 });
 
 // -- Usage: directives pass through --
-export const ButtonConsumer = component({
+export const Consumer = component({
   setup: () => {
     const tooltipMsg = signal('Hover me');
     const valid = signal(false);

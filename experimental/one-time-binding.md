@@ -25,7 +25,7 @@ The consumer freezes a binding at its initial value, regardless of how the targe
 import { component, signal } from '@angular/core';
 import { UserDetail, User } from './user-detail.ng';
 
-export const UserDetailConsumer = component({
+export const Consumer = component({
   setup: () => {
     const user = signal<User>({ name: 'Alice', role: 'admin' });
     const email = signal('alice@example.com');

@@ -89,7 +89,7 @@ Any component can be used in the template; `bind:`, `model:`, and `on:` behave t
 import { component, signal } from '@angular/core';
 import { UserDetail, User } from './user-detail.ng';
 
-export const UserDetailConsumer = component({
+export const Consumer = component({
   setup: () => {
     const user = signal<User>(/** ... **/);
     const email = signal<string>(/** ... **/);
@@ -282,7 +282,7 @@ export const SearchBox = component({
 import { component, signal } from '@angular/core';
 import { UserDetail, User } from './user-detail.ng';
 
-export const UserDetailConsumer = component({
+export const Consumer = component({
   setup: () => {
     const user = signal<User>(/** ... **/);
     const email = signal<string>(/** ... **/);
@@ -419,7 +419,7 @@ Forwarding has two component APIs and one marker: `component.proxy<T>()` exposes
 import { component, signal } from '@angular/core';
 import { Menu, MenuItem } from '@mylib/menu';
 
-export const MenuConsumer = component({
+export const Consumer = component({
   setup: () => {
     const first = signal('First');
     const second = signal('Second');
@@ -478,7 +478,7 @@ export interface Item {
   desc: string;
 }
 
-export const MenuConsumer = component({
+export const Consumer = component({
   setup: () => {
     const items = signal<Item[]>(/** ... **/);
 
@@ -493,7 +493,7 @@ export const MenuConsumer = component({
       </Menu>
     };
   },
-  styleUrl: './menu-consumer.css',
+  styleUrl: './consumer.css',
 });
 
 // -- Menu in @mylib/menu --------------------------

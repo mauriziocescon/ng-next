@@ -16,7 +16,7 @@ import { MyMenuItem } from './my-menu-item.ng';
 export interface Item { id: string; desc: string; }
 
 // -- Consumer: declares a named fragment inline --
-export const MenuConsumer = component({
+export const Consumer = component({
   setup: () => {
     const items = signal<Item[]>(/** ... **/);
 
