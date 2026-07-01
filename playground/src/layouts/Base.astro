@@ -7,20 +7,22 @@ interface Props {
 
 const { title } = Astro.props;
 
+const base = import.meta.env.BASE_URL;
+
 const sections = [
-  { href: '/', label: 'Introduction' },
-  { href: '/components/', label: 'Component Basics' },
-  { href: '/scoping/', label: 'Lexical Scoping' },
-  { href: '/directives/', label: 'Directives' },
-  { href: '/derivations/', label: 'Derivations' },
-  { href: '/refs/', label: 'Expose & Refs' },
-  { href: '/fragments-children/', label: 'Fragments: Children' },
-  { href: '/fragments-named/', label: 'Fragments: Named' },
-  { href: '/proxy/', label: 'Proxy Forwarding' },
-  { href: '/wrap/', label: 'Wrap Forwarding' },
-  { href: '/di-tokens/', label: 'DI: Tokens' },
-  { href: '/di-providers/', label: 'DI: Providers' },
-  { href: '/quiz/', label: 'Quiz' },
+  { href: `${base}`, label: 'Introduction' },
+  { href: `${base}components/`, label: 'Component Basics' },
+  { href: `${base}scoping/`, label: 'Lexical Scoping' },
+  { href: `${base}directives/`, label: 'Directives' },
+  { href: `${base}derivations/`, label: 'Derivations' },
+  { href: `${base}refs/`, label: 'Expose & Refs' },
+  { href: `${base}fragments-children/`, label: 'Fragments: Children' },
+  { href: `${base}fragments-named/`, label: 'Fragments: Named' },
+  { href: `${base}proxy/`, label: 'Proxy Forwarding' },
+  { href: `${base}wrap/`, label: 'Wrap Forwarding' },
+  { href: `${base}di-tokens/`, label: 'DI: Tokens' },
+  { href: `${base}di-providers/`, label: 'DI: Providers' },
+  { href: `${base}quiz/`, label: 'Quiz' },
 ];
 
 const currentPath = Astro.url.pathname;
