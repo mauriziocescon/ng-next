@@ -20,7 +20,7 @@ const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
 
 <Base title={`Quiz ${id}/${total} — ${question.category}`}>
   <h2>Quiz: Valid or Invalid?</h2>
-  <p class="subtitle">Question {id} of {total} — <strong>{question.category}</strong></p>
+  <p class="subtitle">Question {id} of {total} — {question.description}</p>
 
   <div class="quiz-card" role="region" aria-label={`Quiz question ${id}`}>
     <div class="quiz-header">

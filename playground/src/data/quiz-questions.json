@@ -1,156 +1,182 @@
 [
   {
     "category": "Component Basics",
+    "description": "Minimal component with a required input rendered in the template.",
     "code": "export const Badge = component({\n  bindings: {\n    label: input.required<string>(),\n  },\n  setup: ({ label }) => @{\n    <span>{label()}</span>\n  },\n});",
     "valid": true,
     "explanation": "Correct. Minimal component: required input, destructured in setup, rendered in template with signal call syntax."
   },
   {
     "category": "Component Basics",
+    "description": "Signal read syntax inside a template interpolation.",
     "code": "export const Search = component({\n  setup: () => {\n    const text = signal('');\n    return @{\n      <input model:value={text} />\n      <p>{text}</p>\n    };\n  },\n});",
     "valid": false,
     "explanation": "Invalid. In the template, text is a signal — it should be {text()} with the call. {text} would render the signal object, not its value."
   },
   {
     "category": "Component Basics",
+    "description": "Input with a default value used in a text interpolation.",
     "code": "export const Greeting = component({\n  bindings: {\n    name: input<string>('World'),\n  },\n  setup: ({ name }) => @{\n    <h1>Hello, {name()}!</h1>\n  },\n});",
     "valid": true,
     "explanation": "Correct. Input with a default value, destructured in setup, rendered with signal call syntax in a text interpolation."
   },
   {
     "category": "Component Basics",
+    "description": "Two-way model binding with .set() mutation in a click handler.",
     "code": "export const Toggle = component({\n  bindings: {\n    active: model.required<boolean>(),\n  },\n  setup: ({ active }) => @{\n    <button on:click={() => active.set(!active())}>\n      {active() ? 'On' : 'Off'}\n    </button>\n  },\n});",
     "valid": true,
     "explanation": "Correct. A model is a two-way binding — it's a writable signal, so calling .set() on it is valid. The template reads it with active()."
   },
   {
     "category": "Lexical Scoping",
+    "description": "Signal read in templates vs. raw signal reference in providers.",
     "code": "export const Info = component({\n  bindings: {\n    count: input.required<number>(),\n  },\n  setup: ({ count }) => @{\n    <p>Count: {count}</p>\n  },\n  providers: ({ count }) => [\n    provide(Logger, () => new Logger(count)),\n  ],\n});",
     "valid": false,
     "explanation": "Invalid. In the template, count is a signal — it should be {count()}, not {count}. The providers usage is fine though: inputs are hoisted and available there."
   },
   {
     "category": "Directives",
+    "description": "Directive with typed host, input, output, and host access in setup.",
     "code": "const tip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n    hide: output<void>(),\n  },\n  setup: ({ message, hide }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});",
     "valid": true,
     "explanation": "Correct. Directive with typed host, input, output, and host access in setup's second parameter."
   },
   {
     "category": "Directives",
+    "description": "Conditional directive application with :when modifier.",
     "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const SearchBox = component({\n  setup: () => {\n    const text = signal('');\n    const msg = signal('Type to search');\n    const show = signal(true);\n\n    function handler() { /* ... */ }\n\n    return @{\n      <input\n        type=\"text\"\n        model:value={text}\n        use:tooltip(message={msg()}):when={show()}\n        on:input={handler} />\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. :when conditionally applies the directive. It sits outside the directive's parentheses and cannot clash with input names."
   },
   {
     "category": "Directives",
+    "description": "Directive constraining its host to a specific element type.",
     "code": "const highlight = directive({\n  host: ref<HTMLInputElement>(),\n  bindings: {\n    color: input<string>('yellow'),\n  },\n  setup: ({ color }, { host }) => {\n    afterRenderEffect(() => {\n      host()?.style.setProperty('background', color());\n    });\n  },\n});",
     "valid": true,
     "explanation": "Correct. The directive constrains its host to HTMLInputElement, has an optional input with a default, and accesses the host element reactively via afterRenderEffect."
   },
   {
     "category": "Directives",
+    "description": "Applying the same directive twice to one element.",
     "code": "const draggable = directive({\n  host: ref<HTMLElement>(),\n  setup: (_, { host }) => {\n    afterRenderEffect(() => { /* drag logic */ });\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <div\n      use:draggable()\n      use:draggable() />\n  },\n});",
     "valid": false,
     "explanation": "Invalid. The same directive cannot be applied more than once to the same element. The compiler would reject this at build time."
   },
   {
     "category": "Derivations",
+    "description": "Derivation declaring an output binding.",
     "code": "const fmt = derivation({\n  bindings: {\n    value: input.required<number>(),\n    change: output<string>(),\n  },\n  setup: ({ value, change }) => {\n    return computed(() => value().toFixed(2));\n  },\n});",
     "valid": false,
     "explanation": "Invalid. Derivations only support inputs — no outputs, no models. They have no DOM surface to emit from."
   },
   {
     "category": "Derivations",
+    "description": "Simple derivation combining two inputs into a computed value.",
     "code": "const fullName = derivation({\n  bindings: {\n    first: input.required<string>(),\n    last: input.required<string>(),\n  },\n  setup: ({ first, last }) => {\n    return computed(() => `${first()} ${last()}`);\n  },\n});",
     "valid": true,
     "explanation": "Correct. Derivation with two required inputs, returning a computed signal. No DI needed here, but the injection context is still available if needed."
   },
   {
     "category": "Derivations",
+    "description": "Using @derive inside @for to create per-row reactive computations.",
     "code": "const priceCalc = derivation({\n  bindings: {\n    item: input.required<{ id: string; price: number }>(),\n    qty: input.required<number>(),\n  },\n  setup: ({ item, qty }) => {\n    return computed(() => item().price * qty());\n  },\n});\n\nexport const PriceList = component({\n  bindings: {\n    items: input.required<{ id: string; price: number; qty: number }[]>(),\n  },\n  setup: ({ items }) => @{\n    @for (item of items(); track item.id) {\n      @derive total = priceCalc(item={item} qty={item.qty});\n      <span>{total()}</span>\n    }\n  },\n});",
     "valid": true,
     "explanation": "Correct. @derive is used inside @for — each row gets an independent instance that follows the embedded view's lifecycle. Bindings are passed as named pairs."
   },
   {
     "category": "Expose & Refs",
+    "description": "Component returning { template, expose } to define a public API.",
     "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. Setup returns { template, expose } — the expose object becomes the public API available through ref<typeof TextBadge>(). Everything else stays private."
   },
   {
     "category": "Expose & Refs",
+    "description": "Accessing a component's exposed API via ref after afterNextRender.",
     "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    afterNextRender(() => {\n      badge()?.text();\n    });\n\n    return @{\n      <TextBadge ref={badge} />\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. ref<typeof TextBadge>() gives a Signal<expose | undefined>. It's readable after afterNextRender, and .text() is the exposed readonly signal."
   },
   {
     "category": "Expose & Refs",
+    "description": "Reading a ref synchronously in setup before the view is rendered.",
     "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    // Access ref immediately\n    const val = badge()?.text();\n\n    return @{\n      <TextBadge ref={badge} />\n      <p>{val}</p>\n    };\n  },\n});",
     "valid": false,
     "explanation": "Invalid. Refs are readable only after afterNextRender — accessing them synchronously in setup will always yield undefined. The read must happen inside afterNextRender or in a reactive context."
   },
   {
     "category": "Expose & Refs",
+    "description": "Capturing a directive's expose with the :ref modifier.",
     "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input<string>(''),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n    return {\n      toggle: () => { /* ... */ },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = ref<typeof tooltip>();\n\n    return @{\n      <div use:tooltip():ref={tip}>Target</div>\n      <button on:click={() => tip()?.toggle()}>Toggle</button>\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. Directive expose is captured with :ref={variable} on the use: binding. The tooltip directive exposes a toggle() method, accessed through the ref signal."
   },
   {
     "category": "Expose & Refs",
+    "description": "Collecting multiple component instances with refMany.",
     "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const items = refMany<typeof TextBadge>();\n\n    afterNextRender(() => {\n      items().forEach(api => api.text());\n    });\n\n    return @{\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. refMany collects multiple component instances into a Signal<expose[]>. Each TextBadge ref={items} contributes to the same collection."
   },
   {
     "category": "Fragments: Children",
+    "description": "Using a reserved name (ref) as a component binding.",
     "code": "export const Card = component({\n  bindings: {\n    children: fragment<void>(),\n    ref: input<string>(''),\n  },\n  setup: ({ children, ref }) => @{\n    @render(children?.())\n  },\n});",
     "valid": false,
     "explanation": "Invalid. 'ref' is a reserved attribute for components — it cannot be declared as a binding. The 'children: fragment<void>()' declaration is fine (children must be a FragmentBinding<void> when present)."
   },
   {
     "category": "Fragments: Children",
+    "description": "Optional children fragment guarded with @if before rendering.",
     "code": "export const Tabs = component({\n  bindings: {\n    header: fragment.required<[string]>(),\n    children: fragment<void>(),\n  },\n  setup: ({ header, children }) => @{\n    @render(header('Tab 1'))\n    @if (children) {\n      @render(children())\n    }\n  },\n});",
     "valid": true,
     "explanation": "Correct. 'children' can be declared as a binding if it uses fragment<void>() or fragment.required<void>(). Here children is optional (fragment<void>()), so @if (children) guards against it being undefined."
   },
   {
     "category": "Fragments: Named",
+    "description": "Named fragment with a typed parameter rendered inside @for.",
     "code": "export const List = component({\n  bindings: {\n    items: input.required<Item[]>(),\n    row: fragment.required<[Item]>(),\n  },\n  setup: ({ items, row }) => @{\n    @for (item of items(); track item.id) {\n      @render(row(item))\n    }\n  },\n});",
     "valid": true,
     "explanation": "Correct. Named fragment with typed parameter, rendered inside @for with the item passed as argument."
   },
   {
     "category": "Proxy Forwarding",
+    "description": "Applying a use: directive to a component without a proxy surface.",
     "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button is a plain component (no proxy surface)\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
     "valid": false,
     "explanation": "Invalid. use: directives on components only work if the component uses component.proxy<T>. Button is a plain component() — it doesn't expose a native element surface for directives."
   },
   {
     "category": "Proxy Forwarding",
+    "description": "component.proxy exposing an HTMLButtonElement surface with @forward().",
     "code": "export const IconButton = component.proxy<HTMLButtonElement>({\n  bindings: {\n    icon: input.required<string>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, children }) => @{\n    <button @forward()>\n      <i class={icon()} />\n      @render(children())\n    </button>\n  },\n});",
     "valid": true,
     "explanation": "Correct. component.proxy<HTMLButtonElement> exposes a native button surface. Directives applied to <IconButton /> will be forwarded to the inner <button> via @forward()."
   },
   {
     "category": "Wrap Forwarding",
+    "description": "component.wrap forwarding remaining bindings to an inner proxy component.",
     "code": "const Inner = component.proxy<HTMLDivElement>({\n  bindings: {\n    title: input.required<string>(),\n    extra: input<string>(''),\n    children: fragment<void>(),\n  },\n  setup: ({ title, extra, children }) => @{\n    <div @forward() class={extra()}>\n      <h2>{title()}</h2>\n      @render(children?.())\n    </div>\n  },\n});\n\nexport const Wrapper = component.wrap(Inner, {\n  bindings: {\n    extra: input<string>(''),\n  },\n  setup: ({ extra }) => @{\n    <Inner @forward() class={extra()} />\n  },\n});",
     "valid": true,
     "explanation": "Correct. component.wrap forwards remaining bindings of Inner (title, children). The wrapper selects 'extra' for its own setup and places @forward() on the inner component."
   },
   {
     "category": "DI: Tokens",
+    "description": "Using provide(token) shorthand on a token without a factory.",
     "code": "const token = injectionToken<string>({ debugName: 'myToken' });\n\nexport const App = component({\n  setup: () => {\n    const val = inject(token);\n    return @{ <p>{val}</p> };\n  },\n  providers: () => [\n    provide(token),\n  ],\n});",
     "valid": false,
     "explanation": "Invalid. The token has no factory — the provide(token) shorthand requires the token to have a factory defined. Without one, you must use provide(token, () => 'value') with an explicit factory."
   },
   {
     "category": "DI: Tokens",
+    "description": "Auto-provided token registered at root scope without explicit provide().",
     "code": "const theme = injectionToken({\n  debugName: 'theme',\n  autoProvided: true,\n  factory: () => signal('dark'),\n});\n\nexport const App = component({\n  setup: () => {\n    const t = inject(theme);\n    return @{ <div class={t()}>content</div> };\n  },\n});",
     "valid": true,
     "explanation": "Correct. With autoProvided: true, the token is registered at root scope automatically — no need for provide() in the component's providers array."
   },
   {
     "category": "DI: Providers",
+    "description": "Input-driven provider factory with hoisted input access.",
     "code": "class CounterStore {\n  private readonly counter: WritableSignal<number>;\n  readonly value = this.counter.asReadonly();\n\n  constructor(start: InputSignal<number>) {\n    this.counter = linkedSignal(() => start());\n  }\n\n  decrease() { this.counter.update(v => v - 1); }\n  increase() { this.counter.update(v => v + 1); }\n}\n\nexport const Counter = component({\n  bindings: { start: input<number>(0) },\n  providers: ({ start }) => [\n    provide(CounterStore, () => new CounterStore(start)),\n  ],\n  setup: () => {\n    const store = inject(CounterStore);\n    return @{ <span>{store.value()}</span> };\n  },\n});",
     "valid": true,
     "explanation": "Correct. Inputs are hoisted and available in providers before setup runs. The factory has injection context."
