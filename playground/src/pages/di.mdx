@@ -1,0 +1,83 @@
+---
+layout: ../layouts/Base.astro
+title: DI Enhancements — Interactive Tour
+---
+
+## Dependency Injection Enhancements
+
+<p class="subtitle">Small ergonomic improvements to tokens and providers — nothing revolutionary.</p>
+
+`injectionToken` creates a typed DI token. Four flavours:
+
+- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default.
+- **With factory + `autoProvided: true`** — factory registered unconditionally at root scope.
+- **Without factory** — must use `provide(token, factory)` with an explicit factory.
+- **Multi** (`injectionToken.multi`) — each `provide` call contributes one item; `inject` returns the collected array.
+
+```typescript
+import {
+  component, inject, provide, injectionToken,
+  input, signal
+} from '@angular/core';
+
+// With factory (shorthand-eligible)
+const compToken = injectionToken({
+  debugName: 'compToken',
+  factory: () => {
+    const counter = signal(0);
+    return {
+      value: counter.asReadonly(),
+      decrease: () => counter.update(v => v - 1),
+      increase: () => counter.update(v => v + 1),
+    };
+  },
+});
+
+// Auto-provided at root scope
+const rootToken = injectionToken({
+  debugName: 'rootToken',
+  autoProvided: true,
+  factory: () => {
+    const counter = signal(0);
+    return {
+      value: counter.asReadonly(),
+      decrease: () => counter.update(v => v - 1),
+      increase: () => counter.update(v => v + 1),
+    };
+  },
+});
+
+// Multi token with factory
+const multiToken = injectionToken.multi({
+  debugName: 'multiToken',
+  factory: () => Math.random(),
+});
+
+class Store {}
+
+export const Counter = component({
+  bindings: {
+    initialValue: input<number>(),
+  },
+  setup: () => {
+    const rootCounter = inject(rootToken);
+    const compCounter = inject(compToken);
+    const multi = inject(multiToken); // number[]
+    const store = inject(Store);
+    /** ... **/
+    return @{ ... };
+  },
+  providers: ({ initialValue }) => [
+    provide(compToken),
+    provide(multiToken),
+    provide(multiToken),
+    provide(multiToken, () => 10),
+    provide(multiToken, () => initialValue()),
+    provide(Store, () => new Store()),
+  ],
+});
+```
+
+<div class="annotation">
+  <strong>Input-driven providers:</strong> Inputs are hoisted to the component level for use in provider initialization. <code>providers</code> receives only inputs — not models or outputs. Provider factories run in an injection context.
+</div>

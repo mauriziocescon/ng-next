@@ -5,7 +5,7 @@
   "description": "Interactive tour of the ng-next proposal",
   "author": "Maurizio Cescon <maurizio.cescon@gmail.com>",
   "homepage": "https://github.com/mauriziocescon/ng-next",
-  "private": true,
+  "private": false,
   "engines": {
     "node": ">=24.13.0",
     "npm": ">=11.6.2"
@@ -21,12 +21,15 @@
     }
   ],
   "scripts": {
-    "build": "tsc && vite build",
-    "dev": "vite",
-    "preview": "vite preview"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^4.3.0",
+    "astro": "^5.10.2"
   },
   "devDependencies": {
-    "typescript": "^6.0.3",
-    "vite": "^8.1.2"
+    "typescript": "^6.0.3"
   }
 }

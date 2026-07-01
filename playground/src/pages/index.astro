@@ -1,0 +1,26 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Exploring Angular Templates — Interactive Tour">
+  <h2>Exploring Angular's Template Layer</h2>
+  <p class="subtitle">Personal thoughts on what a future template surface might look like — not a proposal, just an exploration.</p>
+
+  <p>This is a thought experiment: what if Angular's template layer were redesigned around explicit contracts and typed surfaces? The ideas here are backed by a <a href="https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts">type system sketch</a>, an <a href="https://github.com/mauriziocescon/ng-next/blob/main/types/ng-ast.ts">AST definition</a>, and a <a href="https://github.com/mauriziocescon/ng-next/blob/main/types/ng-dsl-type-checking-spec.md">type checking spec</a> — but none of this is real Angular. It's just one person thinking out loud.</p>
+
+  <p>The exploration revolves around:</p>
+  <ul>
+    <li><strong>Building blocks as functions</strong> — component, directive, derivation, fragment</li>
+    <li><strong>TS expressions with <code>{'{}'}</code></strong> — bindings + text interpolation</li>
+    <li><strong>Explicit binding prefixes</strong> — bind:, on:, model:, class:, style:, use:</li>
+    <li><strong>Hostless components + lexical scoping</strong></li>
+    <li><strong>Composition via fragments and forwarding</strong></li>
+    <li><strong>Enhanced DI with injectionToken</strong></li>
+  </ul>
+
+  <div class="annotation">
+    <strong>The DSL boundary:</strong> Templates live inside a <code>@{'{ }'}</code> markup literal. The <code>@</code> marks where TypeScript ends and the template DSL begins. It's not plain TS — it would need dedicated tooling and parser support.
+  </div>
+
+  <p>Use the sidebar to walk through each idea.</p>
+</Base>

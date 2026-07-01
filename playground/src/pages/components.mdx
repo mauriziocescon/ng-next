@@ -1,0 +1,100 @@
+---
+layout: ../layouts/Base.astro
+title: Components — Interactive Tour
+---
+
+## Component Structure & Bindings
+
+<p class="subtitle">What if components were just function calls with a strict shape?</p>
+
+`setup` runs once in an injection context. Bindings are immediately available; destructuring is optional.
+
+Native elements resolve through `IntrinsicElements` — the compiler knows valid attributes, properties, and events. Binding syntax:
+
+- **1-way:** `bind:property={var}` (`bind:` can be omitted)
+- **2-way:** `model:property={var}` (input / select / textarea)
+- **events:** `on:event_name={handler}`
+
+```typescript
+import { component, signal, linkedSignal, input, output } from '@angular/core';
+
+export const TextSearch = component({
+  bindings: {
+    value: input.required<string>(),
+    valueChange: output<string>(),
+  },
+  setup: ({ value, valueChange }) => {
+    const text = linkedSignal(() => value());
+    const isDanger = signal(false);
+
+    function textChange() {
+      valueChange.emit(text());
+    }
+
+    return @{
+      <label class:danger={isDanger()}>Text:</label>
+      <input type="text" model:value={text} on:input={textChange} />
+
+      <button disabled={text().length === 0} on:click={() => text.set('')}>
+        {'Reset ' + text()}
+      </button>
+    };
+  },
+  style: `
+    .danger {
+      color: red;
+    }
+  `,
+});
+```
+
+### Using components in templates
+
+Any component can be used in the template; `bind:`, `model:`, and `on:` behave the same as for native elements.
+
+```typescript
+import { component, signal } from '@angular/core';
+import { UserDetail, User } from './user-detail.ng';
+
+export const UserDetailConsumer = component({
+  setup: () => {
+    const user = signal<User>(/** ... **/);
+    const email = signal<string>(/** ... **/);
+
+    function makeAdmin() {/** ... **/}
+
+    return @{
+      <UserDetail
+        user={user()}
+        model:email={email}
+        on:makeAdmin={makeAdmin} />
+    };
+  },
+});
+```
+
+### Lexical scoping
+
+Template → setup → file-level imports (functions, constants, enums, interfaces) → global.
+
+```typescript
+import { component } from '@angular/core';
+
+enum Type {
+  Counter = 'counter',
+  Other = 'other',
+}
+
+const type = Type.Counter;
+const counter = (value: number) => `Let's count till ${value}`;
+
+export const Counter = component({
+  setup: () => @{
+    @if (type === Type.Counter) {
+      <p>{counter(5)}</p>
+    } @else {
+      <span>Empty</span>
+    }
+  },
+});
+```

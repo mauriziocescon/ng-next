@@ -1,0 +1,77 @@
+---
+layout: ../layouts/Base.astro
+title: Forwarding — Interactive Tour
+---
+
+## Forwarding: Proxy & Wrap
+
+<p class="subtitle">How would you build a wrapper component without runtime props spreading?</p>
+
+Two component APIs and one marker: `component.proxy<T>()` exposes a directive-compatible native surface, `component.wrap(Target)` forwards a wrapped component's remaining API, and `@forward()` marks the placement site.
+
+### Proxying directives to an internal element
+
+```typescript
+import { component, signal } from '@angular/core';
+import { Button } from '@mylib/button';
+import { ripple } from '@mylib/ripple';
+import { tooltip } from '@mylib/tooltip';
+
+export const ButtonConsumer = component({
+  setup: () => {
+    const tooltipMsg = signal('');
+    const valid = signal(false);
+
+    function doSomething() {/** ... **/}
+
+    return @{
+      <Button
+        type="button"
+        style="background-color: cyan"
+        class={valid() ? 'global-css-valid' : ''}
+        use:ripple()
+        use:tooltip(message={tooltipMsg()})
+        disabled={!valid()}
+        on:click={doSomething}>
+          Click / Hover me
+      </Button>
+    };
+  },
+});
+```
+
+### Button with proxy surface
+
+```typescript
+import { component, input, output, computed, fragment } from '@angular/core';
+
+export const Button = component.proxy<HTMLButtonElement>({
+  bindings: {
+    type: input<'button' | 'submit' | 'reset'>('button'),
+    class: input<string>(''),
+    style: input<string>(''),
+    disabled: input<boolean>(false),
+    click: output<void>(),
+    children: fragment.required<void>(),
+  },
+  setup: ({ type, class: className, style, disabled, click, children }) => {
+    const innerStyle = computed(() => `${style()}; color: red;`);
+
+    return @{
+      <button
+        @forward()
+        type={type()}
+        class={className()}
+        style={innerStyle()}
+        disabled={disabled()}
+        on:click={() => click.emit()}>
+        @render(children())
+      </button>
+    };
+  },
+});
+```
+
+<div class="annotation">
+  <strong>No runtime spread:</strong> There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings and directive instructions.
+</div>

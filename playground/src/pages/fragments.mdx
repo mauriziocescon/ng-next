@@ -1,0 +1,78 @@
+---
+layout: ../layouts/Base.astro
+title: Fragments — Interactive Tour
+---
+
+## Composition with Fragments
+
+<p class="subtitle">What if ng-content and ng-template were unified into typed functions?</p>
+
+Fragments are functions that return HTML markup — similar to Svelte snippets. The returned markup is opaque and cannot be manipulated.
+
+### Implicit children fragment
+
+```typescript
+import { component, signal } from '@angular/core';
+import { Menu, MenuItem } from '@mylib/menu';
+
+export const MenuConsumer = component({
+  setup: () => {
+    const first = signal('First');
+    const second = signal('Second');
+
+    return @{
+      <Menu>
+        <MenuItem>{first()}</MenuItem>
+        <MenuItem>{second()}</MenuItem>
+      </Menu>
+    };
+  },
+});
+```
+
+### Menu component using fragments
+
+```typescript
+import { component, fragment } from '@angular/core';
+
+export const Menu = component({
+  bindings: {
+    children: fragment<void>(),
+  },
+  setup: ({ children }) => {
+    return @{
+      @if (children) {
+        @render(children())
+      } @else {
+        <span>Empty</span>
+      }
+    };
+  },
+});
+```
+
+### Custom fragment slots
+
+```typescript
+import { component, signal, input, fragment } from '@angular/core';
+import { Menu } from '@mylib/menu';
+import { MyMenuItem } from './my-menu-item.ng';
+
+export interface Item { id: string; desc: string; }
+
+export const MenuConsumer = component({
+  setup: () => {
+    const items = signal<Item[]>(/** ... **/);
+
+    return @{
+      <Menu items={items()}>
+        @fragment menuItem(item: Item) {
+          <div class="my-menu-item">
+            <MyMenuItem>{item.desc}</MyMenuItem>
+          </div>
+        }
+      </Menu>
+    };
+  },
+});
+```
