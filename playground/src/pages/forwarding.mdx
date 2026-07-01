@@ -7,105 +7,52 @@ title: Forwarding — Interactive Tour
 
 <p class="subtitle">How might you build wrapper components without runtime props spreading?</p>
 
-Two component APIs and one marker:
-- `component.proxy<T>()` exposes a directive-compatible native surface
-- `component.wrap(Target)` forwards a wrapped component's remaining API
-- `@forward()` marks the placement site
-
-There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings and directive instructions.
-
-### Proxying directives to an internal element
-
-`Button` exposes an `HTMLButtonElement` proxy surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the `@forward()` target.
+`component.proxy<T>()` exposes a native element surface — directives and bindings forward through `@forward()` at compile time.
 
 ```typescript
-import { component, signal } from '@angular/core';
-import { Button } from '@mylib/button';
+import { component, input, output, computed, fragment, signal } from '@angular/core';
 import { ripple } from '@mylib/ripple';
 import { tooltip } from '@mylib/tooltip';
 
+// -- Definition: proxy surface --
+export const Button = component.proxy<HTMLButtonElement>({
+  bindings: {
+    type: input<'button' | 'submit' | 'reset'>('button'),
+    disabled: input<boolean>(false),
+    click: output<void>(),
+    children: fragment.required<void>(),
+  },
+  setup: ({ type, disabled, click, children }) => @{
+    <button
+      @forward()
+      type={type()}
+      disabled={disabled()}
+      on:click={() => click.emit()}>
+      @render(children())
+    </button>
+  },
+});
+
+// -- Usage: directives pass through --
 export const ButtonConsumer = component({
   setup: () => {
-    const tooltipMsg = signal('');
+    const tooltipMsg = signal('Hover me');
     const valid = signal(false);
-
-    function doSomething() {/** ... **/}
 
     return @{
       <Button
         type="button"
-        style="background-color: cyan"
-        class={valid() ? 'global-css-valid' : ''}
         use:ripple()
         use:tooltip(message={tooltipMsg()})
         disabled={!valid()}
-        on:click={doSomething}>
-          Click / Hover me
+        on:click={() => {}}>
+          Click me
       </Button>
     };
   },
 });
 ```
 
-### Button with proxy surface
-
-```typescript
-import { component, input, output, computed, fragment } from '@angular/core';
-
-export const Button = component.proxy<HTMLButtonElement>({
-  bindings: {
-    type: input<'button' | 'submit' | 'reset'>('button'),
-    class: input<string>(''),
-    style: input<string>(''),
-    disabled: input<boolean>(false),
-    click: output<void>(),
-    children: fragment.required<void>(),
-  },
-  setup: ({ type, class: className, style, disabled, click, children }) => {
-    const innerStyle = computed(() => `${style()}; color: red;`);
-
-    return @{
-      <button
-        @forward()
-        type={type()}
-        class={className()}
-        style={innerStyle()}
-        disabled={disabled()}
-        on:click={() => click.emit()}>
-        @render(children())
-      </button>
-    };
-  },
-});
-```
-
-### Wrapping components
-
-Wrappers forward the target's remaining bindings. Directives pass through only if the target already exposes a proxy surface.
-
-```typescript
-import { component, signal, input, computed } from '@angular/core';
-import { tooltip } from '@mylib/tooltip';
-import { UserDetail, User } from './user-detail.ng';
-
-// Select user locally; forward the remaining UserDetail bindings.
-export const UserDetailWrapper = component.wrap(UserDetail, {
-  bindings: {
-    user: input.required<User>(),
-  },
-  setup: ({ user }) => {
-    const other = computed(() => /** something depending on user() **/);
-
-    return @{
-      <UserDetail
-        @forward()
-        use:tooltip(message={'Tooltip message'})
-        user={other()} />
-    };
-  },
-});
-```
-
 <div class="annotation">
-  <strong>Constraint:</strong> The same directive cannot be applied more than once to the same final element. The compiler enforces this at build time.
+  <strong>No runtime spread:</strong> the compiler expands <code>@forward()</code> into concrete bindings and directive instructions. <code>component.wrap(Target)</code> does the same for component-to-component forwarding — no props object, no magic.
 </div>

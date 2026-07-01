@@ -7,22 +7,10 @@ title: Expose & Refs — Interactive Tour
 
 <p class="subtitle">What if component internals stayed private — and only an explicit <code>expose</code> was reachable through refs?</p>
 
-`expose` is the public API a component or directive makes available through refs; everything else stays private.
-
-Refs are readable signals branded as `Ref<T>`:
-
-- `ref<typeof Type>()` reads as `Signal<expose | undefined>`
-- `refMany<typeof Type>()` reads as `Signal<expose[]>`
-- `ref<HTMLElement>()` reads as `Signal<HTMLElement | undefined>`
-
-Without `expose`: `ref()` reads as `Signal<undefined>`, and `refMany()` reads as `Signal<[]>`. Refs are readable after `afterNextRender`.
-
-### Defining component and directive exposes
-
-When setup returns `{ template, expose }` instead of just a template, the `expose` object becomes the ref's public API.
+A component chooses what to expose; consumers access it through typed `ref` signals.
 
 ```typescript
-import { component, directive, ref, signal } from '@angular/core';
+import { component, afterNextRender, ref, refMany, signal } from '@angular/core';
 
 const TextBadge = component({
   setup: () => {
@@ -37,47 +25,30 @@ const TextBadge = component({
   },
 });
 
-const tooltip = directive({
-  host: ref<HTMLElement>(),
-  setup: () => ({
-    toggle: () => {},
-  }),
-});
-```
-
-### Using refs — elements, components, and directives
-
-```typescript
-import { afterNextRender, component, ref, refMany } from '@angular/core';
-
 export const RefShowcase = component({
   setup: () => {
-    const el = ref<HTMLDivElement>(); // Ref<HTMLDivElement | undefined>
+    const el = ref<HTMLDivElement>();
     const badge = ref<typeof TextBadge>();
-    const tip = ref<typeof tooltip>();
-    const badges = refMany<typeof TextBadge>(); // Ref<{ text: Signal<string> }[]>
+    const badges = refMany<typeof TextBadge>();
 
     afterNextRender(() => {
       el()?.scrollIntoView();
       badge()?.text();
-      tip()?.toggle();
       badges().forEach((api) => api.text());
     });
 
     return @{
-      <div ref={el} use:tooltip():ref={tip}>Target</div>
+      <div ref={el}>Target</div>
 
       <TextBadge ref={badge} />
 
       <TextBadge ref={badges} />
       <TextBadge ref={badges} />
-
-      <button on:click={() => tip()?.toggle()}>Toggle tlp</button>
     };
   },
 });
 ```
 
 <div class="annotation">
-  <strong>Key constraint:</strong> <code>ref</code> and <code>children</code> are reserved at the component level — they cannot be declared as component bindings. Directives and derivations may use them as binding names (though not recommended).
+  <strong>Private by default:</strong> without <code>expose</code>, <code>ref()</code> resolves to <code>Signal&lt;undefined&gt;</code>. Only the explicitly returned surface is reachable — no more accidental coupling to component internals.
 </div>

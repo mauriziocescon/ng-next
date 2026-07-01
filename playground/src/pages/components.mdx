@@ -7,13 +7,7 @@ title: Components — Interactive Tour
 
 <p class="subtitle">What if components were function calls with a strict shape — setup, bindings, providers?</p>
 
-`setup` runs once in an injection context. Bindings are immediately available; destructuring is optional.
-
-Native elements resolve through `IntrinsicElements` — the compiler would know valid attributes, properties, and events for each tag. Binding syntax:
-
-- **1-way:** `bind:property={expr}` (`bind:` can be omitted)
-- **2-way:** `model:property={signal}` (input / select / textarea)
-- **events:** `on:event_name={handler}`
+A component is a `setup` that runs once in an injection context, with typed bindings as its public contract.
 
 ```typescript
 import { component, signal, linkedSignal, input, output } from '@angular/core';
@@ -48,57 +42,6 @@ export const TextSearch = component({
 });
 ```
 
-### Using components in templates
-
-Any component can be used directly in the template; `bind:`, `model:`, and `on:` work the same as for native elements. All required inputs and models must be provided.
-
-```typescript
-import { component, signal } from '@angular/core';
-import { UserDetail, User } from './user-detail.ng';
-
-export const UserDetailConsumer = component({
-  setup: () => {
-    const user = signal<User>(/** ... **/);
-    const email = signal<string>(/** ... **/);
-
-    function makeAdmin() {/** ... **/}
-
-    return @{
-      <UserDetail
-        user={user()}
-        model:email={email}
-        on:makeAdmin={makeAdmin} />
-    };
-  },
-});
-```
-
-### Lexical scoping
-
-Resolution order: template → setup → file-level imports (functions, constants, enums, interfaces) → global.
-
-```typescript
-import { component } from '@angular/core';
-
-enum Type {
-  Counter = 'counter',
-  Other = 'other',
-}
-
-const type = Type.Counter;
-const counter = (value: number) => `Let's count till ${value}`;
-
-export const Counter = component({
-  setup: () => @{
-    @if (type === Type.Counter) {
-      <p>{counter(5)}</p>
-    } @else {
-      <span>Empty</span>
-    }
-  },
-});
-```
-
 <div class="annotation">
-  <strong>Note:</strong> <code>setup</code> returns either a template (<code>@{'{ }'}</code>) or an object <code>{'{ template, expose }'}</code>. The latter makes a public API available through refs — see <a href="https://github.com/mauriziocescon/ng-next/blob/main/readme.md#expose-and-template-refs">Expose and Template Refs</a> in the full README.
+  <strong>One shape, explicit contract:</strong> bindings define the public API, <code>setup</code> owns the logic, the template uses <code>bind:</code>, <code>model:</code>, <code>on:</code> uniformly for native elements and components alike. Lexical scoping resolves template → setup → file-level imports → global.
 </div>

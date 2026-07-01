@@ -7,9 +7,7 @@ title: Derivations — Interactive Tour
 
 <p class="subtitle">Could pipes be replaced by something with DI access and proper lifecycle?</p>
 
-`@derive` creates a template-scoped reactive computation, establishing an injection context before calling the derivation's `setup`. It follows the lifecycle of the enclosing view.
-
-Bindings are passed as named pairs `key={expr}`, not as a JS object literal. Only inputs are allowed (no outputs, no models — a derivation has no DOM surface). `setup` must return a `Signal<T>`.
+A derivation is a reactive computation scoped to its enclosing view — with full injection context.
 
 ```typescript
 import { component, derivation, computed, inject, input } from '@angular/core';
@@ -30,25 +28,17 @@ export const PriceSimulator = component({
   bindings: {
     items: input.required<Item[]>(),
   },
-  setup: ({ items }) => {
-    /**
-     * price shares the @for embedded view scope and is created once,
-     * following its lifecycle. Same scope as @let, same lifetime as
-     * a pure pipe. Each row owns an independent instance. Not accessible
-     * outside its block.
-     */
-    return @{
-      @for (item of items(); track item.id) {
-        @derive price = simulation(item={item} qty={1});
+  setup: ({ items }) => @{
+    @for (item of items(); track item.id) {
+      @derive price = simulation(item={item} qty={1});
 
-        <h5>{item.desc}</h5>
-        <div>Price: {price()}</div>
-      }
-    };
+      <h5>{item.desc}</h5>
+      <div>Price: {price()}</div>
+    }
   },
 });
 ```
 
 <div class="annotation">
-  <strong>Relationship to pipes:</strong> Derivations cover the same transform use case as pipes, but also support DI — which could make them a more general replacement while maintaining the same scoping and lifecycle guarantees.
+  <strong>Pipes, generalized:</strong> each <code>@derive</code> instance lives as long as its view, owns an independent injection context, and can call <code>inject()</code> — something pipes could never do.
 </div>

@@ -7,60 +7,10 @@ title: Fragments — Interactive Tour
 
 <p class="subtitle">What if ng-content and ng-template were unified into typed functions?</p>
 
-Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like React Children or Solid children.
-
-### Implicit children fragment
-
-Markup inside a component tag implicitly becomes a `children` fragment. `children` is a reserved name — provided by Angular from nested content, not directly bindable.
-
-```typescript
-import { component, signal } from '@angular/core';
-import { Menu, MenuItem } from '@mylib/menu';
-
-export const MenuConsumer = component({
-  setup: () => {
-    const first = signal('First');
-    const second = signal('Second');
-
-    return @{
-      <Menu>
-        <MenuItem>{first()}</MenuItem>
-        <MenuItem>{second()}</MenuItem>
-      </Menu>
-    };
-  },
-});
-```
-
-### Menu component using fragments
-
-```typescript
-import { component, fragment } from '@angular/core';
-
-export const Menu = component({
-  bindings: {
-    // Provided by Angular from nested content (not bindable directly). Reserved name.
-    children: fragment<void>(),
-  },
-  setup: ({ children }) => {
-    return @{
-      @if (children) {
-        @render(children())
-      } @else {
-        <span>Empty</span>
-      }
-    };
-  },
-});
-```
-
-### Custom fragment slots
-
-Inline `@fragment` declarations are auto-passed as the matching fragment input by name.
+Fragments are typed functions that return markup — implicit for children, named for custom slots.
 
 ```typescript
 import { component, signal, input, fragment } from '@angular/core';
-import { Menu } from '@mylib/menu';
 import { MyMenuItem } from './my-menu-item.ng';
 
 export interface Item { id: string; desc: string; }
@@ -80,8 +30,28 @@ export const MenuConsumer = component({
     };
   },
 });
+
+// -- Menu --
+export const Menu = component({
+  bindings: {
+    items: input.required<{ id: string; desc: string }[]>(),
+    menuItem: fragment.required<[{ id: string; desc: string }]>(),
+    children: fragment<void>(),
+  },
+  setup: ({ items, menuItem, children }) => @{
+    <h1>Total items: {items().length}</h1>
+
+    @for (item of items(); track item.id) {
+      @render(menuItem(item))
+    }
+
+    @if (children) {
+      @render(children())
+    }
+  },
+});
 ```
 
 <div class="annotation">
-  <strong>Rendering:</strong> <code>@render(fragment())</code> renders a fragment. No <code>ng-container</code> needed. The full form supports an optional injector: <code>@render(fragment(), {'{ injector }'})</code>.
+  <strong>One concept, two modes:</strong> nested markup becomes an implicit <code>children</code> fragment; named <code>@fragment</code> declarations are auto-matched to typed fragment inputs. No <code>ng-content</code>, no <code>ng-template</code>, no <code>let-*</code>.
 </div>

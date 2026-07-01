@@ -7,22 +7,13 @@ title: DI Enhancements — Interactive Tour
 
 <p class="subtitle">Some ergonomic tweaks to tokens and providers — mostly about reducing ceremony.</p>
 
-`injectionToken` creates a typed DI token. Four flavours:
-
-- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default; the factory is only invoked when a component explicitly lists `provide(token)` in its `providers`. Throws if missing from the injector tree.
-- **With factory + `autoProvided: true`** — factory registered unconditionally at root scope; no explicit `provide` needed.
-- **Without factory** — must use `provide(token, factory)` with an explicit factory. The `provide(token)` shorthand would be a compile-time error.
-- **Multi** (`injectionToken.multi`) — each `provide` call contributes one item; `inject` returns the collected array.
+`injectionToken` creates typed tokens; `providers` can depend on inputs and run in injection context.
 
 ```typescript
-import {
-  component, inject, provide, injectionToken,
-  input, signal
-} from '@angular/core';
+import { component, inject, provide, injectionToken, input, signal } from '@angular/core';
 
-// With factory (shorthand-eligible)
-const compToken = injectionToken({
-  debugName: 'compToken',
+const CounterToken = injectionToken({
+  debugName: 'CounterToken',
   factory: () => {
     const counter = signal(0);
     return {
@@ -33,55 +24,34 @@ const compToken = injectionToken({
   },
 });
 
-// Auto-provided at root scope
-const rootToken = injectionToken({
-  debugName: 'rootToken',
-  autoProvided: true,
-  factory: () => {
-    const counter = signal(0);
-    return {
-      value: counter.asReadonly(),
-      decrease: () => counter.update(v => v - 1),
-      increase: () => counter.update(v => v + 1),
-    };
-  },
-});
-
-// Without factory — explicit provide(token, factory) required
-const otherCompToken = injectionToken<string>({ debugName: 'otherCompToken' });
-
-// Multi token with factory
 const multiToken = injectionToken.multi({
   debugName: 'multiToken',
   factory: () => Math.random(),
 });
-
-class Store {}
 
 export const Counter = component({
   bindings: {
     initialValue: input<number>(),
   },
   setup: () => {
-    const rootCounter = inject(rootToken);
-    const compCounter = inject(compToken);
+    const counter = inject(CounterToken);
     const multi = inject(multiToken); // number[]
-    const store = inject(Store);
-    /** ... **/
-    return @{ ... };
+
+    return @{
+      <div>Value: {counter.value()}</div>
+      <button on:click={() => counter.decrease()}>-</button>
+      <button on:click={() => counter.increase()}>+</button>
+    };
   },
   providers: ({ initialValue }) => [
-    provide(compToken),                     // shorthand — uses token's factory
-    provide(multiToken),                    // shorthand
-    provide(multiToken),                    // multiple contributions
-    provide(multiToken, () => 10),          // explicit factory override
+    provide(CounterToken),            // shorthand — uses token's factory
+    provide(multiToken),              // each call contributes one item
+    provide(multiToken, () => 10),    // explicit factory override
     provide(multiToken, () => initialValue()),
-    provide(otherCompToken, () => ''),      // no factory on token — explicit required
-    provide(Store, () => new Store()),      // class
   ],
 });
 ```
 
 <div class="annotation">
-  <strong>Input-driven providers:</strong> Inputs are hoisted to the component level for use in provider initialization. <code>providers</code> receives only inputs — not models or outputs. Provider factories run in an injection context — <code>inject()</code> works inside them.
+  <strong>Input-driven providers:</strong> inputs are hoisted to the component level so <code>providers</code> can depend on them before <code>setup</code> runs. Four token flavours — with factory, auto-provided, factory-less, and multi — cover the common patterns with less boilerplate.
 </div>
