@@ -1,5 +1,5 @@
-import { sections } from './data/sections.js';
-import { getSectionCount } from './navigation.js';
+import { sections } from './data/sections';
+import { getSectionCount } from './navigation';
 
 declare const hljs: { highlightElement(el: Element): void };
 

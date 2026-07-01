@@ -1,7 +1,7 @@
-import { sections } from './data/sections.js';
-import { goTo, navigate, onNavigate, bindKeyboard } from './navigation.js';
-import { renderNav, renderSections, updateActiveSection } from './renderer.js';
-import { initQuiz } from './quiz.js';
+import { sections } from './data/sections';
+import { goTo, navigate, onNavigate, bindKeyboard } from './navigation';
+import { renderNav, renderSections, updateActiveSection } from './renderer';
+import { initQuiz } from './quiz';
 
 declare const hljs: { highlightAll(): void };
 

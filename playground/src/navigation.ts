@@ -1,4 +1,4 @@
-import { sections } from './data/sections.js';
+import { sections } from './data/sections';
 
 type NavigationCallback = (index: number) => void;
 

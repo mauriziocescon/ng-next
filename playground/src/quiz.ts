@@ -1,4 +1,4 @@
-import { quizQuestions } from './data/quiz-questions.js';
+import { quizQuestions } from './data/quiz-questions';
 
 declare const hljs: { highlightElement(el: Element): void };
 
