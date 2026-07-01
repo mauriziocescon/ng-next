@@ -18,6 +18,9 @@ const sections = [
 ];
 
 const currentPath = Astro.url.pathname;
+const currentIndex = sections.findIndex(s => s.href === currentPath);
+const prevSection = currentIndex > 0 ? sections[currentIndex - 1] : null;
+const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
 ---
 
 <!DOCTYPE html>
@@ -44,8 +47,32 @@ const currentPath = Astro.url.pathname;
     </nav>
     <main class="main">
       <slot />
+      <nav class="pagination" aria-label="Section navigation">
+        {prevSection && (
+          <a href={prevSection.href} class="pagination-link prev">
+            <span class="pagination-arrow">←</span>
+            <span class="pagination-label">{prevSection.label}</span>
+          </a>
+        )}
+        {nextSection && (
+          <a href={nextSection.href} class="pagination-link next">
+            <span class="pagination-label">{nextSection.label}</span>
+            <span class="pagination-arrow">→</span>
+          </a>
+        )}
+      </nav>
     </main>
   </div>
+  <script define:vars={{ prevHref: prevSection?.href, nextHref: nextSection?.href }}>
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft' && prevHref) {
+        window.location.href = prevHref;
+      } else if (e.key === 'ArrowRight' && nextHref) {
+        window.location.href = nextHref;
+      }
+    });
+  </script>
 </body>
 </html>
 
@@ -133,6 +160,43 @@ const currentPath = Astro.url.pathname;
   @media (max-width: 900px) {
     .sidebar { display: none; }
     .main { margin-left: 0; padding: 2rem 1.5rem; }
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .pagination-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+  }
+
+  .pagination-link:hover {
+    background: var(--surface-hover);
+    color: var(--accent);
+    border-color: var(--accent);
+    text-decoration: none;
+  }
+
+  .pagination-link.next {
+    margin-left: auto;
+  }
+
+  .pagination-arrow {
+    font-size: 1.1rem;
   }
 </style>
 
