@@ -2,23 +2,16 @@
   {
     "category": "Component Basics",
     "description": "Minimal component with a required input rendered in the template.",
-    "code": "export const Badge = component({\n  bindings: {\n    label: input.required<string>(),\n  },\n  setup: ({ label }) => @{\n    <span>{label()}</span>\n  },\n});",
+    "code": "export const Badge = component({\n  bindings: {\n    label: input.required<string>(),\n  },\n  setup: ({ label }) => @{\n    <span>Badge: {label()}</span>\n  },\n});",
     "valid": true,
     "explanation": "Correct. Minimal component: required input, destructured in setup, rendered in template with signal call syntax."
   },
   {
     "category": "Component Basics",
-    "description": "Signal read syntax inside a template interpolation.",
-    "code": "export const Search = component({\n  setup: () => {\n    const text = signal('');\n    return @{\n      <input model:value={text} />\n      <p>{text}</p>\n    };\n  },\n});",
+    "description": "Input declared inside setup instead of in bindings.",
+    "code": "export const Greeting = component({\n  setup: () => {\n    const name = input<string>('World');\n\n    return @{\n      <h1>Hello, {name()}!</h1>\n    };\n  },\n});",
     "valid": false,
-    "explanation": "Invalid. In the template, text is a signal — it should be {text()} with the call. {text} would render the signal object, not its value."
-  },
-  {
-    "category": "Component Basics",
-    "description": "Input with a default value used in a text interpolation.",
-    "code": "export const Greeting = component({\n  bindings: {\n    name: input<string>('World'),\n  },\n  setup: ({ name }) => @{\n    <h1>Hello, {name()}!</h1>\n  },\n});",
-    "valid": true,
-    "explanation": "Correct. Input with a default value, destructured in setup, rendered with signal call syntax in a text interpolation."
+    "explanation": "Invalid. Inputs must be declared in bindings — they define the component's public contract. Declaring an input inside setup is not allowed; setup only consumes bindings, it doesn't define them."
   },
   {
     "category": "Component Basics",
@@ -28,9 +21,23 @@
     "explanation": "Correct. A model is a two-way binding — it's a writable signal, so calling .set() on it is valid. The template reads it with active()."
   },
   {
+    "category": "Component Basics",
+    "description": "Early return inside setup to short-circuit rendering.",
+    "code": "export const Guarded = component({\n  bindings: {\n    user: input<User | null>(),\n  },\n  setup: ({ user }) => {\n    if (!user()) return @{ <p>No user</p> };\n\n    return @{\n      <h1>{user().name}</h1>\n    };\n  },\n});",
+    "valid": false,
+    "explanation": "Invalid. setup runs once at component creation — it cannot reactively branch with an early return. The signal value may change later, but setup won't re-run. Use @if in the template instead."
+  },
+  {
+    "category": "Component Basics",
+    "description": "Conditional class:, style:, and native element bindings.",
+    "code": "export const Alert = component({\n  bindings: {\n    message: input.required<string>(),\n    severity: input<'info' | 'warn' | 'error'>('info'),\n  },\n  setup: ({ message, severity }) => {\n    const visible = signal(true);\n\n    return @{\n      <div\n        class:alert-visible={visible()}\n        class:alert-error={severity() === 'error'}\n        style:padding={'1rem'}\n        style:opacity={visible() ? '1' : '0'}>\n        <p>{message()}</p>\n        <button on:click={() => visible.set(false)}>Dismiss</button>\n      </div>\n    };\n  },\n  style: `\n    .alert-visible { display: block; }\n    .alert-error { border: 1px solid red; }\n  `,\n});",
+    "valid": true,
+    "explanation": "Correct. Multiple class: and style: bindings on the same element are allowed and independently reactive. Native element properties (like on:click) follow the same bind:/on: rules."
+  },
+  {
     "category": "Lexical Scoping",
     "description": "Signal read in templates vs. raw signal reference in providers.",
-    "code": "export const Info = component({\n  bindings: {\n    count: input.required<number>(),\n  },\n  setup: ({ count }) => @{\n    <p>Count: {count}</p>\n  },\n  providers: ({ count }) => [\n    provide(Logger, () => new Logger(count)),\n  ],\n});",
+    "code": "class Logger {\n  constructor(readonly count: Signal<number>) {}\n}\n\nexport const Info = component({\n  bindings: {\n    count: input.required<number>(),\n  },\n  setup: ({ count }) => @{\n    <p>Count: {count}</p>\n  },\n  providers: ({ count }) => [\n    provide(Logger, () => new Logger(count)),\n  ],\n});",
     "valid": false,
     "explanation": "Invalid. In the template, count is a signal — it should be {count()}, not {count}. The providers usage is fine though: inputs are hoisted and available there."
   },
@@ -149,16 +156,16 @@
   {
     "category": "Proxy Forwarding",
     "description": "component.proxy exposing an HTMLButtonElement surface with @forward().",
-    "code": "export const IconButton = component.proxy<HTMLButtonElement>({\n  bindings: {\n    icon: input.required<string>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, children }) => @{\n    <button @forward()>\n      <i class={icon()} />\n      @render(children())\n    </button>\n  },\n});",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const IconButton = component.proxy<HTMLButtonElement>({\n  bindings: {\n    icon: input.required<string>(),\n    click: output<void>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, click, children }) => @{\n    <button @forward() on:click={() => click.emit()}>\n      <i class={icon()} />\n      @render(children())\n    </button>\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = signal('Save changes');\n\n    return @{\n      <IconButton\n        icon={'icon-save'}\n        use:tooltip(message={tip()})\n        on:click={() => {}}>\n        Save\n      </IconButton>\n    };\n  },\n});",
     "valid": true,
-    "explanation": "Correct. component.proxy<HTMLButtonElement> exposes a native button surface. Directives applied to <IconButton /> will be forwarded to the inner <button> via @forward()."
+    "explanation": "Correct. component.proxy<HTMLButtonElement> exposes a native button surface. The tooltip directive's host (HTMLElement) is compatible with HTMLButtonElement, so use:tooltip on <IconButton /> is forwarded to the inner <button> via @forward()."
   },
   {
     "category": "Wrap Forwarding",
     "description": "component.wrap forwarding remaining bindings to an inner proxy component.",
-    "code": "const Inner = component.proxy<HTMLDivElement>({\n  bindings: {\n    title: input.required<string>(),\n    extra: input<string>(''),\n    children: fragment<void>(),\n  },\n  setup: ({ title, extra, children }) => @{\n    <div @forward() class={extra()}>\n      <h2>{title()}</h2>\n      @render(children?.())\n    </div>\n  },\n});\n\nexport const Wrapper = component.wrap(Inner, {\n  bindings: {\n    extra: input<string>(''),\n  },\n  setup: ({ extra }) => @{\n    <Inner @forward() class={extra()} />\n  },\n});",
+    "code": "const Target = component.proxy<HTMLDivElement>({\n  bindings: {\n    title: input.required<string>(),\n    extra: input<string>(''),\n    select: output<void>(),\n    children: fragment<void>(),\n  },\n  setup: ({ title, extra, select, children }) => @{\n    <div @forward() class={extra()}>\n      <h2 on:click={() => select.emit()}>{title()}</h2>\n      @render(children?.())\n    </div>\n  },\n});\n\nconst Wrapper = component.wrap(Target, {\n  bindings: {\n    extra: input<string>(''),\n  },\n  setup: ({ extra }) => {\n    const cls = computed(() => `wrapped ${extra()}`);\n\n    return @{\n      <Target @forward() extra={cls()} />\n    };\n  },\n});\n\nexport const Consumer = component({\n  setup: () => {\n    function onSelect() { /* ... */ }\n\n    return @{\n      <Wrapper title={'Hello'} extra={'highlighted'} on:select={onSelect}>\n        <p>Forwarded children</p>\n      </Wrapper>\n    };\n  },\n});",
     "valid": true,
-    "explanation": "Correct. component.wrap forwards remaining bindings of Inner (title, children). The wrapper selects 'extra' for its own setup and places @forward() on the inner component."
+    "explanation": "Correct. Wrapper selects 'extra' for its own logic; 'title' and 'children' flow through @forward() to Target. Consumer uses Wrapper as if it were Target — providing title, extra, and children content. Since Target is a proxy, the wrapper inherits its surface."
   },
   {
     "category": "DI: Tokens",
