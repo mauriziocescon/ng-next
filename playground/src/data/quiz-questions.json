@@ -49,7 +49,7 @@
   },
   {
     "category": "Directives",
-    "code": "return @{\n  <div\n    use:draggable()\n    use:draggable() />\n};",
+    "code": "const draggable = directive({\n  host: ref<HTMLElement>(),\n  setup: (_, { host }) => {\n    afterRenderEffect(() => { /* drag logic */ });\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <div\n      use:draggable()\n      use:draggable() />\n  },\n});",
     "valid": false,
     "explanation": "Invalid. The same directive cannot be applied more than once to the same element. The compiler would reject this at build time."
   },
@@ -67,7 +67,7 @@
   },
   {
     "category": "Derivations",
-    "code": "return @{\n  @for (item of items(); track item.id) {\n    @derive total = priceCalc(item={item} qty={item.qty});\n    <span>{total()}</span>\n  }\n};",
+    "code": "const priceCalc = derivation({\n  bindings: {\n    item: input.required<{ id: string; price: number }>(),\n    qty: input.required<number>(),\n  },\n  setup: ({ item, qty }) => {\n    return computed(() => item().price * qty());\n  },\n});\n\nexport const PriceList = component({\n  bindings: {\n    items: input.required<{ id: string; price: number; qty: number }[]>(),\n  },\n  setup: ({ items }) => @{\n    @for (item of items(); track item.id) {\n      @derive total = priceCalc(item={item} qty={item.qty});\n      <span>{total()}</span>\n    }\n  },\n});",
     "valid": true,
     "explanation": "Correct. @derive is used inside @for — each row gets an independent instance that follows the embedded view's lifecycle. Bindings are passed as named pairs."
   },
