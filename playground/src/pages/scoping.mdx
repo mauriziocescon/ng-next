@@ -1,0 +1,37 @@
+---
+layout: ../layouts/Base.astro
+title: Lexical Scoping — Interactive Tour
+---
+
+## Lexical Scoping
+
+<p class="subtitle">Templates resolve names the same way closures do — no module declarations, no selector matching.</p>
+
+Resolution order: template → setup locals → file-level imports → global.
+
+```typescript
+import { component } from '@angular/core';
+
+enum Type {
+  Counter = 'counter',
+  Other = 'other',
+}
+
+const type = Type.Counter;
+
+const counter = (value: number) => `Let's count till ${value}`;
+
+export const Counter = component({
+  setup: () => @{
+    @if (type === Type.Counter) {
+      <p>{counter(5)}</p>
+    } @else {
+      <span>Empty</span>
+    }
+  },
+});
+```
+
+<div class="annotation">
+  <strong>No declarations needed:</strong> <code>Type</code>, <code>type</code>, and <code>counter</code> are file-level — visible in the template without imports arrays or module declarations. Components, helper functions, and constants used in the template are just TypeScript identifiers in the same lexical scope.
+</div>

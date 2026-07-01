@@ -1,0 +1,59 @@
+---
+layout: ../layouts/Base.astro
+title: Directives — Interactive Tour
+---
+
+## Element Directives
+
+<p class="subtitle">Directives are always explicit — no selector matching, just <code>use:</code>.</p>
+
+A directive declares its `host` type and bindings. The compiler ensures it only attaches to compatible elements.
+
+```typescript
+import { directive, ref, input, output, inject, DestroyRef, afterRenderEffect } from '@angular/core';
+import { component, signal } from '@angular/core';
+
+// -- Definition --
+export const tooltip = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    message: input.required<string>(),
+    dismiss: output<void>(),
+  },
+  setup: ({ message, dismiss }, { host }) => {
+    const destroyRef = inject(DestroyRef);
+
+    afterRenderEffect(() => {
+      const hostEl: HTMLElement | undefined = host();
+      // position tooltip near hostEl
+    });
+
+    destroyRef.onDestroy(() => {
+      // cleanup logic
+    });
+  },
+});
+
+// -- Usage --
+export const TextSearch = component({
+  setup: () => {
+    const text = signal('');
+    const message = signal('Message');
+
+    function doSomething() {/** ... **/}
+
+    return @{
+      <input
+        type="text"
+        model:value={text}
+        use:tooltip(message={message()} on:dismiss={doSomething}) />
+
+      <p>Value: {text()}</p>
+    };
+  },
+});
+```
+
+<div class="annotation">
+  <strong>No magic selectors:</strong> directives are applied where you see them (<code>use:</code>), type-checked against the host element, and conditionally toggled with <code>:when</code> — e.g. <code>use:tooltip(message={'{tip()}'}):when={'{showTip()}'}</code>.
+</div>

@@ -1,0 +1,56 @@
+---
+layout: ../layouts/Base.astro
+title: "DI: Tokens — Interactive Tour"
+---
+
+## DI: Token Flavours
+
+<p class="subtitle">Four token shapes — with factory, auto-provided, factory-less, and multi — cover every common pattern.</p>
+
+The flavour determines whether `provide(token)` shorthand works and where the token is registered.
+
+```typescript
+import { inject, provide, injectionToken, signal } from '@angular/core';
+
+// 1. With factory — shorthand-eligible, not auto-provided
+const CounterToken = injectionToken({
+  debugName: 'CounterToken',
+  factory: () => {
+    const counter = signal(0);
+    return {
+      value: counter.asReadonly(),
+      decrease: () => counter.update(v => v - 1),
+      increase: () => counter.update(v => v + 1),
+    };
+  },
+});
+
+// 2. Auto-provided at root scope — no explicit provide() needed
+const ThemeToken = injectionToken({
+  debugName: 'ThemeToken',
+  autoProvided: true,
+  factory: () => signal('dark'),
+});
+
+// 3. Without factory — provide(token, factory) required
+const ApiUrl = injectionToken<string>({ debugName: 'ApiUrl' });
+
+// 4. Multi — each provide() contributes one item
+const PluginToken = injectionToken.multi({
+  debugName: 'PluginToken',
+  factory: () => Math.random(),
+});
+
+// Usage in providers
+providers: () => [
+  provide(CounterToken),              // shorthand — uses token's factory
+  provide(PluginToken),               // contributes one item
+  provide(PluginToken, () => 10),     // explicit override contributes another
+  provide(ApiUrl, () => '/api/v2'),   // no shorthand — factory-less token
+  // provide(ApiUrl) ← compile-time error: no factory on token
+]
+```
+
+<div class="annotation">
+  <strong>Compile-time safety:</strong> <code>provide(token)</code> shorthand only works when the token has a <code>factory</code>. Factory-less tokens require an explicit factory — the compiler catches the mistake. <code>autoProvided: true</code> registers at root unconditionally; <code>multi</code> collects contributions into an array.
+</div>

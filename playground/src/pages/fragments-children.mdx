@@ -1,0 +1,56 @@
+---
+layout: ../layouts/Base.astro
+title: "Fragments: Children — Interactive Tour"
+---
+
+## Fragments: Children
+
+<p class="subtitle">Markup nested inside a component tag becomes an implicit <code>children</code> fragment — no ng-content needed.</p>
+
+Content between a component's opening and closing tags is automatically provided as `children`. The component renders it with `@render`.
+
+```typescript
+import { component, signal, fragment } from '@angular/core';
+
+// -- Consumer: nested content becomes children --
+export const MenuConsumer = component({
+  setup: () => {
+    const first = signal('First');
+    const second = signal('Second');
+
+    return @{
+      <Menu>
+        <MenuItem>{first()}</MenuItem>
+        <MenuItem>{second()}</MenuItem>
+      </Menu>
+    };
+  },
+});
+
+// -- Menu: receives and renders children --
+export const Menu = component({
+  bindings: {
+    children: fragment<void>(),
+  },
+  setup: ({ children }) => @{
+    @if (children) {
+      @render(children())
+    } @else {
+      <span>Empty</span>
+    }
+  },
+});
+
+export const MenuItem = component({
+  bindings: {
+    children: fragment.required<void>(),
+  },
+  setup: ({ children }) => @{
+    <li>@render(children())</li>
+  },
+});
+```
+
+<div class="annotation">
+  <strong>Implicit projection:</strong> <code>children</code> is a reserved name provided by Angular from nested content. It's optional by default (<code>fragment&lt;void&gt;()</code>) or required (<code>fragment.required&lt;void&gt;()</code>). Render it with <code>@render</code> — the markup is opaque, not manipulable like React Children.
+</div>

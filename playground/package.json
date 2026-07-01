@@ -1,0 +1,27 @@
+{
+  "name": "ng-next-playground",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Interactive tour of the ng-next proposal",
+  "author": "Maurizio Cescon <maurizio.cescon@gmail.com>",
+  "homepage": "https://github.com/mauriziocescon/ng-next",
+  "private": true,
+  "engines": {
+    "node": ">=24.13.0",
+    "npm": ">=11.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mauriziocescon/ng-next"
+  },
+  "license": "MIT",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^7.0.0",
+    "astro": "^7.0.4"
+  }
+}

@@ -1,0 +1,44 @@
+---
+layout: ../layouts/Base.astro
+title: Derivations — Interactive Tour
+---
+
+## Template-Scoped Derivations
+
+<p class="subtitle">View-scoped computed values with their own injection context.</p>
+
+`@derive` gives each row its own reactive instance — born with the view, destroyed with it.
+
+```typescript
+import { component, derivation, computed, inject, input } from '@angular/core';
+import { Item, PriceManager } from '@mylib/item';
+
+const simulation = derivation({
+  bindings: {
+    item: input.required<Item>(),
+    qty: input.required<number>(),
+  },
+  setup: ({ item, qty }) => {
+    const priceManager = inject(PriceManager);
+    return computed(() => priceManager.computePrice(item(), qty()));
+  },
+});
+
+export const PriceSimulator = component({
+  bindings: {
+    items: input.required<Item[]>(),
+  },
+  setup: ({ items }) => @{
+    @for (item of items(); track item.id) {
+      @derive price = simulation(item={item} qty={1});
+
+      <h5>{item.desc}</h5>
+      <div>Price: {price()}</div>
+    }
+  },
+});
+```
+
+<div class="annotation">
+  <strong>Per-row instances:</strong> inside <code>@for</code>, each iteration owns an independent <code>@derive</code> instance. When the row is destroyed, so is the derivation — no manual cleanup needed.
+</div>

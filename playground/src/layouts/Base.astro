@@ -1,0 +1,287 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+
+const sections = [
+  { href: '/', label: 'Introduction' },
+  { href: '/components/', label: 'Component Basics' },
+  { href: '/scoping/', label: 'Lexical Scoping' },
+  { href: '/directives/', label: 'Directives' },
+  { href: '/derivations/', label: 'Derivations' },
+  { href: '/refs/', label: 'Expose & Refs' },
+  { href: '/fragments-children/', label: 'Fragments: Children' },
+  { href: '/fragments-named/', label: 'Fragments: Named' },
+  { href: '/proxy/', label: 'Proxy Forwarding' },
+  { href: '/wrap/', label: 'Wrap Forwarding' },
+  { href: '/di-tokens/', label: 'DI: Tokens' },
+  { href: '/di-providers/', label: 'DI: Providers' },
+  { href: '/quiz/', label: 'Quiz' },
+];
+
+const currentPath = Astro.url.pathname;
+const currentIndex = sections.findIndex(s => s.href === currentPath);
+const prevSection = currentIndex > 0 ? sections[currentIndex - 1] : null;
+const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+</head>
+<body>
+  <div class="app">
+    <nav class="sidebar">
+      <h1>Exploration</h1>
+      <ul>
+        {sections.map((s, i) => (
+          <li>
+            <a href={s.href} class:list={['nav-item', { active: currentPath === s.href }]}>
+              <span class="num">{i + 1}</span>
+              {s.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+    <main class="main">
+      <slot />
+      <nav class="pagination" aria-label="Section navigation">
+        {prevSection && (
+          <a href={prevSection.href} class="pagination-link prev">
+            <span class="pagination-arrow">←</span>
+            <span class="pagination-label">{prevSection.label}</span>
+          </a>
+        )}
+        {nextSection && (
+          <a href={nextSection.href} class="pagination-link next">
+            <span class="pagination-label">{nextSection.label}</span>
+            <span class="pagination-arrow">→</span>
+          </a>
+        )}
+      </nav>
+    </main>
+  </div>
+  <script define:vars={{ prevHref: prevSection?.href, nextHref: nextSection?.href }}>
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft' && prevHref) {
+        window.location.href = prevHref;
+      } else if (e.key === 'ArrowRight' && nextHref) {
+        window.location.href = nextHref;
+      }
+    });
+  </script>
+</body>
+</html>
+
+<style>
+  .app {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    width: var(--nav-width);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 2rem 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    overflow-y: auto;
+  }
+
+  .sidebar h1 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .sidebar ul {
+    list-style: none;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1.5rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .nav-item:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .nav-item.active {
+    background: var(--accent-glow);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  .num {
+    font-size: 0.75rem;
+    font-weight: 600;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--border);
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .nav-item.active .num {
+    background: var(--accent);
+    color: white;
+  }
+
+  .main {
+    flex: 1;
+    margin-left: var(--nav-width);
+    padding: 3rem 4rem;
+    max-width: 900px;
+  }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 2rem 1.5rem; }
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .pagination-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+  }
+
+  .pagination-link:hover {
+    background: var(--surface-hover);
+    color: var(--accent);
+    border-color: var(--accent);
+    text-decoration: none;
+  }
+
+  .pagination-link.next {
+    margin-left: auto;
+  }
+
+  .pagination-arrow {
+    font-size: 1.1rem;
+  }
+</style>
+
+<style is:global>
+  /* Content typography */
+  .main h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .main .subtitle {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+
+  .main p, .main li {
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+  }
+
+  .main ul {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .main ul li::before {
+    content: "→ ";
+    color: var(--accent);
+  }
+
+  .main h3 {
+    font-size: 1.2rem;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+  }
+
+  /* Code blocks — Shiki themed */
+  .main pre {
+    margin: 1.5rem 0;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 1.25rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  .main pre code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  .main code:not(pre code) {
+    background: var(--surface);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  /* Annotations */
+  .annotation {
+    background: var(--accent-glow);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.9rem;
+  }
+
+  .annotation strong {
+    color: var(--accent);
+  }
+</style>

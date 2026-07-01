@@ -1,0 +1,54 @@
+---
+layout: ../layouts/Base.astro
+title: Expose & Refs — Interactive Tour
+---
+
+## Expose and Template Refs
+
+<p class="subtitle">Component internals stay private — only an explicit <code>expose</code> is reachable through refs.</p>
+
+A component or directive chooses what to expose; consumers access it through typed `ref` signals.
+
+```typescript
+import { component, afterNextRender, ref, refMany, signal } from '@angular/core';
+
+const TextBadge = component({
+  setup: () => {
+    const text = signal('');
+
+    return {
+      template: @{ <button>{text()}</button> },
+      expose: {
+        text: text.asReadonly(),
+      },
+    };
+  },
+});
+
+export const RefShowcase = component({
+  setup: () => {
+    const el = ref<HTMLDivElement>();
+    const badge = ref<typeof TextBadge>();
+    const badges = refMany<typeof TextBadge>();
+
+    afterNextRender(() => {
+      el()?.scrollIntoView();
+      badge()?.text();
+      badges().forEach((api) => api.text());
+    });
+
+    return @{
+      <div ref={el}>Target</div>
+
+      <TextBadge ref={badge} />
+
+      <TextBadge ref={badges} />
+      <TextBadge ref={badges} />
+    };
+  },
+});
+```
+
+<div class="annotation">
+  <strong>Private by default:</strong> without <code>expose</code>, <code>ref()</code> resolves to <code>Signal&lt;undefined&gt;</code>. Only the explicitly returned surface is reachable — no more accidental coupling to component internals.
+</div>

@@ -1,0 +1,47 @@
+---
+layout: ../layouts/Base.astro
+title: Component Basics — Interactive Tour
+---
+
+## Component Basics
+
+<p class="subtitle">Components as function calls with a strict shape — setup, bindings, template.</p>
+
+Bindings define the public contract (inputs, outputs, models). The template uses `bind:`, `model:`, and `on:` uniformly for native elements and components.
+
+```typescript
+import { component, signal, linkedSignal, input, output } from '@angular/core';
+
+export const TextSearch = component({
+  bindings: {
+    value: input.required<string>(),
+    valueChange: output<string>(),
+  },
+  setup: ({ value, valueChange }) => {
+    const text = linkedSignal(() => value());
+    const isDanger = signal(false);
+
+    function textChange() {
+      valueChange.emit(text());
+    }
+
+    return @{
+      <label class:danger={isDanger()}>Text:</label>
+      <input type="text" model:value={text} on:input={textChange} />
+
+      <button disabled={text().length === 0} on:click={() => text.set('')}>
+        {'Reset ' + text()}
+      </button>
+    };
+  },
+  style: `
+    .danger {
+      color: red;
+    }
+  `,
+});
+```
+
+<div class="annotation">
+  <strong>One shape, explicit contract:</strong> <code>bindings</code> is the public API, <code>setup</code> owns all logic, and the template is a <code>@{'{ }'}</code> markup literal. Native elements resolve through <code>IntrinsicElements</code> — the compiler knows valid attributes, properties, and events at build time.
+</div>
