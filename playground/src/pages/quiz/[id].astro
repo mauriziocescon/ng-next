@@ -1,0 +1,241 @@
+---
+import Base from '../../layouts/Base.astro';
+import { Code } from 'astro:components';
+import questions from '../../data/quiz-questions.json';
+
+export function getStaticPaths() {
+  return questions.map((_, i) => ({
+    params: { id: String(i + 1) },
+  }));
+}
+
+const { id } = Astro.params;
+const index = Number(id) - 1;
+const question = questions[index];
+const total = questions.length;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const prevHref = index > 0 ? `${base}quiz/${index}/` : null;
+const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
+---
+
+<Base title={`Quiz ${id}/${total} — ${question.category}`}>
+  <h2>Quiz: Valid or Invalid?</h2>
+  <p class="subtitle">Question {id} of {total} — <strong>{question.category}</strong></p>
+
+  <div class="quiz-card" role="region" aria-label={`Quiz question ${id}`}>
+    <div class="quiz-header">
+      <span class="quiz-counter" aria-label={`Question ${id} of ${total}`}>
+        {id} / {total}
+      </span>
+      <span class="quiz-category" aria-label={`Category: ${question.category}`}>{question.category}</span>
+    </div>
+
+    <div class="quiz-code" aria-label="Code to evaluate">
+      <Code code={question.code} lang="typescript" theme="github-dark" />
+    </div>
+
+    <div class="quiz-buttons" role="group" aria-label="Answer choices">
+      <button id="btn-valid" class="quiz-btn valid" type="button" aria-label="Mark as valid code">✓ Valid</button>
+      <button id="btn-invalid" class="quiz-btn invalid" type="button" aria-label="Mark as invalid code">✗ Invalid</button>
+    </div>
+
+    <div id="quiz-feedback" class="quiz-feedback" hidden aria-live="assertive" aria-atomic="true">
+      <p id="quiz-result" class="quiz-result"></p>
+      <p id="quiz-explanation"></p>
+    </div>
+
+    <nav class="quiz-nav" aria-label="Quiz question navigation">
+      {prevHref ? <a href={prevHref} class="quiz-nav-btn">← Prev</a> : <span />}
+      {nextHref ? <a href={nextHref} class="quiz-nav-btn">Next →</a> : <span />}
+    </nav>
+  </div>
+
+  <script define:vars={{ valid: question.valid, explanation: question.explanation, prevHref, nextHref }}>
+    const feedbackEl = document.getElementById('quiz-feedback');
+    const resultEl = document.getElementById('quiz-result');
+    const explanationEl = document.getElementById('quiz-explanation');
+    const btnValid = document.getElementById('btn-valid');
+    const btnInvalid = document.getElementById('btn-invalid');
+
+    function answer(userSaidValid) {
+      const correct = userSaidValid === valid;
+      btnValid.disabled = true;
+      btnInvalid.disabled = true;
+      if (userSaidValid) btnValid.classList.add('chosen');
+      else btnInvalid.classList.add('chosen');
+
+      resultEl.textContent = correct ? '✓ Correct!' : '✗ Wrong!';
+      resultEl.className = 'quiz-result ' + (correct ? 'correct' : 'wrong');
+      explanationEl.textContent = explanation;
+      feedbackEl.hidden = false;
+    }
+
+    btnValid.addEventListener('click', () => answer(true));
+    btnInvalid.addEventListener('click', () => answer(false));
+
+    document.addEventListener('keydown', (e) => {
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft' && prevHref) {
+        e.stopImmediatePropagation();
+        window.location.href = prevHref;
+      } else if (e.key === 'ArrowRight' && nextHref) {
+        e.stopImmediatePropagation();
+        window.location.href = nextHref;
+      }
+    });
+  </script>
+</Base>
+
+<style>
+  .quiz-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 1.5rem;
+  }
+
+  .quiz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .quiz-counter {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .quiz-category {
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: var(--accent-glow);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+
+  .quiz-code {
+    margin: 0 0 1.5rem 0;
+  }
+
+  .quiz-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .quiz-btn {
+    padding: 0.6rem 1.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .quiz-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    text-decoration: none;
+  }
+
+  .quiz-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .quiz-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .quiz-btn.valid.chosen {
+    border-color: var(--success);
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .quiz-btn.invalid.chosen {
+    border-color: var(--error);
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .quiz-btn.next {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .quiz-feedback {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .quiz-result {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .quiz-result.correct {
+    color: var(--success);
+  }
+
+  .quiz-result.wrong {
+    color: var(--error);
+  }
+
+  .quiz-feedback p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+
+  .quiz-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+  }
+
+  .quiz-nav-btn {
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+  }
+
+  .quiz-nav-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+    text-decoration: none;
+  }
+
+  .quiz-nav-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 900px) {
+    .quiz-card {
+      padding: 1.25rem;
+    }
+
+    .quiz-btn {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      justify-content: center;
+    }
+  }
+</style>

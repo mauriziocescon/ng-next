@@ -37,7 +37,7 @@
   },
   {
     "category": "Directives",
-    "code": "return @{\n  <input\n    type=\"text\"\n    model:value={text}\n    use:tooltip(message={msg()}):when={show()}\n    on:input={handler} />\n};",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const SearchBox = component({\n  setup: () => {\n    const text = signal('');\n    const msg = signal('Type to search');\n    const show = signal(true);\n\n    function handler() { /* ... */ }\n\n    return @{\n      <input\n        type=\"text\"\n        model:value={text}\n        use:tooltip(message={msg()}):when={show()}\n        on:input={handler} />\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. :when conditionally applies the directive. It sits outside the directive's parentheses and cannot clash with input names."
   },
@@ -79,25 +79,25 @@
   },
   {
     "category": "Expose & Refs",
-    "code": "export const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    afterNextRender(() => {\n      badge()?.text();\n    });\n\n    return @{\n      <TextBadge ref={badge} />\n    };\n  },\n});",
+    "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    afterNextRender(() => {\n      badge()?.text();\n    });\n\n    return @{\n      <TextBadge ref={badge} />\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. ref<typeof TextBadge>() gives a Signal<expose | undefined>. It's readable after afterNextRender, and .text() is the exposed readonly signal."
   },
   {
     "category": "Expose & Refs",
-    "code": "export const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    // Access ref immediately\n    const val = badge()?.text();\n\n    return @{\n      <TextBadge ref={badge} />\n      <p>{val}</p>\n    };\n  },\n});",
+    "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const badge = ref<typeof TextBadge>();\n\n    // Access ref immediately\n    const val = badge()?.text();\n\n    return @{\n      <TextBadge ref={badge} />\n      <p>{val}</p>\n    };\n  },\n});",
     "valid": false,
     "explanation": "Invalid. Refs are readable only after afterNextRender — accessing them synchronously in setup will always yield undefined. The read must happen inside afterNextRender or in a reactive context."
   },
   {
     "category": "Expose & Refs",
-    "code": "export const App = component({\n  setup: () => {\n    const tip = ref<typeof tooltip>();\n\n    return @{\n      <div use:tooltip():ref={tip}>Target</div>\n      <button on:click={() => tip()?.toggle()}>Toggle</button>\n    };\n  },\n});",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input<string>(''),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n    return {\n      toggle: () => { /* ... */ },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = ref<typeof tooltip>();\n\n    return @{\n      <div use:tooltip():ref={tip}>Target</div>\n      <button on:click={() => tip()?.toggle()}>Toggle</button>\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. Directive expose is captured with :ref={variable} on the use: binding. The tooltip directive exposes a toggle() method, accessed through the ref signal."
   },
   {
     "category": "Expose & Refs",
-    "code": "export const App = component({\n  setup: () => {\n    const items = refMany<typeof TextBadge>();\n\n    afterNextRender(() => {\n      items().forEach(api => api.text());\n    });\n\n    return @{\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n    };\n  },\n});",
+    "code": "const TextBadge = component({\n  setup: () => {\n    const text = signal('');\n    return {\n      template: @{ <button>{text()}</button> },\n      expose: {\n        text: text.asReadonly(),\n      },\n    };\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const items = refMany<typeof TextBadge>();\n\n    afterNextRender(() => {\n      items().forEach(api => api.text());\n    });\n\n    return @{\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n      <TextBadge ref={items} />\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. refMany collects multiple component instances into a Signal<expose[]>. Each TextBadge ref={items} contributes to the same collection."
   },
@@ -105,13 +105,13 @@
     "category": "Fragments: Children",
     "code": "export const Card = component({\n  bindings: {\n    children: fragment<void>(),\n    ref: input<string>(''),\n  },\n  setup: ({ children, ref }) => @{\n    @render(children?.())\n  },\n});",
     "valid": false,
-    "explanation": "Invalid. Both 'children' and 'ref' are reserved names at the component level — they cannot be declared as component bindings."
+    "explanation": "Invalid. 'ref' is a reserved attribute for components — it cannot be declared as a binding. The 'children: fragment<void>()' declaration is fine (children must be a FragmentBinding<void> when present)."
   },
   {
     "category": "Fragments: Children",
     "code": "export const Tabs = component({\n  bindings: {\n    header: fragment.required<[string]>(),\n    children: fragment<void>(),\n  },\n  setup: ({ header, children }) => @{\n    @render(header('Tab 1'))\n    @if (children) {\n      @render(children())\n    }\n  },\n});",
-    "valid": false,
-    "explanation": "Invalid. 'children' is a reserved name — it's provided by Angular from nested content and cannot be declared as a binding. The 'header' fragment is fine."
+    "valid": true,
+    "explanation": "Correct. 'children' can be declared as a binding if it uses fragment<void>() or fragment.required<void>(). Here children is optional (fragment<void>()), so @if (children) guards against it being undefined."
   },
   {
     "category": "Fragments: Named",
@@ -121,9 +121,9 @@
   },
   {
     "category": "Proxy Forwarding",
-    "code": "export const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button is a plain component (no proxy surface)\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
     "valid": false,
-    "explanation": "Invalid (likely). use: directives on components only work if the component uses component.proxy<T>. A plain component() doesn't expose a native element surface for directives."
+    "explanation": "Invalid. use: directives on components only work if the component uses component.proxy<T>. Button is a plain component() — it doesn't expose a native element surface for directives."
   },
   {
     "category": "Proxy Forwarding",
@@ -133,9 +133,9 @@
   },
   {
     "category": "Wrap Forwarding",
-    "code": "export const Wrapper = component.wrap(Inner, {\n  bindings: {\n    extra: input<string>(''),\n  },\n  setup: ({ extra }) => @{\n    <Inner @forward() class={extra()} />\n  },\n});",
+    "code": "const Inner = component.proxy<HTMLDivElement>({\n  bindings: {\n    title: input.required<string>(),\n    extra: input<string>(''),\n    children: fragment<void>(),\n  },\n  setup: ({ title, extra, children }) => @{\n    <div @forward() class={extra()}>\n      <h2>{title()}</h2>\n      @render(children?.())\n    </div>\n  },\n});\n\nexport const Wrapper = component.wrap(Inner, {\n  bindings: {\n    extra: input<string>(''),\n  },\n  setup: ({ extra }) => @{\n    <Inner @forward() class={extra()} />\n  },\n});",
     "valid": true,
-    "explanation": "Correct. component.wrap forwards remaining bindings of Inner. The wrapper adds its own 'extra' input and places @forward() on the inner component."
+    "explanation": "Correct. component.wrap forwards remaining bindings of Inner (title, children). The wrapper selects 'extra' for its own setup and places @forward() on the inner component."
   },
   {
     "category": "DI: Tokens",
@@ -151,7 +151,7 @@
   },
   {
     "category": "DI: Providers",
-    "code": "export const Counter = component({\n  bindings: { start: input<number>(0) },\n  providers: ({ start }) => [\n    provide(CounterStore, () => new CounterStore(start)),\n  ],\n  setup: () => {\n    const store = inject(CounterStore);\n    return @{ <span>{store.value()}</span> };\n  },\n});",
+    "code": "class CounterStore {\n  private readonly counter: WritableSignal<number>;\n  readonly value = this.counter.asReadonly();\n\n  constructor(start: InputSignal<number>) {\n    this.counter = linkedSignal(() => start());\n  }\n\n  decrease() { this.counter.update(v => v - 1); }\n  increase() { this.counter.update(v => v + 1); }\n}\n\nexport const Counter = component({\n  bindings: { start: input<number>(0) },\n  providers: ({ start }) => [\n    provide(CounterStore, () => new CounterStore(start)),\n  ],\n  setup: () => {\n    const store = inject(CounterStore);\n    return @{ <span>{store.value()}</span> };\n  },\n});",
     "valid": true,
     "explanation": "Correct. Inputs are hoisted and available in providers before setup runs. The factory has injection context."
   }

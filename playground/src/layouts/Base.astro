@@ -30,11 +30,13 @@ const sections = [
   { href: `${base}wrap/`, label: 'Wrap Forwarding' },
   { href: `${base}di-providers/`, label: 'DI: Providers' },
   { href: `${base}di-tokens/`, label: 'DI: Tokens' },
-  { href: `${base}quiz/`, label: 'Quiz' },
+  { href: `${base}quiz/1/`, label: 'Quiz' },
 ];
 
 const currentPath = Astro.url.pathname.replace(/\/?$/, '/');
-const currentIndex = sections.findIndex(s => s.href === currentPath);
+const currentIndex = sections.findIndex(s =>
+  currentPath === s.href || (s.href.includes('quiz/') && currentPath.startsWith(`${base}quiz/`))
+);
 const prevSection = currentIndex > 0 ? sections[currentIndex - 1] : null;
 const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
 ---
