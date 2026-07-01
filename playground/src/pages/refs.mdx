@@ -7,7 +7,7 @@ title: Expose & Refs — Interactive Tour
 
 <p class="subtitle">Component internals stay private — only an explicit <code>expose</code> is reachable through refs.</p>
 
-Consumers access the exposed surface through typed `ref` signals, readable after `afterNextRender`.
+A component or directive chooses what to expose; consumers access it through typed `ref` signals.
 
 ```typescript
 import { component, afterNextRender, ref, refMany, signal } from '@angular/core';

@@ -10,29 +10,29 @@ title: "Wrap Forwarding — Interactive Tour"
 The wrapper declares only the bindings it intercepts. Everything else flows through `@forward()` — including directives if the target is a proxy.
 
 ```typescript
-import { component, signal, input, computed } from '@angular/core';
+import { component, signal, input, model, output, computed } from '@angular/core';
 import { tooltip } from '@mylib/tooltip';
-import { UserDetail, User } from './user-detail.ng';
 
-// -- Consumer: uses the wrapper like the original --
-export const UserDetailConsumer = component({
-  setup: () => {
-    const user = signal<User>(/** ... **/);
-    const email = signal<string>(/** ... **/);
+// -- Target --
+export interface User { name: string; role: string; }
 
-    function makeAdmin() {/** ... **/}
-
-    return @{
-      <UserDetailWrapper
-        user={user()}
-        model:email={email}
-        on:makeAdmin={makeAdmin} />
-    };
+export const Target = component.proxy<HTMLDivElement>({
+  bindings: {
+    user: input.required<User>(),
+    email: model.required<string>(),
+    makeAdmin: output<void>(),
+  },
+  setup: ({ user, email, makeAdmin }) => @{
+    <div @forward()>
+      <h3>{user().name}</h3>
+      <input type="email" model:value={email} />
+      <button on:click={() => makeAdmin.emit()}>Make Admin</button>
+    </div>
   },
 });
 
 // -- Wrapper: intercepts user, forwards the rest --
-export const UserDetailWrapper = component.wrap(UserDetail, {
+export const Wrapper = component.wrap(Target, {
   bindings: {
     user: input.required<User>(),
   },
@@ -40,15 +40,32 @@ export const UserDetailWrapper = component.wrap(UserDetail, {
     const other = computed(() => /** transform user() **/);
 
     return @{
-      <UserDetail
+      <Target
         @forward()
         use:tooltip(message={'Tooltip message'})
         user={other()} />
     };
   },
 });
+
+// -- Consumer: uses the wrapper like the original --
+export const Consumer = component({
+  setup: () => {
+    const user = signal<User>(/** ... **/);
+    const email = signal<string>(/** ... **/);
+
+    function makeAdmin() {/** ... **/}
+
+    return @{
+      <Wrapper
+        user={user()}
+        model:email={email}
+        on:makeAdmin={makeAdmin} />
+    };
+  },
+});
 ```
 
 <div class="annotation">
-  <strong>Selective override:</strong> the wrapper declares only the bindings it intercepts (<code>user</code>). Everything else — <code>email</code>, <code>makeAdmin</code>, and any future bindings added to <code>UserDetail</code> — flows through <code>@forward()</code> automatically. The compiler resolves this statically.
+  <strong>Selective override:</strong> the wrapper declares only the bindings it intercepts (<code>user</code>). Everything else — <code>email</code>, <code>makeAdmin</code>, and any future bindings added to <code>Target</code> — flows through <code>@forward()</code> automatically. The compiler resolves this statically.
 </div>

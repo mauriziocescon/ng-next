@@ -5,9 +5,9 @@ title: Derivations — Interactive Tour
 
 ## Template-Scoped Derivations
 
-<p class="subtitle">View-scoped computed values with their own injection context — a stricter, per-instance replacement for pipes.</p>
+<p class="subtitle">View-scoped computed values with their own injection context.</p>
 
-`@derive` creates a reactive computation that follows the lifecycle of its enclosing view. Bindings are passed as named pairs, and `setup` must return a `Signal<T>`.
+`@derive` gives each row its own reactive instance — born with the view, destroyed with it.
 
 ```typescript
 import { component, derivation, computed, inject, input } from '@angular/core';
