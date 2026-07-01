@@ -53,6 +53,6 @@ export const Consumer = component({
 });
 ```
 
-<div class="annotation">
+<div class="annotation" role="note">
   <strong>No runtime spread:</strong> the compiler expands <code>@forward()</code> into concrete bindings and directive instructions. <code>use:ripple()</code> and <code>use:tooltip(...)</code> are accepted because their <code>host</code> types are compatible with <code>HTMLButtonElement</code>. The same directive cannot appear twice on the same final element.
 </div>

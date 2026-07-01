@@ -8,52 +8,55 @@ import questions from '../data/quiz-questions.json';
   <h2>Quiz: Valid or Invalid?</h2>
   <p class="subtitle">Test your understanding — is this code correct according to the proposal's rules?</p>
 
-  <div id="quiz" data-questions={JSON.stringify(questions)}>
-    <div class="quiz-card">
+  <div id="quiz" data-questions={JSON.stringify(questions)} role="region" aria-label="Quiz">
+    <div class="quiz-card" aria-live="polite">
       <div class="quiz-header">
-        <span class="quiz-counter"><span id="quiz-current">1</span> / <span id="quiz-total">{questions.length}</span></span>
-        <span class="quiz-category" id="quiz-category"></span>
+        <span class="quiz-counter" aria-label={`Question 1 of ${questions.length}`}>
+          <span id="quiz-current">1</span> / <span id="quiz-total">{questions.length}</span>
+        </span>
+        <span class="quiz-category" id="quiz-category" aria-label="Category"></span>
       </div>
-      <div class="quiz-code" id="quiz-code">
+      <div class="quiz-code" id="quiz-code" aria-label="Code to evaluate">
         {questions.map((q, i) => (
           <div class="quiz-code-item" data-index={i} hidden={i !== 0}>
             <Code code={q.code} lang="typescript" theme="github-dark" />
           </div>
         ))}
       </div>
-      <div class="quiz-buttons">
-        <button id="btn-valid" class="quiz-btn valid">✓ Valid</button>
-        <button id="btn-invalid" class="quiz-btn invalid">✗ Invalid</button>
+      <div class="quiz-buttons" role="group" aria-label="Answer choices">
+        <button id="btn-valid" class="quiz-btn valid" type="button" aria-label="Mark as valid code">✓ Valid</button>
+        <button id="btn-invalid" class="quiz-btn invalid" type="button" aria-label="Mark as invalid code">✗ Invalid</button>
       </div>
-      <div id="quiz-feedback" class="quiz-feedback" hidden>
-        <div id="quiz-result" class="quiz-result"></div>
+      <div id="quiz-feedback" class="quiz-feedback" hidden aria-live="assertive" aria-atomic="true">
+        <p id="quiz-result" class="quiz-result"></p>
         <p id="quiz-explanation"></p>
-        <button id="btn-next" class="quiz-btn next">Next →</button>
+        <button id="btn-next" class="quiz-btn next" type="button">Next →</button>
       </div>
     </div>
-    <div id="quiz-score" class="quiz-score" hidden>
+    <div id="quiz-score" class="quiz-score" hidden aria-live="polite" aria-atomic="true">
       <p><strong id="score-text"></strong></p>
-      <button id="btn-restart" class="quiz-btn next">Try again</button>
+      <button id="btn-restart" class="quiz-btn next" type="button">Try again</button>
     </div>
   </div>
 
   <script>
-    const quizEl = document.getElementById('quiz')!;
-    const questions = JSON.parse(quizEl.dataset.questions!);
-    const codeEl = document.getElementById('quiz-code')!;
+    const quizEl = document.getElementById('quiz');
+    const questions = JSON.parse(quizEl.dataset.questions);
+    const codeEl = document.getElementById('quiz-code');
     const codeItems = codeEl.querySelectorAll('.quiz-code-item');
-    const currentEl = document.getElementById('quiz-current')!;
-    const totalEl = document.getElementById('quiz-total')!;
-    const categoryEl = document.getElementById('quiz-category')!;
-    const feedbackEl = document.getElementById('quiz-feedback')!;
-    const resultEl = document.getElementById('quiz-result')!;
-    const explanationEl = document.getElementById('quiz-explanation')!;
-    const btnValid = document.getElementById('btn-valid')! as HTMLButtonElement;
-    const btnInvalid = document.getElementById('btn-invalid')! as HTMLButtonElement;
-    const btnNext = document.getElementById('btn-next')! as HTMLButtonElement;
-    const scoreEl = document.getElementById('quiz-score')!;
-    const scoreText = document.getElementById('score-text')!;
-    const btnRestart = document.getElementById('btn-restart')! as HTMLButtonElement;
+    const counterEl = codeEl.closest('.quiz-card').querySelector('.quiz-counter');
+    const currentEl = document.getElementById('quiz-current');
+    const totalEl = document.getElementById('quiz-total');
+    const categoryEl = document.getElementById('quiz-category');
+    const feedbackEl = document.getElementById('quiz-feedback');
+    const resultEl = document.getElementById('quiz-result');
+    const explanationEl = document.getElementById('quiz-explanation');
+    const btnValid = document.getElementById('btn-valid');
+    const btnInvalid = document.getElementById('btn-invalid');
+    const btnNext = document.getElementById('btn-next');
+    const scoreEl = document.getElementById('quiz-score');
+    const scoreText = document.getElementById('score-text');
+    const btnRestart = document.getElementById('btn-restart');
 
     let index = 0;
     let score = 0;
@@ -62,27 +65,29 @@ import questions from '../data/quiz-questions.json';
       index = 0;
       score = 0;
       scoreEl.hidden = true;
-      quizEl.querySelector('.quiz-card')!.removeAttribute('hidden');
+      quizEl.querySelector('.quiz-card').removeAttribute('hidden');
       render();
     }
 
     function render() {
       const q = questions[index];
-      // Show/hide code items
       codeItems.forEach((item, i) => {
-        (item as HTMLElement).hidden = i !== index;
+        item.hidden = i !== index;
       });
       categoryEl.textContent = q.category;
+      categoryEl.setAttribute('aria-label', `Category: ${q.category}`);
       currentEl.textContent = String(index + 1);
       totalEl.textContent = String(questions.length);
+      counterEl.setAttribute('aria-label', `Question ${index + 1} of ${questions.length}`);
       feedbackEl.hidden = true;
       btnValid.disabled = false;
       btnInvalid.disabled = false;
       btnValid.classList.remove('chosen');
       btnInvalid.classList.remove('chosen');
+      btnValid.focus();
     }
 
-    function answer(userSaidValid: boolean) {
+    function answer(userSaidValid) {
       const q = questions[index];
       const correct = userSaidValid === q.valid;
       if (correct) score++;
@@ -99,17 +104,21 @@ import questions from '../data/quiz-questions.json';
 
       if (index === questions.length - 1) {
         btnNext.textContent = 'See score';
+        btnNext.setAttribute('aria-label', 'See final score');
       } else {
         btnNext.textContent = 'Next →';
+        btnNext.setAttribute('aria-label', 'Go to next question');
       }
+      btnNext.focus();
     }
 
     function next() {
       index++;
       if (index >= questions.length) {
-        quizEl.querySelector('.quiz-card')!.setAttribute('hidden', '');
+        quizEl.querySelector('.quiz-card').setAttribute('hidden', '');
         scoreText.textContent = `You got ${score} out of ${questions.length} correct.`;
         scoreEl.hidden = false;
+        btnRestart.focus();
       } else {
         render();
       }
@@ -161,6 +170,7 @@ import questions from '../data/quiz-questions.json';
   .quiz-buttons {
     display: flex;
     gap: 1rem;
+    flex-wrap: wrap;
   }
 
   .quiz-btn {
@@ -179,18 +189,23 @@ import questions from '../data/quiz-questions.json';
     background: var(--accent-glow);
   }
 
+  .quiz-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
   .quiz-btn:disabled {
     opacity: 0.5;
     cursor: default;
   }
 
   .quiz-btn.valid.chosen {
-    border-color: #22c55e;
+    border-color: var(--success);
     background: rgba(34, 197, 94, 0.1);
   }
 
   .quiz-btn.invalid.chosen {
-    border-color: #ef4444;
+    border-color: var(--error);
     background: rgba(239, 68, 68, 0.1);
   }
 
@@ -213,11 +228,11 @@ import questions from '../data/quiz-questions.json';
   }
 
   .quiz-result.correct {
-    color: #22c55e;
+    color: var(--success);
   }
 
   .quiz-result.wrong {
-    color: #ef4444;
+    color: var(--error);
   }
 
   .quiz-feedback p {
@@ -239,5 +254,18 @@ import questions from '../data/quiz-questions.json';
     font-size: 1.2rem;
     color: var(--text);
     margin-bottom: 1rem;
+  }
+
+  @media (max-width: 900px) {
+    .quiz-card {
+      padding: 1.25rem;
+    }
+
+    .quiz-btn {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      justify-content: center;
+    }
   }
 </style>

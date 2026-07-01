@@ -51,6 +51,6 @@ providers: () => [
 ]
 ```
 
-<div class="annotation">
+<div class="annotation" role="note">
   <strong>Compile-time safety:</strong> <code>provide(token)</code> shorthand only works when the token has a <code>factory</code>. Factory-less tokens require an explicit factory — the compiler catches the mistake. <code>autoProvided: true</code> registers at root unconditionally; <code>multi</code> collects contributions into an array.
 </div>

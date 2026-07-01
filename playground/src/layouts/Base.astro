@@ -3,11 +3,19 @@ import '../styles/global.css';
 
 interface Props {
   title: string;
+  description?: string;
+  frontmatter?: {
+    title?: string;
+    description?: string;
+  };
 }
 
-const { title } = Astro.props;
+const props = Astro.props;
+const title = props.title || props.frontmatter?.title || '';
+const description = props.description || props.frontmatter?.description || 'Exploring Angular templates for an agentic future — explicit contracts, typed template surfaces, and structures easier for humans, tooling, and AI agents to reason about.';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
 
 const sections = [
   { href: `${base}`, label: 'Introduction' },
@@ -20,12 +28,12 @@ const sections = [
   { href: `${base}fragments-named/`, label: 'Fragments: Named' },
   { href: `${base}proxy/`, label: 'Proxy Forwarding' },
   { href: `${base}wrap/`, label: 'Wrap Forwarding' },
-  { href: `${base}di-tokens/`, label: 'DI: Tokens' },
   { href: `${base}di-providers/`, label: 'DI: Providers' },
+  { href: `${base}di-tokens/`, label: 'DI: Tokens' },
   { href: `${base}quiz/`, label: 'Quiz' },
 ];
 
-const currentPath = Astro.url.pathname;
+const currentPath = Astro.url.pathname.replace(/\/?$/, '/');
 const currentIndex = sections.findIndex(s => s.href === currentPath);
 const prevSection = currentIndex > 0 ? sections[currentIndex - 1] : null;
 const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
@@ -37,35 +45,58 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{title}</title>
+  <meta name="description" content={description}>
+  <link rel="canonical" href={canonicalUrl.href}>
+  <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`}>
+  <meta name="theme-color" content="#0f1117">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content={title}>
+  <meta property="og:description" content={description}>
+  <meta property="og:url" content={canonicalUrl.href}>
+  <meta property="og:site_name" content="ng-next">
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content={title}>
+  <meta name="twitter:description" content={description}>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <button class="mobile-menu-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="sidebar-nav" type="button">
+    <span aria-hidden="true">☰</span>
+  </button>
+  <div class="backdrop" aria-hidden="true"></div>
   <div class="app">
-    <nav class="sidebar">
-      <h1>Exploration</h1>
-      <ul>
+    <nav id="sidebar-nav" class="sidebar" aria-label="Sections">
+      <p class="sidebar-heading">Exploration</p>
+      <ul role="list">
         {sections.map((s, i) => (
           <li>
-            <a href={s.href} class:list={['nav-item', { active: currentPath === s.href }]}>
-              <span class="num">{i + 1}</span>
+            <a
+              href={s.href}
+              class:list={['nav-item', { active: currentPath === s.href }]}
+              aria-current={currentPath === s.href ? 'page' : undefined}
+            >
+              <span class="num" aria-hidden="true">{i + 1}</span>
               {s.label}
             </a>
           </li>
         ))}
       </ul>
     </nav>
-    <main class="main">
+    <main id="main-content" class="main">
       <slot />
-      <nav class="pagination" aria-label="Section navigation">
+      <nav class="pagination" aria-label="Pagination">
         {prevSection && (
-          <a href={prevSection.href} class="pagination-link prev">
-            <span class="pagination-arrow">←</span>
+          <a href={prevSection.href} class="pagination-link prev" aria-label={`Previous: ${prevSection.label}`}>
+            <span class="pagination-arrow" aria-hidden="true">←</span>
             <span class="pagination-label">{prevSection.label}</span>
           </a>
         )}
         {nextSection && (
-          <a href={nextSection.href} class="pagination-link next">
+          <a href={nextSection.href} class="pagination-link next" aria-label={`Next: ${nextSection.label}`}>
             <span class="pagination-label">{nextSection.label}</span>
-            <span class="pagination-arrow">→</span>
+            <span class="pagination-arrow" aria-hidden="true">→</span>
           </a>
         )}
       </nav>
@@ -73,18 +104,70 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
   </div>
   <script define:vars={{ prevHref: prevSection?.href, nextHref: nextSection?.href }}>
     document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const target = e.target;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
       if (e.key === 'ArrowLeft' && prevHref) {
         window.location.href = prevHref;
       } else if (e.key === 'ArrowRight' && nextHref) {
         window.location.href = nextHref;
       }
     });
+
+    // Mobile menu toggle
+    const toggle = document.querySelector('.mobile-menu-toggle');
+    const sidebar = document.getElementById('sidebar-nav');
+    const backdrop = document.querySelector('.backdrop');
+    if (toggle && sidebar && backdrop) {
+      function openMenu() {
+        sidebar.classList.add('open');
+        backdrop.classList.add('visible');
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-label', 'Close navigation menu');
+      }
+      function closeMenu() {
+        sidebar.classList.remove('open');
+        backdrop.classList.remove('visible');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', 'Open navigation menu');
+      }
+      toggle.addEventListener('click', () => {
+        sidebar.classList.contains('open') ? closeMenu() : openMenu();
+      });
+      backdrop.addEventListener('click', closeMenu);
+      // Close on link click (mobile)
+      sidebar.addEventListener('click', (e) => {
+        if (e.target.closest('a')) closeMenu();
+      });
+      // Close on Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+          closeMenu();
+          toggle.focus();
+        }
+      });
+    }
   </script>
 </body>
 </html>
 
 <style>
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 1000;
+    padding: 0.5rem 1rem;
+    background: var(--accent);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    text-decoration: none;
+  }
+
+  .skip-link:focus {
+    top: 1rem;
+  }
+
   .app {
     display: flex;
     min-height: 100vh;
@@ -102,8 +185,9 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     overflow-y: auto;
   }
 
-  .sidebar h1 {
+  .sidebar-heading {
     font-size: 0.85rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--accent);
@@ -131,6 +215,11 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     background: var(--surface-hover);
     color: var(--text);
     text-decoration: none;
+  }
+
+  .nav-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   .nav-item.active {
@@ -165,9 +254,51 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     max-width: 900px;
   }
 
+  .mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1001;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 1.2rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-menu-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+
   @media (max-width: 900px) {
+    .mobile-menu-toggle { display: flex; }
     .sidebar { display: none; }
-    .main { margin-left: 0; padding: 2rem 1.5rem; }
+    .sidebar.open {
+      display: block;
+      z-index: 1000;
+      width: 100%;
+      max-width: 300px;
+      padding-top: 4rem;
+    }
+    .backdrop.visible { display: block; }
+    .main { margin-left: 0; padding: 3.5rem 1.25rem 2rem; }
+    .pagination { flex-direction: column; gap: 0.75rem; }
+    .pagination-link.next { margin-left: 0; align-self: flex-end; }
   }
 
   .pagination {
@@ -197,6 +328,11 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     color: var(--accent);
     border-color: var(--accent);
     text-decoration: none;
+  }
+
+  .pagination-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .pagination-link.next {
@@ -285,5 +421,31 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
 
   .annotation strong {
     color: var(--accent);
+  }
+
+  /* Mobile content adjustments */
+  @media (max-width: 900px) {
+    .main h2 {
+      font-size: 1.5rem;
+    }
+
+    .main .subtitle {
+      font-size: 1rem;
+    }
+
+    .main pre {
+      margin: 1rem -1.25rem;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      padding: 1rem;
+      font-size: 0.78rem;
+    }
+
+    .annotation {
+      margin: 1rem -0.5rem;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+    }
   }
 </style>

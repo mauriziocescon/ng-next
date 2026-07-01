@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mauriziocescon.github.io/ng-next/sitemap-index.xml

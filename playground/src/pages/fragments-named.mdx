@@ -48,6 +48,6 @@ export const Menu = component({
 });
 ```
 
-<div class="annotation">
+<div class="annotation" role="note">
   <strong>Type-safe slots:</strong> the fragment's parameter list is typed at the declaration site. The component calls <code>menuItem(item)</code> — the compiler checks the argument matches <code>[{'{'}id: string; desc: string{'}'}]</code>. No <code>let-*</code>, no <code>ng-template</code>, no <code>ngTemplateGuard</code>.
 </div>

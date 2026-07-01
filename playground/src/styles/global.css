@@ -4,12 +4,13 @@
   --surface-hover: #242836;
   --border: #2e3345;
   --text: #e4e7ef;
-  --text-muted: #8b90a0;
-  --accent: #7c6ef6;
+  --text-muted: #9ba0b2;
+  --accent: #9b8afb;
   --accent-glow: rgba(124, 110, 246, 0.15);
   --success: #4ade80;
   --error: #f87171;
   --nav-width: 280px;
+  --focus-ring: #9b8afb;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,4 +29,20 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+/* Global focus styles */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

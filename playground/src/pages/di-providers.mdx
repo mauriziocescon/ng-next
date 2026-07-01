@@ -44,6 +44,6 @@ export const Counter = component({
 });
 ```
 
-<div class="annotation">
+<div class="annotation" role="note">
   <strong>Inputs before setup:</strong> <code>providers</code> receives only inputs (not models or outputs). The factory <code>() =&gt; new CounterStore(c)</code> captures the input signal <code>c</code> — the store reacts to input changes via <code>linkedSignal</code>. This replaces the common pattern of injecting a service and manually feeding it inputs in <code>ngOnInit</code>.
 </div>

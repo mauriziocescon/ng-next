@@ -66,6 +66,6 @@ export const Consumer = component({
 });
 ```
 
-<div class="annotation">
+<div class="annotation" role="note">
   <strong>Selective override:</strong> the wrapper declares only the bindings it intercepts (<code>user</code>). Everything else — <code>email</code>, <code>makeAdmin</code>, and any future bindings added to <code>Target</code> — flows through <code>@forward()</code> automatically. The compiler resolves this statically.
 </div>
