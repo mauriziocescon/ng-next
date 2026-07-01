@@ -1,0 +1,62 @@
+[
+  {
+    "category": "Components",
+    "code": "export const Badge = component({\n  bindings: {\n    label: input.required<string>(),\n  },\n  setup: ({ label }) => @{\n    <span>{label()}</span>\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. Minimal component: required input, destructured in setup, rendered in template with signal call syntax."
+  },
+  {
+    "category": "Components",
+    "code": "export const Search = component({\n  setup: () => {\n    const text = signal('');\n    return @{\n      <input model:value={text} />\n      <p>{text}</p>\n    };\n  },\n});",
+    "valid": false,
+    "explanation": "Invalid. In the template, text is a signal — it should be {text()} with the call. {text} would render the signal object, not its value."
+  },
+  {
+    "category": "Directives",
+    "code": "const tip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n    hide: output<void>(),\n  },\n  setup: ({ message, hide }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. Directive with typed host, input, output, and host access in setup's second parameter."
+  },
+  {
+    "category": "Directives",
+    "code": "return @{\n  <input\n    type=\"text\"\n    model:value={text}\n    use:tooltip(message={msg()}):when={show()}\n    on:input={handler} />\n};",
+    "valid": true,
+    "explanation": "Correct. :when conditionally applies the directive. It sits outside the directive's parentheses and cannot clash with input names."
+  },
+  {
+    "category": "Derivations",
+    "code": "const fmt = derivation({\n  bindings: {\n    value: input.required<number>(),\n    change: output<string>(),\n  },\n  setup: ({ value, change }) => {\n    return computed(() => value().toFixed(2));\n  },\n});",
+    "valid": false,
+    "explanation": "Invalid. Derivations only support inputs — no outputs, no models. They have no DOM surface to emit from."
+  },
+  {
+    "category": "Fragments",
+    "code": "export const List = component({\n  bindings: {\n    items: input.required<Item[]>(),\n    row: fragment.required<[Item]>(),\n  },\n  setup: ({ items, row }) => @{\n    @for (item of items(); track item.id) {\n      @render(row(item))\n    }\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. Named fragment with typed parameter, rendered inside @for with the item passed as argument."
+  },
+  {
+    "category": "Fragments",
+    "code": "export const Card = component({\n  bindings: {\n    children: fragment<void>(),\n    ref: input<string>(''),\n  },\n  setup: ({ children, ref }) => @{\n    @render(children?.())\n  },\n});",
+    "valid": false,
+    "explanation": "Invalid. Both 'children' and 'ref' are reserved names at the component level — they cannot be declared as component bindings."
+  },
+  {
+    "category": "Forwarding",
+    "code": "export const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
+    "valid": false,
+    "explanation": "Invalid (likely). use: directives on components only work if the component uses component.proxy<T>. A plain component() doesn't expose a native element surface for directives."
+  },
+  {
+    "category": "Forwarding",
+    "code": "export const Wrapper = component.wrap(Inner, {\n  bindings: {\n    extra: input<string>(''),\n  },\n  setup: ({ extra }) => @{\n    <Inner @forward() class={extra()} />\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. component.wrap forwards remaining bindings of Inner. The wrapper adds its own 'extra' input and places @forward() on the inner component."
+  },
+  {
+    "category": "DI & Providers",
+    "code": "export const Counter = component({\n  bindings: { start: input<number>(0) },\n  providers: ({ start }) => [\n    provide(CounterStore, () => new CounterStore(start)),\n  ],\n  setup: () => {\n    const store = inject(CounterStore);\n    return @{ <span>{store.value()}</span> };\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. Inputs are hoisted and available in providers before setup runs. The factory has injection context."
+  }
+]
