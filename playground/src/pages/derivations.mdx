@@ -5,9 +5,9 @@ title: Derivations — Interactive Tour
 
 ## Template-Scoped Derivations
 
-<p class="subtitle">Could pipes be replaced by something with DI access and proper lifecycle?</p>
+<p class="subtitle">View-scoped computed values with their own injection context — a stricter, per-instance replacement for pipes.</p>
 
-A derivation is a reactive computation scoped to its enclosing view — with full injection context.
+`@derive` creates a reactive computation that follows the lifecycle of its enclosing view. Bindings are passed as named pairs, and `setup` must return a `Signal<T>`.
 
 ```typescript
 import { component, derivation, computed, inject, input } from '@angular/core';
@@ -40,5 +40,5 @@ export const PriceSimulator = component({
 ```
 
 <div class="annotation">
-  <strong>Pipes, generalized:</strong> each <code>@derive</code> instance lives as long as its view, owns an independent injection context, and can call <code>inject()</code> — something pipes could never do.
+  <strong>Per-row instances:</strong> inside <code>@for</code>, each iteration owns an independent <code>@derive</code> instance. When the row is destroyed, so is the derivation — no manual cleanup needed.
 </div>

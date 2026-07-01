@@ -1,0 +1,54 @@
+---
+layout: ../layouts/Base.astro
+title: "Wrap Forwarding — Interactive Tour"
+---
+
+## Wrap Forwarding
+
+<p class="subtitle"><code>component.wrap(Target)</code> forwards the target's remaining bindings — no props object, no manual passthrough.</p>
+
+The wrapper declares only the bindings it intercepts. Everything else flows through `@forward()` — including directives if the target is a proxy.
+
+```typescript
+import { component, signal, input, computed } from '@angular/core';
+import { tooltip } from '@mylib/tooltip';
+import { UserDetail, User } from './user-detail.ng';
+
+// -- Consumer: uses the wrapper like the original --
+export const UserDetailConsumer = component({
+  setup: () => {
+    const user = signal<User>(/** ... **/);
+    const email = signal<string>(/** ... **/);
+
+    function makeAdmin() {/** ... **/}
+
+    return @{
+      <UserDetailWrapper
+        user={user()}
+        model:email={email}
+        on:makeAdmin={makeAdmin} />
+    };
+  },
+});
+
+// -- Wrapper: intercepts user, forwards the rest --
+export const UserDetailWrapper = component.wrap(UserDetail, {
+  bindings: {
+    user: input.required<User>(),
+  },
+  setup: ({ user }) => {
+    const other = computed(() => /** transform user() **/);
+
+    return @{
+      <UserDetail
+        @forward()
+        use:tooltip(message={'Tooltip message'})
+        user={other()} />
+    };
+  },
+});
+```
+
+<div class="annotation">
+  <strong>Selective override:</strong> the wrapper declares only the bindings it intercepts (<code>user</code>). Everything else — <code>email</code>, <code>makeAdmin</code>, and any future bindings added to <code>UserDetail</code> — flows through <code>@forward()</code> automatically. The compiler resolves this statically.
+</div>

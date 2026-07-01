@@ -1,13 +1,13 @@
 ---
 layout: ../layouts/Base.astro
-title: Forwarding — Interactive Tour
+title: "Proxy Forwarding — Interactive Tour"
 ---
 
-## Forwarding: Proxy & Wrap
+## Proxy Forwarding
 
-<p class="subtitle">How might you build wrapper components without runtime props spreading?</p>
+<p class="subtitle"><code>component.proxy&lt;T&gt;()</code> exposes a native element surface — directives and bindings forward at compile time.</p>
 
-`component.proxy<T>()` exposes a native element surface — directives and bindings forward through `@forward()` at compile time.
+Directives applied to the component are type-checked against the proxy's element type, then placed on the `@forward()` target inside the template.
 
 ```typescript
 import { component, input, output, computed, fragment, signal } from '@angular/core';
@@ -54,5 +54,5 @@ export const ButtonConsumer = component({
 ```
 
 <div class="annotation">
-  <strong>No runtime spread:</strong> the compiler expands <code>@forward()</code> into concrete bindings and directive instructions. <code>component.wrap(Target)</code> does the same for component-to-component forwarding — no props object, no magic.
+  <strong>No runtime spread:</strong> the compiler expands <code>@forward()</code> into concrete bindings and directive instructions. <code>use:ripple()</code> and <code>use:tooltip(...)</code> are accepted because their <code>host</code> types are compatible with <code>HTMLButtonElement</code>. The same directive cannot appear twice on the same final element.
 </div>

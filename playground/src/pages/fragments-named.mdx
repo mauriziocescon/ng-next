@@ -1,13 +1,13 @@
 ---
 layout: ../layouts/Base.astro
-title: Fragments — Interactive Tour
+title: "Fragments: Named — Interactive Tour"
 ---
 
-## Composition with Fragments
+## Fragments: Named
 
-<p class="subtitle">What if ng-content and ng-template were unified into typed functions?</p>
+<p class="subtitle">Named fragments are typed template functions — custom slots with parameters, auto-matched by name.</p>
 
-Fragments are typed functions that return markup — implicit for children, named for custom slots.
+A `@fragment` declaration inside a component tag is matched to a `fragment` binding by name. The consuming component calls it with typed arguments.
 
 ```typescript
 import { component, signal, input, fragment } from '@angular/core';
@@ -15,6 +15,7 @@ import { MyMenuItem } from './my-menu-item.ng';
 
 export interface Item { id: string; desc: string; }
 
+// -- Consumer: declares a named fragment inline --
 export const MenuConsumer = component({
   setup: () => {
     const items = signal<Item[]>(/** ... **/);
@@ -31,27 +32,22 @@ export const MenuConsumer = component({
   },
 });
 
-// -- Menu --
+// -- Menu: accepts a typed fragment input --
 export const Menu = component({
   bindings: {
     items: input.required<{ id: string; desc: string }[]>(),
     menuItem: fragment.required<[{ id: string; desc: string }]>(),
-    children: fragment<void>(),
   },
-  setup: ({ items, menuItem, children }) => @{
+  setup: ({ items, menuItem }) => @{
     <h1>Total items: {items().length}</h1>
 
     @for (item of items(); track item.id) {
       @render(menuItem(item))
-    }
-
-    @if (children) {
-      @render(children())
     }
   },
 });
 ```
 
 <div class="annotation">
-  <strong>One concept, two modes:</strong> nested markup becomes an implicit <code>children</code> fragment; named <code>@fragment</code> declarations are auto-matched to typed fragment inputs. No <code>ng-content</code>, no <code>ng-template</code>, no <code>let-*</code>.
+  <strong>Type-safe slots:</strong> the fragment's parameter list is typed at the declaration site. The component calls <code>menuItem(item)</code> — the compiler checks the argument matches <code>[{'{'}id: string; desc: string{'}'}]</code>. No <code>let-*</code>, no <code>ng-template</code>, no <code>ngTemplateGuard</code>.
 </div>

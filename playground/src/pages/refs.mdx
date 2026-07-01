@@ -5,9 +5,9 @@ title: Expose & Refs — Interactive Tour
 
 ## Expose and Template Refs
 
-<p class="subtitle">What if component internals stayed private — and only an explicit <code>expose</code> was reachable through refs?</p>
+<p class="subtitle">Component internals stay private — only an explicit <code>expose</code> is reachable through refs.</p>
 
-A component chooses what to expose; consumers access it through typed `ref` signals.
+Consumers access the exposed surface through typed `ref` signals, readable after `afterNextRender`.
 
 ```typescript
 import { component, afterNextRender, ref, refMany, signal } from '@angular/core';

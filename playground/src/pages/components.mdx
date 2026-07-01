@@ -1,13 +1,13 @@
 ---
 layout: ../layouts/Base.astro
-title: Components — Interactive Tour
+title: Component Basics — Interactive Tour
 ---
 
-## Component Structure & Bindings
+## Component Basics
 
-<p class="subtitle">What if components were function calls with a strict shape — setup, bindings, providers?</p>
+<p class="subtitle">Components as function calls with a strict shape — setup, bindings, template.</p>
 
-A component is a `setup` that runs once in an injection context, with typed bindings as its public contract.
+Bindings define the public contract (inputs, outputs, models). The template uses `bind:`, `model:`, and `on:` uniformly for native elements and components.
 
 ```typescript
 import { component, signal, linkedSignal, input, output } from '@angular/core';
@@ -43,5 +43,5 @@ export const TextSearch = component({
 ```
 
 <div class="annotation">
-  <strong>One shape, explicit contract:</strong> bindings define the public API, <code>setup</code> owns the logic, the template uses <code>bind:</code>, <code>model:</code>, <code>on:</code> uniformly for native elements and components alike. Lexical scoping resolves template → setup → file-level imports → global.
+  <strong>One shape, explicit contract:</strong> <code>bindings</code> is the public API, <code>setup</code> owns all logic, and the template is a <code>@{'{ }'}</code> markup literal. Native elements resolve through <code>IntrinsicElements</code> — the compiler knows valid attributes, properties, and events at build time.
 </div>
