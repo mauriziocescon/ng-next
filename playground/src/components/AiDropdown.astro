@@ -6,13 +6,12 @@ const prompt = encodeURIComponent(`Read from this URL: ${llmsFullUrl} and explai
 const links = [
   { label: 'Open in Claude', href: `https://claude.ai/new?q=${prompt}`, icon: '⬡' },
   { label: 'Open in ChatGPT', href: `https://chatgpt.com/?q=${prompt}`, icon: '◈' },
-  { label: 'Open in Gemini', href: `https://gemini.google.com/app?q=${prompt}`, icon: '◇' },
 ];
 ---
 
 <div class="ai-dropdown" data-base={base}>
-  <button class="ai-trigger" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="ai-menu">
-    <span aria-hidden="true">🤖</span> Open with AI
+  <button class="ai-trigger" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="ai-menu" aria-label="Open with AI">
+    <span aria-hidden="true">🤖</span><span class="ai-trigger-label"> Open with AI</span>
   </button>
   <div id="ai-menu" class="ai-menu" role="menu" hidden>
     {links.map(({ label, href, icon }) => (
@@ -116,12 +115,12 @@ const links = [
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.4rem 0.75rem;
+    padding: 0.35rem 0.65rem;
     border-radius: 6px;
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text-muted);
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.15s;
     white-space: nowrap;
@@ -188,5 +187,27 @@ const links = [
     border: none;
     border-top: 1px solid var(--border);
     margin: 0.3rem 0.5rem;
+  }
+
+  @media (max-width: 900px) {
+    .ai-trigger {
+      min-height: 44px;
+      min-width: 44px;
+      justify-content: center;
+      border-radius: 50%;
+      padding: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .ai-trigger .ai-trigger-label {
+      display: none;
+    }
+
+    .ai-menu {
+      right: 0;
+      bottom: calc(100% + 0.5rem);
+      top: auto;
+      min-width: 200px;
+    }
   }
 </style>

@@ -75,7 +75,6 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     <nav id="sidebar-nav" class="sidebar" aria-label="Sections">
       <div class="sidebar-top">
         <p class="sidebar-heading">Exploration</p>
-        <AiDropdown />
       </div>
       <ul role="list">
         {sections.map((s, i) => (
@@ -93,6 +92,9 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
       </ul>
     </nav>
     <main id="main-content" class="main">
+      <div class="ai-float">
+        <AiDropdown />
+      </div>
       <slot />
       <nav class="pagination" aria-label="Pagination">
         {prevSection && (
@@ -177,6 +179,26 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     top: 1rem;
   }
 
+  .ai-float {
+    float: right;
+    position: sticky;
+    top: 1rem;
+    z-index: 100;
+    height: 0;
+    overflow: visible;
+  }
+
+  @media (max-width: 900px) {
+    .ai-float {
+      float: none;
+      position: fixed;
+      top: auto;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      height: auto;
+    }
+  }
+
   .app {
     display: flex;
     min-height: 100vh;
@@ -197,7 +219,6 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
   .sidebar-top {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: 0 1.5rem;
     margin-bottom: 1.5rem;
   }
