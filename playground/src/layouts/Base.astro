@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import AiDropdown from '../components/AiDropdown.astro';
 
 interface Props {
   title: string;
@@ -70,7 +71,10 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
   <div class="backdrop" aria-hidden="true"></div>
   <div class="app">
     <nav id="sidebar-nav" class="sidebar" aria-label="Sections">
-      <p class="sidebar-heading">Exploration</p>
+      <div class="sidebar-top">
+        <p class="sidebar-heading">Exploration</p>
+        <AiDropdown />
+      </div>
       <ul role="list">
         {sections.map((s, i) => (
           <li>
@@ -187,14 +191,22 @@ const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex +
     overflow-y: auto;
   }
 
+  .sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
   .sidebar-heading {
     font-size: 0.85rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--accent);
-    padding: 0 1.5rem;
-    margin-bottom: 1.5rem;
+    padding: 0;
+    margin-bottom: 0;
   }
 
   .sidebar ul {

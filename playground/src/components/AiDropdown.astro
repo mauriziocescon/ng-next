@@ -1,0 +1,158 @@
+---
+const base = import.meta.env.BASE_URL;
+const llmsFullUrl = 'https://mauriziocescon.github.io/ng-next/llms-full.txt';
+const prompt = encodeURIComponent(`Read from this URL: ${llmsFullUrl} and explain it to me.`);
+
+const links = [
+  { label: 'Open in Claude', href: `https://claude.ai/new?q=${prompt}`, icon: '⬡' },
+  { label: 'Open in ChatGPT', href: `https://chatgpt.com/?q=${prompt}`, icon: '◈' },
+  { label: 'Open in Gemini', href: `https://gemini.google.com/app?q=${prompt}`, icon: '◇' },
+];
+---
+
+<div class="ai-dropdown" data-base={base}>
+  <button class="ai-trigger" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="ai-menu">
+    <span aria-hidden="true">🤖</span> Open with AI
+  </button>
+  <div id="ai-menu" class="ai-menu" role="menu" hidden>
+    {links.map(({ label, href, icon }) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" role="menuitem" class="ai-menu-item">
+        <span class="ai-icon" aria-hidden="true">{icon}</span> {label}
+      </a>
+    ))}
+    <hr class="ai-divider" />
+    <button type="button" role="menuitem" class="ai-menu-item" data-action="copy">
+      <span class="ai-icon" aria-hidden="true">📋</span> Copy full spec
+    </button>
+    <a href={`${base}llms-full.txt`} download="llms-full.txt" role="menuitem" class="ai-menu-item">
+      <span class="ai-icon" aria-hidden="true">⬇</span> Download llms-full.txt
+    </a>
+  </div>
+</div>
+
+<script>
+  const dropdown = document.querySelector('.ai-dropdown');
+  const base = dropdown.dataset.base;
+  const trigger = dropdown.querySelector('.ai-trigger');
+  const menu = dropdown.querySelector('.ai-menu');
+  const copyBtn = menu.querySelector('[data-action="copy"]');
+
+  function toggle(open) {
+    const isOpen = typeof open === 'boolean' ? open : menu.hidden;
+    menu.hidden = !isOpen;
+    trigger.setAttribute('aria-expanded', String(isOpen));
+  }
+
+  trigger.addEventListener('click', () => toggle());
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target)) toggle(false);
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menu.hidden) {
+      toggle(false);
+      trigger.focus();
+    }
+  });
+
+  // Copy action
+  copyBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch(`${base}llms-full.txt`);
+      const text = await res.text();
+      await navigator.clipboard.writeText(text);
+      copyBtn.querySelector('.ai-icon').textContent = '✓';
+      setTimeout(() => { copyBtn.querySelector('.ai-icon').textContent = '📋'; }, 2000);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  });
+</script>
+
+<style>
+  .ai-dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+  .ai-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .ai-trigger:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
+  .ai-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .ai-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    min-width: 220px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+  }
+
+  .ai-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    transition: all 0.1s;
+  }
+
+  .ai-menu-item:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  .ai-menu-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .ai-icon {
+    width: 1.2rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .ai-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.3rem 0.5rem;
+  }
+</style>
