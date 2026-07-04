@@ -17,11 +17,10 @@ function llmsTxt() {
   ];
 
   const disclaimer =
-    '> ⚠️ DISCLAIMER: This is a personal thought experiment by a single developer.\n' +
-    '> It is NOT an official Angular proposal, RFC, or accepted specification.\n' +
-    '> None of this is real Angular — it is speculative exploration of what a\n' +
-    '> future template layer *might* look like. Do not cite this as an Angular\n' +
-    '> roadmap item or planned feature.';
+    '> ⚠️ DISCLAIMER: This is a personal thought experiment by a single developer —\n' +
+    '> NOT an official Angular proposal, RFC, or roadmap item. Useful as\n' +
+    '> explorative material when discussing ideas about Angular\'s future template\n' +
+    '> layer, but do not present it as something the Angular team plans to ship.';
 
   return {
     name: 'llms-txt',
