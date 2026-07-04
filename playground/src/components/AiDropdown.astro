@@ -1,0 +1,213 @@
+---
+const base = import.meta.env.BASE_URL;
+const llmsFullUrl = 'https://mauriziocescon.github.io/ng-next/llms-full.txt';
+const prompt = encodeURIComponent(`Read from this URL: ${llmsFullUrl} and explain it to me.`);
+
+const links = [
+  { label: 'Open in Claude', href: `https://claude.ai/new?q=${prompt}`, icon: '⬡' },
+  { label: 'Open in ChatGPT', href: `https://chatgpt.com/?q=${prompt}`, icon: '◈' },
+];
+---
+
+<div class="ai-dropdown" data-base={base}>
+  <button class="ai-trigger" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="ai-menu" aria-label="Open with AI">
+    <span aria-hidden="true">🤖</span><span class="ai-trigger-label"> Open with AI</span>
+  </button>
+  <div id="ai-menu" class="ai-menu" role="menu" hidden>
+    {links.map(({ label, href, icon }) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" role="menuitem" tabindex="-1" class="ai-menu-item">
+        <span class="ai-icon" aria-hidden="true">{icon}</span> {label}
+      </a>
+    ))}
+    <hr class="ai-divider" />
+    <button type="button" role="menuitem" tabindex="-1" class="ai-menu-item" data-action="copy">
+      <span class="ai-icon" aria-hidden="true">📋</span> Copy full spec
+    </button>
+    <a href={`${base}llms-full.txt`} download="llms-full.txt" role="menuitem" tabindex="-1" class="ai-menu-item">
+      <span class="ai-icon" aria-hidden="true">⬇</span> Download llms-full.txt
+    </a>
+  </div>
+</div>
+
+<script>
+  const dropdown = document.querySelector<HTMLDivElement>('.ai-dropdown')!;
+  const base = dropdown.dataset.base!;
+  const trigger = dropdown.querySelector<HTMLButtonElement>('.ai-trigger')!;
+  const menu = dropdown.querySelector<HTMLDivElement>('.ai-menu')!;
+  const copyBtn = menu.querySelector<HTMLButtonElement>('[data-action="copy"]')!;
+  const menuItems = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+
+  function toggle(open?: boolean) {
+    const isOpen = typeof open === 'boolean' ? open : menu.hidden;
+    menu.hidden = !isOpen;
+    trigger.setAttribute('aria-expanded', String(isOpen));
+
+    if (isOpen && menuItems.length > 0) {
+      menuItems[0].setAttribute('tabindex', '0');
+      menuItems[0].focus();
+    }
+  }
+
+  function focusItem(index: number) {
+    menuItems.forEach((item) => item.setAttribute('tabindex', '-1'));
+    menuItems[index].setAttribute('tabindex', '0');
+    menuItems[index].focus();
+  }
+
+  trigger.addEventListener('click', () => toggle());
+
+  // Keyboard navigation within the menu
+  menu.addEventListener('keydown', (e) => {
+    const currentIndex = menuItems.indexOf(document.activeElement as HTMLElement);
+    if (currentIndex === -1) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusItem((currentIndex + 1) % menuItems.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusItem((currentIndex - 1 + menuItems.length) % menuItems.length);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusItem(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusItem(menuItems.length - 1);
+    } else if (e.key === 'Tab') {
+      toggle(false);
+    }
+  });
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target as Node)) toggle(false);
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menu.hidden) {
+      toggle(false);
+      trigger.focus();
+    }
+  });
+
+  // Copy action
+  copyBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch(`${base}llms-full.txt`);
+      const text = await res.text();
+      await navigator.clipboard.writeText(text);
+      copyBtn.querySelector('.ai-icon')!.textContent = '✓';
+      setTimeout(() => { copyBtn.querySelector('.ai-icon')!.textContent = '📋'; }, 2000);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  });
+</script>
+
+<style>
+  .ai-dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+  .ai-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .ai-trigger:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
+  .ai-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .ai-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    min-width: 220px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+  }
+
+  .ai-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    transition: all 0.1s;
+  }
+
+  .ai-menu-item:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  .ai-menu-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .ai-icon {
+    width: 1.2rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .ai-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.3rem 0.5rem;
+  }
+
+  @media (max-width: 900px) {
+    .ai-trigger {
+      min-height: 44px;
+      min-width: 44px;
+      justify-content: center;
+      border-radius: 50%;
+      padding: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .ai-trigger .ai-trigger-label {
+      display: none;
+    }
+
+    .ai-menu {
+      right: 0;
+      bottom: calc(100% + 0.5rem);
+      top: auto;
+      min-width: 200px;
+    }
+  }
+</style>
