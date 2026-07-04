@@ -74,8 +74,8 @@ const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
     btnInvalid.addEventListener('click', () => answer(false));
 
     document.addEventListener('keydown', (e) => {
-      const tag = e.target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const el = e.target;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.tagName === 'BUTTON' || el.isContentEditable) return;
       if (e.key === 'ArrowLeft' && prevHref) {
         e.stopImmediatePropagation();
         window.location.href = prevHref;
