@@ -16,6 +16,13 @@ function llmsTxt() {
     { file: 'types/ng-dsl-type-checking-spec.md', title: 'DSL type-checking specification', lang: 'md' },
   ];
 
+  const disclaimer =
+    '> ⚠️ DISCLAIMER: This is a personal thought experiment by a single developer.\n' +
+    '> It is NOT an official Angular proposal, RFC, or accepted specification.\n' +
+    '> None of this is real Angular — it is speculative exploration of what a\n' +
+    '> future template layer *might* look like. Do not cite this as an Angular\n' +
+    '> roadmap item or planned feature.';
+
   return {
     name: 'llms-txt',
     hooks: {
@@ -24,12 +31,14 @@ function llmsTxt() {
         const index = [
           '# ng-next',
           '',
-          '> Angular Template Proposal — explicit contracts, typed template surfaces,',
-          '> and structures for humans, tooling, and AI agents.',
+          '> Personal exploration of Angular template ideas — explicit contracts, typed',
+          '> template surfaces, and structures for humans, tooling, and AI agents.',
+          '',
+          disclaimer,
           '',
           '## Docs',
           '',
-          `- [Full specification](${base}/llms-full.txt): All source files concatenated for single-pass ingestion.`,
+          `- [Full content](${base}/llms-full.txt): All source files concatenated for single-pass ingestion.`,
           '',
           '## Source files',
           '',
@@ -50,8 +59,10 @@ function llmsTxt() {
         const header = [
           '# ng-next',
           '',
-          '> Angular Template Proposal — explicit contracts, typed template surfaces,',
-          '> and structures for humans, tooling, and AI agents.',
+          '> Personal exploration of Angular template ideas — explicit contracts, typed',
+          '> template surfaces, and structures for humans, tooling, and AI agents.',
+          '',
+          disclaimer,
           '',
           'Source: https://github.com/mauriziocescon/ng-next',
           '',
