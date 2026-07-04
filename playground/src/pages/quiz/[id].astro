@@ -77,10 +77,8 @@ const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
       const el = e.target;
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.tagName === 'BUTTON' || el.isContentEditable) return;
       if (e.key === 'ArrowLeft' && prevHref) {
-        e.stopImmediatePropagation();
         window.location.href = prevHref;
       } else if (e.key === 'ArrowRight' && nextHref) {
-        e.stopImmediatePropagation();
         window.location.href = nextHref;
       }
     });
