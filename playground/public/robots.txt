@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://mauriziocescon.github.io/ng-next/sitemap-index.xml
+Llmstxt: https://mauriziocescon.github.io/ng-next/llms.txt
