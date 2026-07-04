@@ -21,19 +21,23 @@ function llmsTxt() {
     '> Useful as explorative material when discussing ideas about Angular\'s future template\n' +
     '> layer.';
 
+  const preamble = [
+    '# ng-next',
+    '',
+    '> Personal exploration of Angular template ideas — explicit contracts, typed',
+    '> template surfaces, and structures easier to reason about for humans, tooling,',
+    '> and AI agents.',
+    '',
+    disclaimer,
+  ].join('\n');
+
   return {
     name: 'llms-txt',
     hooks: {
       'astro:build:start': async () => {
         // --- llms.txt (index) ---
         const index = [
-          '# ng-next',
-          '',
-          '> Personal exploration of Angular template ideas — explicit contracts, typed',
-          '> template surfaces, and structures easier to reason about for humans, tooling,',
-          '> and AI agents.',
-          '',
-          disclaimer,
+          preamble,
           '',
           '## Docs',
           '',
@@ -56,13 +60,7 @@ function llmsTxt() {
 
         // --- llms-full.txt (expanded content) ---
         const header = [
-          '# ng-next',
-          '',
-          '> Personal exploration of Angular template ideas — explicit contracts, typed',
-          '> template surfaces, and structures easier to reason about for humans, tooling,',
-          '> and AI agents.',
-          '',
-          disclaimer,
+          preamble,
           '',
           'Source: https://github.com/mauriziocescon/ng-next',
           '',
