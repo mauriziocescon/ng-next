@@ -1,7 +1,7 @@
 ---
 const base = import.meta.env.BASE_URL;
 const llmsFullUrl = 'https://mauriziocescon.github.io/ng-next/llms-full.txt';
-const prompt = encodeURIComponent(`Read from this URL: ${llmsFullUrl} — explain it to me as an Angular developer. What problems does it try to solve and how?`);
+const prompt = encodeURIComponent(`Read from this URL: ${llmsFullUrl} — explain it to me as an Angular developer working on large-scale enterprise projects with AI-assisted workflows. What problems does it try to solve and how?`);
 
 const links = [
   { label: 'Open in Claude', href: `https://claude.ai/new?q=${prompt}`, icon: '⬡' },
