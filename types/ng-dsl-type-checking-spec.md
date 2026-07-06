@@ -846,7 +846,9 @@ not visible outside the child-list where declared.
 ### 10.2 Fragment Props
 
 **Explicit:** `<Component fragmentName={fragmentValue} />` — checks
-`fragmentValue ⊑ FragmentBinding<T>`.
+`fragmentValue ⊑ FragmentBinding<T>` when `B[name] : RequiredFragmentBinding<T>`,
+or `fragmentValue ⊑ FragmentBinding<T> | undefined` when
+`B[name] : OptionalFragmentBinding<T>`.
 
 **Implicit (inline):** `@fragment name(...) { ... }` as direct child of a
 component element — auto-passed to the matching binding. Rules:
