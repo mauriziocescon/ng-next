@@ -393,6 +393,11 @@ For native elements, `E = H` (the host element type).
 For components, `E = E(C)` (the expose type).
 For directives, `E = E(D)` (the directive expose type).
 
+Note: a `ref()` variable (`Ref<T | undefined>`) may appear at multiple sites
+across the template — last rendered wins (template order). This is intentional:
+it supports patterns like `@if`/`@else` branches sharing the same ref. Use
+`refMany()` when collecting multiple simultaneously-active instances.
+
 ### 3.9 once: Binding
 
 ```
