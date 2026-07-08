@@ -5,7 +5,6 @@ import {
   type Signal,
   HostAttributeToken,
   InjectionToken,
-  afterNextRender,
   computed,
   input,
   model,
@@ -30,7 +29,7 @@ import {
   type RequiredFragmentBinding,
   type TemplateAstOf,
   type TemplateMarkup,
-  type __ReservedBindingsConstraint,
+  type __ValidateComponentBindings,
   type __WrapSelectionDiagnostics,
   component,
   derivation,
@@ -1472,7 +1471,7 @@ type _WrapTypeMessage = Assert<
   >
 >;
 
-type _ReservedChildrenDiag = __ReservedBindingsConstraint<{
+type _ReservedChildrenDiag = __ValidateComponentBindings<{
   children: InputSignal<string>;
 }>;
 type _ReservedChildrenMsg = Assert<
@@ -1482,13 +1481,13 @@ type _ReservedChildrenMsg = Assert<
   >
 >;
 
-type _ReservedOk = __ReservedBindingsConstraint<{
+type _ReservedOk = __ValidateComponentBindings<{
   children: OptionalFragmentBinding<void>;
 }>;
 type _ReservedOkCheck = Assert<IsEqual<_ReservedOk['children'], OptionalFragmentBinding<void>>>;
 
 // ref is reserved — any binding named 'ref' on a component is an error
-type _ReservedRefDiag = __ReservedBindingsConstraint<{
+type _ReservedRefDiag = __ValidateComponentBindings<{
   ref: InputSignal<string>;
 }>;
 type _ReservedRefMsg = Assert<

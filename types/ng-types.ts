@@ -109,7 +109,6 @@ type AnyBindingValue =
   | OptionalFragmentBinding<any>
   | RequiredFragmentBinding<any>;
 
-export type DerivationBindingValue = InputSignal<any>;
 export type DirectiveBindingValue = AnyBindingValue;
 export type ComponentBindingValue = AnyBindingValue;
 
@@ -318,7 +317,7 @@ export type __WrapSelectionDiagnostics<
   All extends Record<string, unknown>,
 > = WrapSelectionDiagnostics<Sel, All>;
 
-export type __ReservedBindingsConstraint<
+export type __ValidateComponentBindings<
   B extends Record<string, ComponentBindingValue>,
 > = ValidateComponentBindings<B>;
 
@@ -466,6 +465,7 @@ export namespace component {
             'component.proxy requires an explicit HTMLElement surface type';
         }
       : {
+          bindings?: never;
           setup: () => SetupReturn<E, TMarkup>;
           providers?: () => Provider[];
           style?: string;
@@ -534,6 +534,7 @@ export function directive<
 // No bindings
 export function directive<H extends HTMLElement, E = void>(config: {
   host: Ref<H | undefined>;
+  bindings?: never;
   setup: (bindings: {}, context: { host: Ref<H | undefined> }) => E;
 }): DirectiveInstance<H, {}, E>;
 
