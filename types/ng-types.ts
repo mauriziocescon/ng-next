@@ -109,7 +109,6 @@ type AnyBindingValue =
   | OptionalFragmentBinding<any>
   | RequiredFragmentBinding<any>;
 
-export type DerivationBindingValue = InputSignal<any>;
 export type DirectiveBindingValue = AnyBindingValue;
 export type ComponentBindingValue = AnyBindingValue;
 
@@ -300,22 +299,17 @@ type SetupBindings<B> = {
   [K in keyof B]: SetupBindingValue<B[K]>;
 };
 
-type ReservedBindingsConstraint<
+type ValidateComponentBindings<
   B extends Record<string, ComponentBindingValue>,
-> = ('children' extends keyof B
-  ? B['children'] extends FragmentBinding<void>
-    ? {}
-    : {
-        __reserved_children_error__:
-          'children binding must use fragment<void>() or fragment.required<void>()';
-      }
-  : unknown) &
-  ('ref' extends keyof B
-    ? {
-        __reserved_ref_error__:
-          'ref is a reserved attribute for components and cannot be declared as a binding';
-      }
-    : unknown);
+> = {
+  [K in keyof B]: K extends 'ref'
+    ? never
+    : K extends 'children'
+      ? B[K] extends FragmentBinding<void>
+        ? B[K]
+        : never
+      : B[K];
+};
 
 // Test-only exports for diagnostic contract checks in ng-types.spec.ts
 export type __WrapSelectionDiagnostics<
@@ -323,9 +317,9 @@ export type __WrapSelectionDiagnostics<
   All extends Record<string, unknown>,
 > = WrapSelectionDiagnostics<Sel, All>;
 
-export type __ReservedBindingsConstraint<
+export type __ValidateComponentBindings<
   B extends Record<string, ComponentBindingValue>,
-> = ReservedBindingsConstraint<B>;
+> = ValidateComponentBindings<B>;
 
 // ────────────────────────────────────────────────────────────────
 // 6. REF UTILITIES
@@ -414,12 +408,12 @@ export function component<
   TMarkup extends TemplateMarkup = TemplateMarkup,
 >(
   config: {
-    bindings: B;
+    bindings: B & ValidateComponentBindings<B>;
     setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
     providers?: (inputs: InputsOnly<B>) => Provider[];
     style?: string;
     styleUrl?: string;
-  } & ReservedBindingsConstraint<B>,
+  },
 ): ComponentInstance<B, E, never, TMarkup>;
 
 // No bindings
@@ -427,6 +421,7 @@ export function component<
   E = void,
   TMarkup extends TemplateMarkup = TemplateMarkup,
 >(config: {
+  bindings?: never;
   setup: () => SetupReturn<E, TMarkup>;
   providers?: () => Provider[];
   style?: string;
@@ -451,12 +446,12 @@ export namespace component {
             'component.proxy requires an explicit HTMLElement surface type';
         }
       : {
-          bindings: B;
+          bindings: B & ValidateComponentBindings<B>;
           setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
           providers?: (inputs: InputsOnly<B>) => Provider[];
           style?: string;
           styleUrl?: string;
-        } & ReservedBindingsConstraint<B>,
+        },
   ): ComponentInstance<B, E, S, TMarkup>;
 
   export declare function proxy<
@@ -470,6 +465,7 @@ export namespace component {
             'component.proxy requires an explicit HTMLElement surface type';
         }
       : {
+          bindings?: never;
           setup: () => SetupReturn<E, TMarkup>;
           providers?: () => Provider[];
           style?: string;
@@ -538,6 +534,7 @@ export function directive<
 // No bindings
 export function directive<H extends HTMLElement, E = void>(config: {
   host: Ref<H | undefined>;
+  bindings?: never;
   setup: (bindings: {}, context: { host: Ref<H | undefined> }) => E;
 }): DirectiveInstance<H, {}, E>;
 
@@ -567,23 +564,28 @@ export type DerivationInstance<B, T> = {
   readonly [RESULT]: T;
 };
 
-type DerivationBindingsConstraint<
-  B extends Record<string, DerivationBindingValue>,
+type ValidateDerivationBindings<
+  B extends Record<string, AnyBindingValue>,
 > = {
-  [K in keyof B]: B[K] extends ModelSignal<any> ? never : B[K];
+  [K in keyof B]: B[K] extends InputSignal<any>
+    ? B[K] extends ModelSignal<any>
+      ? never
+      : B[K]
+    : never;
 };
 
-// With bindings (input-only; excludes ModelSignal explicitly)
+// With bindings (input-only; rejects model, output, fragment via never)
 export function derivation<
-  B extends Record<string, DerivationBindingValue>,
+  B extends Record<string, AnyBindingValue>,
   T,
 >(config: {
-  bindings: B & DerivationBindingsConstraint<B>;
+  bindings: B & ValidateDerivationBindings<B>;
   setup: (bindings: B) => Signal<T>;
 }): DerivationInstance<B, T>;
 
 // No bindings
 export function derivation<T>(config: {
+  bindings?: never;
   setup: () => Signal<T>;
 }): DerivationInstance<{}, T>;
 
@@ -654,6 +656,7 @@ interface DiTokenWithFactoryConfig<T> {
   debugName?: string;
   factory: () => T;
   autoProvided?: boolean;
+  multi?: never;
 }
 
 // Config: multi token without factory (explicit type parameter required).
@@ -665,6 +668,7 @@ interface DiMultiTokenBaseConfig {
 interface DiTokenBaseConfig {
   debugName?: string;
   autoProvided?: false;
+  multi?: never;
 }
 
 export function injectionToken<T>(
