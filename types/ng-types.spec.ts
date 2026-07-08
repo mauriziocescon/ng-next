@@ -239,8 +239,8 @@ const RequiredChildren = component({
 
 // Reserved names enforcement on component bindings:
 // - children must be fragment(...)
-// @ts-expect-error reserved name 'children' must use fragment(...)
 const _NegChildrenMustBeFragment = component({
+  // @ts-expect-error reserved name 'children' must use fragment(...)
   bindings: {
     children: input<string>(),
   },
@@ -248,8 +248,8 @@ const _NegChildrenMustBeFragment = component({
 });
 
 // - ref cannot be used as a binding name in components
-// @ts-expect-error reserved name 'ref' cannot be a component binding
 const _NegRefReserved = component({
+  // @ts-expect-error reserved name 'ref' cannot be a component binding
   bindings: {
     ref: input<string>(),
   },
@@ -982,24 +982,24 @@ const simple = derivation({
 const _simpleType: DerivationInstance<{}, number> = simple;
 
 // Derivation must reject non-input bindings
-// @ts-expect-error derivations cannot declare model bindings
 const _NegDerivationNonInput = derivation({
+  // @ts-expect-error derivations cannot declare model bindings
   bindings: {
     changed: model<number>(),
   },
   setup: () => computed(() => 1),
 });
 
-// @ts-expect-error derivations cannot declare output bindings
 const _NegDerivationOutput = derivation({
+  // @ts-expect-error derivations cannot declare output bindings
   bindings: {
     changed: output<number>(),
   },
   setup: () => computed(() => 1),
 });
 
-// @ts-expect-error derivations cannot declare fragment bindings
 const _NegDerivationFragment = derivation({
+  // @ts-expect-error derivations cannot declare fragment bindings
   bindings: {
     content: fragment<void>(),
   },
@@ -1090,8 +1090,8 @@ const _unknownValue: unknown = inject(unknownTypeToken);
 const _unknownCast = <string>inject(unknownTypeToken);
 
 // Negative: autoProvided: true without factory
-// @ts-expect-error autoProvided: true requires a factory
 const _negAutoProvidedNoFactory = injectionToken<string>({
+  // @ts-expect-error autoProvided: true requires a factory
   autoProvided: true,
 });
 
@@ -1477,15 +1477,15 @@ type _ReservedChildrenDiag = __ReservedBindingsConstraint<{
 }>;
 type _ReservedChildrenMsg = Assert<
   IsEqual<
-    _ReservedChildrenDiag['__reserved_children_error__'],
-    'children binding must use fragment<void>() or fragment.required<void>()'
+    _ReservedChildrenDiag['children'],
+    never
   >
 >;
 
 type _ReservedOk = __ReservedBindingsConstraint<{
   children: OptionalFragmentBinding<void>;
 }>;
-type _ReservedOkKeys = Assert<IsEqual<keyof _ReservedOk, never>>;
+type _ReservedOkCheck = Assert<IsEqual<_ReservedOk['children'], OptionalFragmentBinding<void>>>;
 
 // ref is reserved — any binding named 'ref' on a component is an error
 type _ReservedRefDiag = __ReservedBindingsConstraint<{
@@ -1493,7 +1493,7 @@ type _ReservedRefDiag = __ReservedBindingsConstraint<{
 }>;
 type _ReservedRefMsg = Assert<
   IsEqual<
-    _ReservedRefDiag['__reserved_ref_error__'],
-    'ref is a reserved attribute for components and cannot be declared as a binding'
+    _ReservedRefDiag['ref'],
+    never
   >
 >;
