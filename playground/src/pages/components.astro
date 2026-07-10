@@ -38,7 +38,7 @@ export const TextSearch = component({
 const annotations = [
   {
     token: 'TextSearch',
-    explanation: 'Named export. Used as a tag in templates. Injectable via inject() when expose is defined.',
+    explanation: 'Named export. Used as a tag in templates or inject().',
     category: 'keyword',
   },
   {
@@ -263,11 +263,6 @@ const variantTemplateExposeAnnotations = [
     token: 'expose:',
     explanation: 'Public API for ref() and inject(). Only listed members are reachable — everything else stays private.',
     category: 'keyword',
-  },
-  {
-    token: 'text: text.asReadonly()',
-    explanation: 'Read-only view. Consumers can read text() but not mutate it.',
-    category: 'type',
   },
 ];
 
