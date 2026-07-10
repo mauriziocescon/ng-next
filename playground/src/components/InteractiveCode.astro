@@ -1,0 +1,508 @@
+---
+/**
+ * InteractiveCode — an explorable code block with:
+ * 1. Shiki syntax highlighting (build-time)
+ * 2. Token annotations via DOM ranges (runtime hover/click)
+ * 3. "What if?" variant toggles
+ */
+import { createHighlighter } from 'shiki';
+
+interface Annotation {
+  token: string;
+  explanation: string;
+  category?: string;
+}
+
+interface Variant {
+  label: string;
+  code: string;
+  annotations?: Annotation[];
+  note: string;
+  invalid?: boolean;
+}
+
+interface Props {
+  code: string;
+  lang?: string;
+  label?: string;
+  annotations?: Annotation[];
+  variants?: Variant[];
+  title?: string;
+}
+
+const { code, lang = 'typescript', label = 'Original', annotations = [], variants = [], title } = Astro.props;
+
+// Pre-highlight all code variants at build time using Shiki
+const highlighter = await createHighlighter({
+  themes: ['github-dark'],
+  langs: [lang],
+});
+
+function highlight(source: string): string {
+  return highlighter.codeToHtml(source, { lang, theme: 'github-dark' });
+}
+
+// Pre-render all highlighted HTML
+const baseHtml = highlight(code);
+const variantHtmls = variants.map(v => highlight(v.code));
+---
+
+<div
+  class="interactive-code"
+  data-base-html={baseHtml}
+  data-annotations={JSON.stringify(annotations)}
+  data-variants={JSON.stringify(variants)}
+  data-variant-htmls={JSON.stringify(variantHtmls)}
+>
+  {title && <div class="ic-title">{title}</div>}
+
+  {variants.length > 0 && (
+    <div class="ic-variants" role="tablist" aria-label="Code variants">
+      <button class="ic-variant-btn active" role="tab" aria-selected="true" data-variant-index="-1" type="button">
+        {label}
+      </button>
+      {variants.map((v, i) => (
+        <button
+          class:list={['ic-variant-btn', { invalid: v.invalid }]}
+          role="tab"
+          aria-selected="false"
+          data-variant-index={String(i)}
+          type="button"
+        >
+          {v.invalid && <span class="ic-variant-icon" aria-hidden="true">✗</span>}
+          {!v.invalid && <span class="ic-variant-icon" aria-hidden="true">↻</span>}
+          {v.label}
+        </button>
+      ))}
+    </div>
+  )}
+
+  <div class="ic-code-container">
+    <div class="ic-code-wrapper" set:html={baseHtml} />
+    <div class="ic-popover" hidden aria-live="polite">
+      <span class="ic-popover-category"></span>
+      <span class="ic-popover-text"></span>
+    </div>
+  </div>
+
+  <div class="ic-note" hidden aria-live="polite"></div>
+
+</div>
+
+<script>
+  class InteractiveCodeBlock {
+    private root: HTMLElement;
+    private wrapper: HTMLElement;
+    private popover: HTMLElement;
+    private noteEl: HTMLElement;
+    private baseHtml: string;
+    private baseAnnotations: any[];
+    private variants: any[];
+    private variantHtmls: string[];
+
+    constructor(root: HTMLElement) {
+      this.root = root;
+      this.wrapper = root.querySelector('.ic-code-wrapper')!;
+      this.popover = root.querySelector('.ic-popover')!;
+      this.noteEl = root.querySelector('.ic-note')!;
+      this.baseHtml = root.dataset.baseHtml || '';
+      this.baseAnnotations = JSON.parse(root.dataset.annotations || '[]');
+      this.variants = JSON.parse(root.dataset.variants || '[]');
+      this.variantHtmls = JSON.parse(root.dataset.variantHtmls || '[]');
+
+      this.applyAnnotations(this.baseAnnotations);
+      this.bindVariants();
+      this.bindPopover();
+    }
+
+    private applyAnnotations(annotations: any[]) {
+      // Work on the already-rendered Shiki HTML via DOM text search
+      const codeEl = this.wrapper.querySelector('code');
+      if (!codeEl) return;
+
+      // Sort longest first to avoid substring conflicts
+      const sorted = [...annotations].sort((a, b) => b.token.length - a.token.length);
+
+      for (const ann of sorted) {
+        this.wrapTextInDom(codeEl, ann.token, ann);
+      }
+    }
+
+    private wrapTextInDom(container: HTMLElement, searchText: string, ann: any) {
+      // Walk text nodes to find the first occurrence of searchText
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+      let accumulated = '';
+      const textNodes: Text[] = [];
+
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode as Text);
+        accumulated += (walker.currentNode as Text).textContent || '';
+      }
+
+      // Find the search text in the accumulated text
+      const fullText = textNodes.map(n => n.textContent || '').join('');
+      const startIdx = fullText.indexOf(searchText);
+      if (startIdx === -1) return;
+      const endIdx = startIdx + searchText.length;
+
+      // Find which text nodes contain the start and end
+      let currentOffset = 0;
+      let startNode: Text | null = null;
+      let startOffset = 0;
+      let endNode: Text | null = null;
+      let endOffset = 0;
+
+      for (const node of textNodes) {
+        const nodeLen = (node.textContent || '').length;
+        if (!startNode && currentOffset + nodeLen > startIdx) {
+          startNode = node;
+          startOffset = startIdx - currentOffset;
+        }
+        if (!endNode && currentOffset + nodeLen >= endIdx) {
+          endNode = node;
+          endOffset = endIdx - currentOffset;
+          break;
+        }
+        currentOffset += nodeLen;
+      }
+
+      if (!startNode || !endNode) return;
+
+      // Create a range and wrap it
+      const range = document.createRange();
+      range.setStart(startNode, startOffset);
+      range.setEnd(endNode, endOffset);
+
+      const category = ann.category || 'keyword';
+      const span = document.createElement('span');
+      span.className = `ic-token ic-cat-${category}`;
+      span.dataset.explanation = ann.explanation;
+      span.dataset.category = category;
+      span.tabIndex = 0;
+      span.setAttribute('role', 'button');
+      span.setAttribute('aria-label', `${ann.token}: ${ann.explanation}`);
+
+      try {
+        range.surroundContents(span);
+      } catch (e) {
+        // If surroundContents fails (crosses element boundaries),
+        // fall back to extracting and re-inserting
+        const fragment = range.extractContents();
+        span.appendChild(fragment);
+        range.insertNode(span);
+      }
+    }
+
+    private bindVariants() {
+      const buttons = this.root.querySelectorAll<HTMLButtonElement>('.ic-variant-btn');
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          buttons.forEach((b) => {
+            b.classList.remove('active');
+            b.setAttribute('aria-selected', 'false');
+          });
+          btn.classList.add('active');
+          btn.setAttribute('aria-selected', 'true');
+
+          const index = Number(btn.dataset.variantIndex);
+          if (index === -1) {
+            this.wrapper.innerHTML = this.baseHtml;
+            this.applyAnnotations(this.baseAnnotations);
+            this.noteEl.hidden = true;
+            this.noteEl.textContent = '';
+          } else {
+            const variant = this.variants[index];
+            this.wrapper.innerHTML = this.variantHtmls[index];
+            this.applyAnnotations(variant.annotations || []);
+            if (variant.note) {
+              this.noteEl.textContent = variant.note;
+              this.noteEl.hidden = false;
+              this.noteEl.className = `ic-note ${variant.invalid ? 'ic-note-error' : 'ic-note-info'}`;
+            }
+          }
+
+          this.popover.hidden = true;
+        });
+      });
+    }
+
+    private bindPopover() {
+      this.wrapper.addEventListener('pointerenter', (e) => {
+        const target = (e.target as HTMLElement).closest('.ic-token') as HTMLElement | null;
+        if (target) this.showPopover(target);
+      }, true);
+
+      this.wrapper.addEventListener('pointerleave', (e) => {
+        const target = (e.target as HTMLElement).closest('.ic-token') as HTMLElement | null;
+        if (target) this.hidePopover();
+      }, true);
+
+      this.wrapper.addEventListener('focusin', (e) => {
+        const target = (e.target as HTMLElement).closest('.ic-token') as HTMLElement | null;
+        if (target) this.showPopover(target);
+      });
+
+      this.wrapper.addEventListener('focusout', () => this.hidePopover());
+    }
+
+    private showPopover(target: HTMLElement) {
+      const explanation = target.dataset.explanation || '';
+      const category = target.dataset.category || 'keyword';
+
+      this.popover.querySelector('.ic-popover-category')!.textContent = category.toUpperCase();
+      this.popover.querySelector('.ic-popover-text')!.textContent = explanation;
+      this.popover.hidden = false;
+
+      const containerRect = this.root.querySelector('.ic-code-container')!.getBoundingClientRect();
+      const tokenRect = target.getBoundingClientRect();
+
+      const top = tokenRect.bottom - containerRect.top + 8;
+      const left = Math.max(0, Math.min(
+        tokenRect.left - containerRect.left,
+        containerRect.width - 320
+      ));
+
+      (this.popover as HTMLElement).style.top = `${top}px`;
+      (this.popover as HTMLElement).style.left = `${left}px`;
+    }
+
+    private hidePopover() {
+      this.popover.hidden = true;
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('.interactive-code').forEach((el) => {
+    new InteractiveCodeBlock(el);
+  });
+</script>
+
+<style is:global>
+  .interactive-code {
+    margin: 1.5rem 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .ic-title {
+    padding: 0.6rem 1.25rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ic-variants {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 0.75rem;
+    overflow-x: auto;
+  }
+
+  .ic-variant-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .ic-variant-btn:hover { color: var(--text); }
+  .ic-variant-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .ic-variant-btn.invalid { color: var(--text-muted); }
+  .ic-variant-btn.invalid:hover { color: var(--error); }
+  .ic-variant-btn.invalid.active { color: var(--error); border-bottom-color: var(--error); }
+  .ic-variant-icon { font-size: 0.75rem; }
+  .ic-variant-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* Code container — override Shiki's default styles */
+  .ic-code-container {
+    position: relative;
+    overflow: visible;
+  }
+
+  .ic-code-wrapper pre {
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 1.25rem !important;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  .ic-code-wrapper code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  /* Annotated tokens — layered on top of Shiki highlighting */
+  .ic-token {
+    position: relative;
+    border-radius: 3px;
+    padding: 0 2px;
+    cursor: pointer;
+    transition: background 0.1s;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .ic-token:hover,
+  .ic-token:focus-visible {
+    outline: none;
+  }
+
+  .ic-cat-binding {
+    text-decoration-color: #9b8afb;
+  }
+  .ic-cat-binding:hover,
+  .ic-cat-binding:focus-visible {
+    background: rgba(155, 138, 251, 0.15);
+  }
+
+  .ic-cat-keyword {
+    text-decoration-color: #67e8f9;
+  }
+  .ic-cat-keyword:hover,
+  .ic-cat-keyword:focus-visible {
+    background: rgba(103, 232, 249, 0.12);
+  }
+
+  .ic-cat-directive {
+    text-decoration-color: #fbbf24;
+  }
+  .ic-cat-directive:hover,
+  .ic-cat-directive:focus-visible {
+    background: rgba(251, 191, 36, 0.12);
+  }
+
+  .ic-cat-type {
+    text-decoration-color: #a78bfa;
+  }
+  .ic-cat-type:hover,
+  .ic-cat-type:focus-visible {
+    background: rgba(167, 139, 250, 0.12);
+  }
+
+  .ic-cat-error {
+    text-decoration-color: #f87171;
+  }
+  .ic-cat-error:hover,
+  .ic-cat-error:focus-visible {
+    background: rgba(248, 113, 113, 0.12);
+  }
+
+  /* Popover */
+  .ic-popover {
+    position: absolute;
+    z-index: 50;
+    max-width: 320px;
+    padding: 0.6rem 0.9rem;
+    background: var(--surface-hover, #2a2a3e);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text);
+    pointer-events: none;
+  }
+
+  .ic-popover-category {
+    display: inline-block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+    margin-bottom: 0.2rem;
+    font-weight: 600;
+  }
+
+  .ic-popover-category::after {
+    content: ' ·';
+    margin-left: 0.1rem;
+  }
+
+  .ic-popover-text {
+    color: var(--text-muted);
+  }
+
+  /* Note */
+  .ic-note {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    border-top: 1px solid var(--border);
+  }
+
+  .ic-note-error {
+    color: var(--error);
+    background: rgba(248, 113, 113, 0.06);
+  }
+
+  .ic-note-info {
+    color: var(--text-muted);
+    background: rgba(103, 232, 249, 0.04);
+  }
+
+  /* Legend */
+  .ic-legend {
+    padding: 0.5rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .ic-legend-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  .ic-legend-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  @media (max-width: 900px) {
+    .interactive-code {
+      margin: 1rem -1.25rem;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+    }
+
+    .ic-code-wrapper pre {
+      font-size: 0.78rem !important;
+      padding: 1rem !important;
+    }
+
+    .ic-popover {
+      max-width: 260px;
+      font-size: 0.78rem;
+    }
+
+    .ic-variants {
+      padding: 0 0.5rem;
+    }
+
+    .ic-variant-btn {
+      padding: 0.5rem 0.65rem;
+      font-size: 0.75rem;
+    }
+  }
+</style>

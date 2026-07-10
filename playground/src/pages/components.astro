@@ -1,0 +1,330 @@
+---
+import Base from '../layouts/Base.astro';
+import InteractiveCode from '../components/InteractiveCode.astro';
+
+// Main example code
+const originalCode = `import { component, signal, input, output } from '@angular/core';
+
+export const TextSearch = component({
+  bindings: {
+    value: input.required<string>(),
+    valueChange: output<string>(),
+  },
+  setup: ({ value, valueChange }) => {
+    const text = signal(value());
+    const isDanger = signal(false);
+
+    function textChange() {
+      valueChange.emit(text());
+    }
+
+    return @{
+      <label class:danger={isDanger()}>Text:</label>
+      <input type="text" model:value={text} on:input={textChange} />
+
+      <button disabled={text().length === 0} on:click={() => text.set('')}>
+        {'Reset ' + text()}
+      </button>
+    };
+  },
+  style: \`
+    .danger {
+      color: red;
+    }
+  \`,
+});`;
+
+// Annotations for the main code
+const annotations = [
+  {
+    token: 'TextSearch',
+    explanation: 'Named export. Used as a tag in templates. Injectable via inject() when expose is defined.',
+    category: 'keyword',
+  },
+  {
+    token: 'component({',
+    explanation: 'Factory function, not a class. Config shape is always: bindings → setup → template.',
+    category: 'keyword',
+  },
+  {
+    token: 'bindings:',
+    explanation: 'The public API. Declares inputs, models, outputs, and fragments — statically typed, checked at build time.',
+    category: 'keyword',
+  },
+  {
+    token: '({ value, valueChange })',
+    explanation: 'Destructured bindings. Optional — you can use a single param (e.g., b.value()). Aliasing works via standard JS: ({ value: myValue }).',
+    category: 'type',
+  },
+  {
+    token: 'setup:',
+    explanation: 'Runs once in an injection context. Owns all logic. Returns the template or { template, expose }.',
+    category: 'keyword',
+  },
+  {
+    token: 'class:danger={isDanger()}',
+    explanation: 'Conditional class. Adds/removes "danger" based on the expression. Multiple class: per element allowed.',
+    category: 'binding',
+  },
+  {
+    token: 'model:value={text}',
+    explanation: 'Two-way binding. Passes the signal itself — Angular syncs it with the DOM property.',
+    category: 'binding',
+  },
+  {
+    token: 'on:input={textChange}',
+    explanation: 'Event binding. on: + event name. Handler is a plain function reference.',
+    category: 'binding',
+  },
+  {
+    token: "on:click={() => text.set('')}",
+    explanation: 'Inline handler — arrow functions work. Resets text to empty.',
+    category: 'binding',
+  },
+  {
+    token: 'disabled={text().length === 0}',
+    explanation: 'One-way property binding. The bind: prefix is optional — disabled={expr} and bind:disabled={expr} are identical.',
+    category: 'binding',
+  },
+  {
+    token: "{'Reset ' + text()}",
+    explanation: 'Text interpolation via {}. Any JS expression. Replaces {{ }} — one unified expression syntax for bindings and content.',
+    category: 'binding',
+  },
+  {
+    token: 'return @{',
+    explanation: 'Markup literal. The @ marks the TypeScript→DSL boundary. Inside: Angular control flow, directives, bindings.',
+    category: 'keyword',
+  },
+  {
+    token: 'style:',
+    explanation: 'Scoped styles. Encapsulated to this component — won\'t leak. Equivalent to styleUrl for external files.',
+    category: 'keyword',
+  },
+];
+
+// Variant 1: Bindings declared inside setup (invalid)
+const variantNoBindings = `import { component, signal, input, output } from '@angular/core';
+
+export const TextSearch = component({
+  setup: () => {
+    const value = input.required<string>();
+    const valueChange = output<string>();
+    const text = signal(value());
+    const isDanger = signal(false);
+
+    function textChange() {
+      valueChange.emit(text());
+    }
+
+    return @{
+      <label class:danger={isDanger()}>Text:</label>
+      <input type="text" model:value={text} on:input={textChange} />
+
+      <button disabled={text().length === 0} on:click={() => text.set('')}>
+        {'Reset ' + text()}
+      </button>
+    };
+  },
+  style: \`
+    .danger { color: red; }
+  \`,
+});`;
+
+const variantNoBindingsAnnotations = [
+  {
+    token: 'const value = input.required<string>();',
+    explanation: '❌ Inputs belong in the bindings object — not in setup. Bindings must exist as a separate, top-level declaration so the public API is explicit and statically analyzable.',
+    category: 'error',
+  },
+  {
+    token: 'const valueChange = output<string>();',
+    explanation: '❌ Same: outputs belong in bindings. Without a separate bindings declaration, consumers have no way to know what the component accepts or emits.',
+    category: 'error',
+  },
+];
+
+// Variant 2: Early return / multiple @{ } (invalid)
+const variantEarlyReturn = `import { component, signal, input, output } from '@angular/core';
+
+export const TextSearch = component({
+  bindings: {
+    value: input.required<string>(),
+    valueChange: output<string>(),
+  },
+  setup: ({ value, valueChange }) => {
+    const text = signal(value());
+    const isDanger = signal(false);
+
+    if (!value()) {
+      return @{
+        <p>No value provided</p>
+      };
+    }
+
+    return @{
+      <label class:danger={isDanger()}>Text:</label>
+      <input type="text" model:value={text} />
+    };
+  },
+  style: \`
+    .danger { color: red; }
+  \`,
+});`;
+
+const variantEarlyReturnAnnotations = [
+  {
+    token: 'if (!value()) {',
+    explanation: '❌ Conditional return is not allowed. Setup must return exactly one @{ } — no branching, no early exits. Use @if inside the template instead.',
+    category: 'error',
+  },
+];
+
+// Variant 3: TSX fragment syntax instead of @{ } (invalid)
+const variantNoMarkup = `import { component, signal, input, output } from '@angular/core';
+
+export const TextSearch = component({
+  bindings: {
+    value: input.required<string>(),
+    valueChange: output<string>(),
+  },
+  setup: ({ value, valueChange }) => {
+    const text = signal(value());
+    const isDanger = signal(false);
+
+    function textChange() {
+      valueChange.emit(text());
+    }
+
+    return (<>
+      <label class:danger={isDanger()}>Text:</label>
+      <input type="text" model:value={text} on:input={textChange} />
+
+      <button disabled={text().length === 0} on:click={() => text.set('')}>
+        {'Reset ' + text()}
+      </button>
+    </>);
+  },
+  style: \`
+    .danger { color: red; }
+  \`,
+});`;
+
+const variantNoMarkupAnnotations = [
+  {
+    token: 'return (<>',
+    explanation: '❌ This is TSX/JSX fragment syntax — not supported. Angular templates use @{ } markup literals, not JSX. The @ marks the TypeScript→DSL boundary.',
+    category: 'error',
+  },
+];
+
+// Variant 4: Returning { template, expose } (valid alternative)
+const variantTemplateExpose = `import { component, signal, input, output } from '@angular/core';
+
+export const TextSearch = component({
+  bindings: {
+    value: input.required<string>(),
+    valueChange: output<string>(),
+  },
+  setup: ({ value, valueChange }) => {
+    const text = signal(value());
+    const isDanger = signal(false);
+
+    function textChange() {
+      valueChange.emit(text());
+    }
+
+    return {
+      template: @{
+        <label class:danger={isDanger()}>Text:</label>
+        <input type="text" model:value={text} on:input={textChange} />
+
+        <button disabled={text().length === 0} on:click={() => text.set('')}>
+          {'Reset ' + text()}
+        </button>
+      },
+      expose: {
+        text: text.asReadonly(),
+      },
+    };
+  },
+  style: \`
+    .danger { color: red; }
+  \`,
+});`;
+
+const variantTemplateExposeAnnotations = [
+  {
+    token: 'template: @{',
+    explanation: 'Same @{ } literal — just nested under a key when expose is needed.',
+    category: 'keyword',
+  },
+  {
+    token: 'expose:',
+    explanation: 'Public API for ref() and inject(). Only listed members are reachable — everything else stays private.',
+    category: 'keyword',
+  },
+  {
+    token: 'text: text.asReadonly()',
+    explanation: 'Read-only view. Consumers can read text() but not mutate it.',
+    category: 'type',
+  },
+];
+
+// All variants
+const variants = [
+  {
+    label: '{ template, expose }',
+    code: variantTemplateExpose,
+    annotations: variantTemplateExposeAnnotations,
+    note: 'Valid. When a component needs to expose a public API (for ref() or inject()), setup returns { template, expose } instead of a bare @{ }. Only exposed members are reachable — internals stay private.',
+    invalid: false,
+  },
+  {
+    label: 'Bindings in setup',
+    code: variantNoBindings,
+    annotations: variantNoBindingsAnnotations,
+    note: 'Compile error: inputs, outputs, models, and fragments must be declared in the bindings object. Without bindings, the component has no public API — consumers can\'t know what to pass. The separation keeps the contract explicit and statically analyzable.',
+    invalid: true,
+  },
+  {
+    label: 'Early return',
+    code: variantEarlyReturn,
+    annotations: variantEarlyReturnAnnotations,
+    note: 'Compile error: setup must return exactly one @{ } markup literal — no conditional returns, no branching. Use @if or @switch inside the template for conditional rendering.',
+    invalid: true,
+  },
+  {
+    label: 'No @{ }',
+    code: variantNoMarkup,
+    annotations: variantNoMarkupAnnotations,
+    note: 'Parse error: this is JSX/TSX syntax — Angular doesn\'t use it. The @{ } markup literal is Angular\'s own template DSL boundary. It supports control flow, directives, and bindings that JSX cannot express.',
+    invalid: true,
+  },
+];
+---
+
+<Base title="Component Basics">
+  <h2>Component Basics</h2>
+  <p class="subtitle">Components as function calls with a strict shape — setup, bindings, template.</p>
+
+  <p>
+    Bindings define the public contract (inputs, outputs, models).
+    The template uses <code>bind:</code>, <code>model:</code>, and <code>on:</code> uniformly for native elements and components.
+  </p>
+
+  <InteractiveCode
+    code={originalCode}
+    label="TextSearch"
+    annotations={annotations}
+    variants={variants}
+  />
+
+  <div class="annotation" role="note">
+    <strong>One shape, explicit contract:</strong> <code>bindings</code> is the public API,
+    <code>setup</code> owns all logic, and the template is a <code>@&#123; &#125;</code> markup literal.
+    Native elements resolve through <code>IntrinsicElements</code> — the compiler knows valid attributes,
+    properties, and events at build time.
+  </div>
+
+</Base>
