@@ -71,13 +71,7 @@ a:hover {
   background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
-}
-
-.code-block-wrapper:hover .copy-btn,
-.copy-btn:focus-visible {
-  opacity: 1;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .copy-btn:hover {
@@ -94,11 +88,22 @@ a:hover {
 .copy-btn.copied {
   color: var(--success);
   border-color: var(--success);
-  opacity: 1;
 }
 
-@media (max-width: 900px) {
-  .copy-btn {
-    opacity: 1;
-  }
+/* DSL zone tinting — highlights @{ ... } template regions */
+.dsl-zone {
+  display: inline-block;
+  width: calc(100% + 1.25rem);
+  background: rgba(124, 110, 246, 0.06);
+  border-left: 2px solid var(--accent);
+  margin-left: -1.25rem;
+  padding-left: calc(1.25rem - 2px);
+}
+
+.dsl-zone-start {
+  border-top-left-radius: 3px;
+}
+
+.dsl-zone-end {
+  border-bottom-left-radius: 3px;
 }
