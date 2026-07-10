@@ -31,7 +31,7 @@ const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
     </div>
 
     <div class="quiz-code" aria-label="Code to evaluate">
-      <Code code={question.code} lang="typescript" theme="github-dark-default" />
+      <Code code={question.code} lang="typescript" theme="github-dark" />
     </div>
 
     <div class="quiz-buttons" role="group" aria-label="Answer choices">
@@ -76,10 +76,12 @@ const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
     document.addEventListener('keydown', (e) => {
       const el = e.target;
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.tagName === 'BUTTON' || el.isContentEditable) return;
-      if (e.key === 'ArrowLeft' && prevHref) {
-        window.location.href = prevHref;
-      } else if (e.key === 'ArrowRight' && nextHref) {
-        window.location.href = nextHref;
+      if (e.key === 'ArrowLeft') {
+        const href = prevHref || document.querySelector('.pagination-link.prev')?.href;
+        if (href) window.location.href = href;
+      } else if (e.key === 'ArrowRight') {
+        const href = nextHref || document.querySelector('.pagination-link.next')?.href;
+        if (href) window.location.href = href;
       }
     });
   </script>
