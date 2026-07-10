@@ -88,7 +88,7 @@ export default defineConfig({
   integrations: [mdx(), sitemap(), llmsTxt()],
   markdown: {
     shikiConfig: {
-      theme: 'github-dark',
+      theme: 'github-dark-default',
     },
   },
 });
