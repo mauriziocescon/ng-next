@@ -36,10 +36,10 @@
   },
   {
     "category": "Lexical Scoping",
-    "description": "Signal read in templates vs. raw signal reference in providers.",
-    "code": "class Logger {\n  constructor(readonly count: Signal<number>) {}\n}\n\nexport const Info = component({\n  bindings: {\n    count: input.required<number>(),\n  },\n  setup: ({ count }) => @{\n    <p>Count: {count}</p>\n  },\n  providers: ({ count }) => [\n    provide(Logger, () => new Logger(count)),\n  ],\n});",
+    "description": "Providers accessing an output binding alongside an input.",
+    "code": "class Logger {\n  constructor(readonly count: Signal<number>) {}\n}\n\nexport const Info = component({\n  bindings: {\n    count: input.required<number>(),\n    reset: output<void>(),\n  },\n  setup: ({ count, reset }) => @{\n    <p>Count: {count()}</p>\n    <button on:click={() => reset.emit()}>Reset</button>\n  },\n  providers: ({ count, reset }) => [\n    provide(Logger, () => new Logger(count)),\n  ],\n});",
     "valid": false,
-    "explanation": "Invalid. In the template, count is a signal — it should be {count()}, not {count}. The providers usage is fine though: inputs are hoisted and available there."
+    "explanation": "Invalid. providers receives only inputs — outputs, models, and fragments are excluded. Destructuring 'reset' in the providers callback is a compile-time error. The template and input usage are fine."
   },
   {
     "category": "Directives",
