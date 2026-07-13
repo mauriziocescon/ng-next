@@ -728,10 +728,11 @@ D : DirectiveInstance<H_D, B_D, E_D>
 HOST-COMPAT:  H_host ⊑ H_D                         → D022
 UNIQUE:       D at most once per element in R_host  → D023
 
-∀ input ∈ dir.inputs:   CHECK-INPUT(Γ, B_D, input)
+∀ input ∈ dir.inputs:
+  if B_D[input.name] : FragmentBinding<T>  → Γ ⊢ input.value : U    U ⊑ FragmentBinding<T>
+  else                                     → CHECK-INPUT(Γ, B_D, input)
 ∀ output ∈ dir.outputs: CHECK-OUTPUT(Γ, B_D, output)
 ∀ model ∈ dir.models:   CHECK-MODEL(Γ, B_D, model)
-∀ frag ∈ dir.fragments: CHECK-FRAGMENT(Γ, B_D, frag)
 CHECK-REQUIRED(B_D, provided, "directive")
 NO-UNKNOWN-BINDINGS(B_D, dir)
 
@@ -741,7 +742,7 @@ if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 Γ ⊢ use:D(...) ✓
 ```
 
-Directive fragments use local syntax: `use:D(@fragment name(p₁: T₁) { children })`.
+Inline `@fragment` delivery is supported only on component elements. Directives receive fragments exclusively by reference via `name={expr}` syntax inside `use:dir(...)`.
 
 ### 7.1 Uniqueness Note
 
@@ -971,6 +972,7 @@ BindingKind<V> =
 | D042 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
 | D043 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
 | D044 | Animate | `on:animate:` handler type mismatch | Error |
+| D045 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1144,4 +1146,7 @@ const child = ref<HTMLDivElement>();
 
 // D044 — on:animate: handler type mismatch
 <div on:animate:enter={(x: string) => {}}>X</div> // ❌ D044
+
+// D045 — inline fragment inside use:
+<button use:popover(@fragment content() { <div>Body</div> })>X</button> // ❌ D045
 ```

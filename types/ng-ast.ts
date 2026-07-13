@@ -202,7 +202,6 @@ export interface DirectiveBindingNode extends BaseNode {
   inputs: DirectiveInputNode[];
   outputs: DirectiveOutputNode[];
   models: DirectiveModelNode[];
-  fragments: FragmentNode[];
   when?: DirectiveWhenNode;
   ref?: RefNode;
   keySpan?: SourceSpan;
