@@ -332,7 +332,7 @@ CHECK-REQUIRED(B, provided, context_label)
   B[k] : ModelSignal.required<T>    → k ∈ provided_models
   B[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments
 
-Violation → D013 (component), D014 (directive), D037 (derivation)
+Violation → D013 (component), D014 (directive), D038 (derivation)
 ─────────────────────────────────────────────────
 ```
 
@@ -515,8 +515,8 @@ AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction; }
 
 ANIMATE-CONSTRAINTS
 ─────────────────────────────────────────────────
-- applies ONLY to native elements (not components → D039)
-- phase must be "enter" or "leave" → D040
+- applies ONLY to native elements (not components → D040)
+- phase must be "enter" or "leave" → D041
 - at most one animate:enter and one animate:leave (class form) per element
 - at most one on:animate:enter and one on:animate:leave per element
 - both phases and both forms (class + event) can coexist on the same element
@@ -811,7 +811,7 @@ D : DerivationInstance<B_D, T>
 ∀ input ∈ node.inputs:  CHECK-INPUT(Γ, B_D, input)
 CHECK-REQUIRED(B_D, provided, "derivation")
 NO-UNKNOWN-BINDINGS(B_D, node)
-Any non-input binding form → D038
+Any non-input binding form → D039
 
 Γ' = Γ ∪ { node.name : Signal<T> }
 ─────────────────────────────────────────────────────────────────
@@ -821,7 +821,7 @@ Any non-input binding form → D038
 Block-scoped to enclosing control-flow block. Each `@for` iteration owns an
 independent instance.
 
-Note: D038 is a parse-time diagnostic. The AST `DeriveNode` only carries
+Note: D039 is a parse-time diagnostic. The AST `DeriveNode` only carries
 `inputs: DerivationInputNode[]` — non-input binding forms are rejected before
 the tree reaches the type checker.
 
@@ -963,16 +963,16 @@ BindingKind<V> =
 | D033 | Fragments | Fragment argument count/type mismatch | Error |
 | D034 | Fragments | Implicit fragment has no matching parent binding or conflicts with explicit | Error |
 | D035 | Fragments | Duplicate implicit fragment name under same parent | Error |
-| D036 | Refs | `ref=` variable type incompatible with expose | Error |
-| D037 | Derivation | Missing required derivation input | Error |
-| D038 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
-| D039 | Animate | `animate:` on component element | Error |
-| D040 | Animate | Invalid animate phase (not `enter`/`leave`) | Error |
-| D041 | Animate | Duplicate `animate:enter` or `animate:leave` class binding | Error |
-| D042 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
-| D043 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
-| D044 | Animate | `on:animate:` handler type mismatch | Error |
-| D045 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
+| D036 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
+| D037 | Refs | `ref=` variable type incompatible with expose | Error |
+| D038 | Derivation | Missing required derivation input | Error |
+| D039 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
+| D040 | Animate | `animate:` on component element | Error |
+| D041 | Animate | Invalid animate phase (not `enter`/`leave`) | Error |
+| D042 | Animate | Duplicate `animate:enter` or `animate:leave` class binding | Error |
+| D043 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
+| D044 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
+| D045 | Animate | `on:animate:` handler type mismatch | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1119,34 +1119,34 @@ const SplitPanel = component.proxy<HTMLDivElement>({
   @fragment row(i: Item) { <b>{i.name}</b> }  // ❌ D035
 </List>
 
-// D036 — ref type incompatible
+// D036 — inline fragment inside use:
+<button use:popover(@fragment content() { <div>Body</div> })>X</button> // ❌ D036
+
+// D037 — ref type incompatible
 const child = ref<HTMLDivElement>();
-<Child ref={child} /> // ❌ D036: expects Ref<{ value: Signal<number> } | undefined>
+<Child ref={child} /> // ❌ D037: expects Ref<{ value: Signal<number> } | undefined>
 
-// D037 — missing required derivation input
-@derive total = price(); // ❌ D037: 'item' required
+// D038 — missing required derivation input
+@derive total = price(); // ❌ D038: 'item' required
 
-// D038 — derivation non-input binding
-@derive total = price(model:item={x}); // ❌ D038
+// D039 — derivation non-input binding
+@derive total = price(model:item={x}); // ❌ D039
 
-// D039 — animate: on component element
-<Card animate:enter={'fade'} /> // ❌ D039
+// D040 — animate: on component element
+<Card animate:enter={'fade'} /> // ❌ D040
 
-// D040 — invalid animate phase
-<div animate:show={'fade'}>X</div> // ❌ D040
+// D041 — invalid animate phase
+<div animate:show={'fade'}>X</div> // ❌ D041
 
-// D041 — duplicate animate:enter class binding
-<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D041
+// D042 — duplicate animate:enter class binding
+<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D042
 
-// D042 — duplicate on:animate:leave event binding
-<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D042
+// D043 — duplicate on:animate:leave event binding
+<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D043
 
-// D043 — animate: expression type mismatch
-<div animate:enter={42}>X</div> // ❌ D043: number not assignable
+// D044 — animate: expression type mismatch
+<div animate:enter={42}>X</div> // ❌ D044: number not assignable
 
-// D044 — on:animate: handler type mismatch
-<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D044
-
-// D045 — inline fragment inside use:
-<button use:popover(@fragment content() { <div>Body</div> })>X</button> // ❌ D045
+// D045 — on:animate: handler type mismatch
+<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D045
 ```
