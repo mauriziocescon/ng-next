@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import InteractiveCode from '../components/InteractiveCode.astro';
 
 // Main example code
-const originalCode = `import { component, signal, input, output } from '@angular/core';
+const originalCode = `import { component, signal, linkedSignal, input, output } from '@angular/core';
 
 export const TextSearch = component({
   bindings: {
@@ -11,7 +11,7 @@ export const TextSearch = component({
     valueChange: output<string>(),
   },
   setup: ({ value, valueChange }) => {
-    const text = signal(value());
+    const text = linkedSignal(() => value());
     const isDanger = signal(false);
 
     function textChange() {
@@ -145,7 +145,7 @@ const variantNoBindingsAnnotations = [
 ];
 
 // Variant 2: Early return / multiple @{ } (invalid)
-const variantEarlyReturn = `import { component, signal, input, output } from '@angular/core';
+const variantEarlyReturn = `import { component, signal, linkedSignal, input, output } from '@angular/core';
 
 export const TextSearch = component({
   bindings: {
@@ -153,7 +153,7 @@ export const TextSearch = component({
     valueChange: output<string>(),
   },
   setup: ({ value, valueChange }) => {
-    const text = signal(value());
+    const text = linkedSignal(() => value());
     const isDanger = signal(false);
 
     if (!value()) {
@@ -181,7 +181,7 @@ const variantEarlyReturnAnnotations = [
 ];
 
 // Variant 3: TSX fragment syntax instead of @{ } (invalid)
-const variantNoMarkup = `import { component, signal, input, output } from '@angular/core';
+const variantNoMarkup = `import { component, signal, linkedSignal, input, output } from '@angular/core';
 
 export const TextSearch = component({
   bindings: {
@@ -189,7 +189,7 @@ export const TextSearch = component({
     valueChange: output<string>(),
   },
   setup: ({ value, valueChange }) => {
-    const text = signal(value());
+    const text = linkedSignal(() => value());
     const isDanger = signal(false);
 
     function textChange() {
@@ -219,7 +219,7 @@ const variantNoMarkupAnnotations = [
 ];
 
 // Variant 4: Returning { template, expose } (valid alternative)
-const variantTemplateExpose = `import { component, signal, input, output } from '@angular/core';
+const variantTemplateExpose = `import { component, signal, linkedSignal, input, output } from '@angular/core';
 
 export const TextSearch = component({
   bindings: {
@@ -227,7 +227,7 @@ export const TextSearch = component({
     valueChange: output<string>(),
   },
   setup: ({ value, valueChange }) => {
-    const text = signal(value());
+    const text = linkedSignal(() => value());
     const isDanger = signal(false);
 
     function textChange() {
