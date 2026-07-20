@@ -488,7 +488,7 @@ elements is a compile-time error (D021).
 ```
 CLASS-BINDING
 ─────────────────────────────────────────────────
-class:name={expr}    Γ ⊢ expr : boolean
+class:name={expr}    Γ ⊢ expr : T    (any type — truthiness)
 
 
 STYLE-BINDING
