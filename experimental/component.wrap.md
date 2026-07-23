@@ -335,25 +335,4 @@ export declare function wrap<
 | `@forward()` on incompatible node | D032 |
 | `bindings` selection references an omitted key | `WRAP003` — omitted keys are not selectable |
 
----
 
-## Migration and Compatibility
-
-This can be introduced as a backward-compatible extension:
-
-- Existing wrappers without `addBindings` / `omitBindings` produce `EffectivePublicBindings<C, {}, {}>` = `Omit<TargetBindings<C>, never> & {}` = `TargetBindings<C>` — identical to current behavior.
-- Existing compiler lowering of `@forward()` is unchanged when both fields are absent.
-- Type-level changes are additive (new generics default to `{}`).
-- Setup parameter style remains binding-only (`setup(bindings)`); parameter destructuring with spread is not part of the model.
-
----
-
-## Ivy Bridge Considerations
-
-`addBindings` / `omitBindings` is primarily a **compiler + type-system** evolution.
-
-- **Type system** computes `EffectivePublicBindings` as the wrapper's external surface.
-- **Compiler** adjusts the key expansion set for `@forward()`, enforces non-forwarding of added keys, validates omit key existence, and rejects name collisions.
-- **Runtime** remains unchanged — generated instructions stay in the same class as those emitted today for `component.wrap`.
-
-**Change Class:** Compiler + Type-level (no new runtime primitive).

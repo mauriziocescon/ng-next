@@ -335,20 +335,4 @@ type ValidateDerivationBindings<B extends Record<string, AnyBindingValue>> = {
 | `once:` on a `fragment` binding | D018 — fragments are not inputs |
 | `addBindings` key uses `OnceInput` | Valid — follows same rules as `InputSignal` |
 
----
 
-## Ivy Bridge Considerations
-
-Consumer-side `once:` needs no new runtime instructions; it is a **compiler-only** change:
-
-- **Creation pass**: reuse existing eager seed path.
-- **Update pass**: omit property writes for once-bound inputs (codegen decision, no runtime branch).
-- **AST**: already represented (`once: boolean` on `BoundAttributeNode`, `DirectiveInputNode`, `DerivationInputNode`).
-
-Declaration-side `input.once` is also compiler-level:
-
-- **Type system**: new `OnceInput<T>` brand, extended `AnyBindingValue`, `SetupBindingValue` unwrapping.
-- **Compiler**: same creation-only codegen as consumer `once:`, plus `setup` parameter resolves to plain `T`.
-- **Runtime**: no new instruction or signal variant.
-
-**Change Class:** Consumer `once:` — Compiler-only (already in AST). Declaration `input.once` — Compiler + Type-level (no new runtime primitive).
