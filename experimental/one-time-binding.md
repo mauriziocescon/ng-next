@@ -133,7 +133,7 @@ The `item` derivation input is frozen at creation time; `qty` remains reactive.
 
 This section introduces new API (`input.once`) that is **proposed** — not currently available in `types/ng-types.ts`.
 
-The author declares that an input is creation-time only. In `setup`, the binding is exposed as plain `T` (not `InputSignal<T>`).
+The author declares that an input is creation-time only. The binding still produces an `InputSignal<T>` — it is simply never updated after creation. `setup` reads it via `()` like any other input signal.
 
 ```ts
 import { component, input, signal } from '@angular/core';
@@ -141,27 +141,27 @@ import { component, input, signal } from '@angular/core';
 export const Panel = component({
   bindings: {
     /**
-     * input.once<T>()          — optional, T | undefined
-     * input.once<T>(default)   — optional with default
-     * input.once.required<T>() — required
+     * input.once<T>()          — optional, InputSignal<T | undefined>
+     * input.once<T>(default)   — optional with default, InputSignal<T>
+     * input.once.required<T>() — required, InputSignal<T>
      *
-     * Produces a plain T in setup (not a signal).
+     * Still an InputSignal — just never updated after creation.
      */
     title: input.once.required<string>(),
     collapsible: input.once<boolean>(true),
     mode: input<'light' | 'dark'>('light'),
   },
   setup: ({ title, collapsible, mode }) => {
-    // title: string            — plain value, read once
-    // collapsible: boolean     — plain value, read once (default: true)
-    // mode: InputSignal<...>   — reactive as usual
+    // title: InputSignal<string>   — seeded once, never updated
+    // collapsible: InputSignal<boolean> — seeded once, never updated
+    // mode: InputSignal<...>       — reactive as usual
 
-    const open = signal(collapsible);
+    const open = signal(collapsible());
 
     return @{
       <div class={mode()}>
-        <h2>{title}</h2>
-        @if (collapsible) {
+        <h2>{title()}</h2>
+        @if (collapsible()) {
           <button on:click={() => open.update(v => !v)}>Toggle</button>
         }
       </div>
@@ -181,11 +181,11 @@ For `input.once`, codegen follows the same pattern: seed in creation pass, skip 
 // ɵɵproperty('mode', ...) IS emitted (regular input)
 ```
 
-Semantics: write once at creation, then treat as constant. `setup` sees plain `T`. The compiler `MUST NOT` emit update-pass writes for `input.once` bindings.
+Semantics: write once at creation, then treat as constant. The `InputSignal<T>` holds its initial value indefinitely. The compiler `MUST NOT` emit update-pass writes for `input.once` bindings.
 
 ### Use in providers
 
-`OnceInput` keys appear in `providers` like regular inputs:
+`input.once` keys appear in `providers` like regular inputs — they are `InputSignal<T>`:
 
 ```ts
 import { component, input, provide, inject } from '@angular/core';
@@ -203,7 +203,7 @@ export const Panel = component({
     return @{ <div>{svc.title}</div> };
   },
   providers: ({ title }) => [
-    // title is OnceInput<string> here — read once via title()
+    // title is InputSignal<string> — read via title()
     provide(PanelService, () => new PanelService(title())),
   ],
 });
@@ -219,92 +219,7 @@ Derivations are also supported: they declare input `bindings`, so they can use `
 
 ## Type-Level Integration
 
-The following type snippets are **proposed deltas** to the current type model in `types/ng-types.ts`.
-
-### Branded type
-
-```ts
-declare const ONCE_INPUT: unique symbol;
-
-// Branded type distinct from InputSignal
-export type OnceInput<T> = { readonly [ONCE_INPUT]: T };
-```
-
-### Extended binding surface
-
-Currently `types/ng-types.ts` defines:
-
-```ts
-type AnyBindingValue =
-  | InputSignal<any>
-  | ModelSignal<any>
-  | OutputEmitterRef<any>
-  | OptionalFragmentBinding<any>
-  | RequiredFragmentBinding<any>;
-
-export type DirectiveBindingValue = AnyBindingValue;
-export type ComponentBindingValue = AnyBindingValue;
-```
-
-The proposed extension adds `OnceInput` to the union:
-
-```ts
-type AnyBindingValue =
-  | InputSignal<any>
-  | ModelSignal<any>
-  | OutputEmitterRef<any>
-  | OptionalFragmentBinding<any>
-  | RequiredFragmentBinding<any>
-  | OnceInput<any>;              // ← new
-```
-
-### `InputsOnly<B>` includes `OnceInput` keys
-
-`providers` sees `OnceInput` bindings alongside regular inputs:
-
-```ts
-type InputKeys<B> = {
-  [K in keyof B]: B[K] extends ModelSignal<any> ? never
-    : B[K] extends InputSignal<any> ? K
-    : B[K] extends OnceInput<any> ? K    // ← new
-    : never;
-}[keyof B];
-```
-
-### `SetupBindingValue` unwraps `OnceInput<T>` to `T`
-
-Currently `types/ng-types.ts` defines:
-
-```ts
-type SetupBindingValue<V> =
-  V extends OptionalFragmentBinding<infer T>
-    ? OptionalFragmentBinding<T> | undefined
-    : V;
-```
-
-The proposed extension adds `OnceInput` unwrapping:
-
-```ts
-type SetupBindingValue<V> =
-  V extends OnceInput<infer T>
-    ? T                                       // ← unwrap to plain value
-    : V extends OptionalFragmentBinding<infer T>
-      ? OptionalFragmentBinding<T> | undefined
-      : V;
-```
-
-### `ValidateDerivationBindings` accepts `OnceInput`
-
-Currently derivations accept only `InputSignal`. The proposed extension:
-
-```ts
-type ValidateDerivationBindings<B extends Record<string, AnyBindingValue>> = {
-  [K in keyof B]: B[K] extends InputSignal<any>
-    ? B[K] extends ModelSignal<any> ? never : B[K]
-    : B[K] extends OnceInput<any> ? B[K]    // ← new
-    : never;
-};
-```
+No new branded type or type-level changes are required. `input.once<T>()` produces a standard `InputSignal<T>` — the `once` semantics are purely a compiler/codegen concern (skip update-pass writes). All existing type infrastructure (`AnyBindingValue`, `InputsOnly`, `SetupBindingValue`, `ValidateDerivationBindings`) works unchanged.
 
 ---
 
@@ -333,6 +248,5 @@ type ValidateDerivationBindings<B extends Record<string, AnyBindingValue>> = {
 | `input.once` in directive bindings | Valid |
 | `input.once` in `@derive` bindings | Valid |
 | `once:` on a `fragment` binding | D018 — fragments are not inputs |
-| `addBindings` key uses `OnceInput` | Valid — follows same rules as `InputSignal` |
 
 

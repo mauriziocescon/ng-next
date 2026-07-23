@@ -120,6 +120,8 @@ Benefits:
 - no `as const` tuple ergonomics,
 - easier structural validation in type space.
 
+`omitBindings` values are constrained to the literal `true`. Setting a key to `false` is a compile-time error — remove the key instead.
+
 ---
 
 ## 2. `addBindings`: Wrapper-Local Bindings
