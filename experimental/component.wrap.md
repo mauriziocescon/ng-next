@@ -1,8 +1,8 @@
-# `component.wrap` API Shaping (`addBindings` / `omitBindings`)
+# Wrapper API Shaping (`addBindings` / `omitBindings`)
 
-This proposal evolves the two-argument `component.wrap(Target, config)` form so wrappers can expose a curated API while preserving current compile-time forwarding guarantees.
+Two mechanisms for curating a wrapper's public API on top of `component.wrap`.
 
-> Status: proposal only. This document describes a possible evolution and is not implemented in `experimental/types.ts` yet.
+> Status: proposal only. This document describes a possible evolution and is not implemented in `types/ng-types.ts` yet.
 
 ## Conventions
 
@@ -14,172 +14,57 @@ Normative keywords in this document follow RFC-style meaning:
 
 ## Summary
 
-Today, `component.wrap(Target, config)` mirrors target bindings (with optional overrides), and setup receives selected/effective bindings in `setup(bindings)`. In templates, `@forward()` places the wrapper payload on the wrapped target at compile time.
+1. `omitBindings`: hide selected target bindings from the wrapper's public API.
+2. `addBindings`: declare wrapper-local bindings not present on the target.
 
-This evolution adds two capabilities:
-
-1. `addBindings`: wrapper-local bindings not present on the target.
-2. `omitBindings`: hide selected target bindings from the wrapper public API.
-
-The primary constraint is preserving target soundness. Added bindings are never treated as implicit target bindings.
-
-All practical scenarios described here are achievable today with a pure façade component (`component(...)`) that explicitly maps bindings to the target. This evolution mainly optimizes ergonomics when only one or two bindings need to be adjusted, hidden, or renamed on top of a large target API.
+All practical scenarios described here are achievable today with a pure façade component (`component(...)`) that explicitly maps bindings to the target. This evolution optimizes ergonomics when only one or two bindings need to be adjusted, hidden, or renamed on top of a large target API.
 
 ---
 
-## Proposed API
+## Current `component.wrap` Baseline
 
-Examples below use proposal syntax and are not type-checked against the current `experimental/types.ts`.
-
-```ts
-export const UserDetail = component({
-  bindings: {
-    user: input.required<User>(),
-    email: model.required<string>(),
-    makeAdmin: output<void>(),
-    children: fragment<void>(),
-  },
-  setup: ({ user, email, makeAdmin, children }) => @{ ... },
-});
-
-export const EnterpriseUser = component.wrap(UserDetail, {
-  omitBindings: {
-    email: true,
-    makeAdmin: true,
-  },
-  addBindings: {
-    contactEmail: model.required<string>(),
-    readOnly: input<boolean>(true),
-  },
-  setup: (bindings) => @{
-    <UserDetail
-      @forward()
-      model:email={bindings.contactEmail}
-      on:makeAdmin={() => {
-        if (!bindings.readOnly()) {
-          // internal policy
-        }
-      }} />
-  },
-});
-```
-
-### Why object form for `omitBindings`
-
-A typed marker object is used instead of string arrays:
+Today, `component.wrap(Target, config)` selects a subset of the target's bindings to handle in `setup`; the remainder is delivered to the wrapped target by `@forward()`. The wrapper's **public API is always the full target bindings** — selection only controls what `setup` receives.
 
 ```ts
-omitBindings: {
-  email: true,
-  makeAdmin: true,
-}
-```
-
-Benefits:
-
-- autocomplete on valid keys,
-- rename-safe in editors,
-- no `as const` tuple ergonomics,
-- easier structural validation in type space.
-
----
-
-## Type-Level Shape
-
-The types below are **proposed** shapes for this evolution, not current source-of-truth declarations.
-
-```ts
-type OmitMap<B> = Partial<Record<Extract<keyof B, string>, true>>;
-
-type KeysMarkedTrue<M> = {
-  [K in keyof M]: M[K] extends true ? K : never
-}[keyof M];
-
-type EffectiveBindings<
-  C extends ComponentInstance<any, any, any>,
-  Added extends Record<string, ComponentBindingValue>,
-  OmitM extends OmitMap<TargetBindings<C>>
-> = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>> & Added;
-
-type ForwardableTargetBindings<
-  C extends ComponentInstance<any, any, any>,
-  OmitM extends OmitMap<TargetBindings<C>>
-> = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>>;
-```
-
-`wrap(Target, config)` config sketch:
-
-This is a **proposed** extension of `component.wrap(Target, config)`, not the current signature in `experimental/types.ts`.
-
-```ts
+// Current signature (from types/ng-types.ts)
 export declare function wrap<
-  C extends ComponentInstance<any, any, any>,
-  Added extends Record<string, ComponentBindingValue> = {},
-  OmitM extends OmitMap<TargetBindings<C>> = {},
-  E = void
+  ExplicitWrapperGenericsAreNotAllowed extends never = never,
+  C extends ComponentInstance<unknown, unknown, any>,
+  Sel extends Record<string, ComponentBindingValue> = {},
+  E = void,
+  TMarkup extends TemplateMarkup = TemplateMarkup,
 >(
   target: C,
-  config: {
-    omitBindings?: OmitM;
-    addBindings?: Added;
-    bindings?: Partial<Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>>>;
-    setup: (b: SetupBindings<EffectiveBindings<C, Added, OmitM>>) => SetupReturn<E>;
-    providers?: (inputs: InputsOnly<EffectiveBindings<C, Added, OmitM>>) => Provider[];
-    style?: string;
-    styleUrl?: string;
-  }
-): ComponentInstance<
-  EffectiveBindings<C, Added, OmitM>,
-  E,
-  ProxySurfaceOf<C>
->;
+  config: TargetBindings<C> extends Record<string, ComponentBindingValue>
+    ? {
+        bindings: ValidateWrapSelection<Sel, TargetBindings<C>>;
+        setup: (bindings: SetupBindings<Sel>) => SetupReturn<E, TMarkup>;
+        providers?: (inputs: InputsOnly<Sel>) => Provider[];
+        style?: string;
+        styleUrl?: string;
+      }
+    : never,
+): ComponentInstance<TargetBindings<C>, E, ProxySurfaceOf<C>, TMarkup>;
 ```
 
-Notes:
+Key properties:
 
-- `bindings` still means target binding overrides only.
-- `addBindings` is separate to avoid ambiguity.
-- `setup` sees target-minus-omitted plus added as the first argument.
-- `@forward()` places target-minus-omitted bindings only.
+- Public API: always `TargetBindings<C>` (unchanged by selection).
+- `bindings` is validated by `ValidateWrapSelection` (unknown keys → D027, kind mismatch → D028, type mismatch → D029).
+- `setup` receives `SetupBindings<Sel>` (selected subset only).
+- `providers` receives `InputsOnly<Sel>` (selected inputs only).
+- Proxy surface inherited: `ProxySurfaceOf<C>`.
+- Inference-only — explicit generics rejected.
 
 ---
 
-## Compiler Lowering
+## 1. `omitBindings`: Hide Target Bindings from the Public API
 
-Given:
-
-```ts
-component.wrap(Target, {
-  omitBindings: { x: true },
-  addBindings: { y: input.required<number>() },
-  setup: (bindings) => @{
-    <Target @forward() x={bindings.y()} />
-  },
-});
-```
-
-Compiler contract:
-
-1. The compiler `MUST` build the target-forwardable key set as `keyof Target` minus omitted keys.
-2. The compiler `MUST` lower `@forward()` by unrolling only that key set.
-3. The compiler `MUST NOT` include `addBindings` keys in target forwarding.
-4. The compiler `MUST` keep existing explicit-binding precedence (React-style last wins).
-5. The compiler `SHOULD` preserve proxy-surface metadata inheritance by inheriting the target proxy surface type in wrappers. For native proxy placements, that surface type comes from the Angular DSL `IntrinsicElements` map.
-6. The compiler `MUST` treat `@forward()` as marker-only: no forwarding object, property reads, or enumeration.
-7. The compiler `MUST` reject `@forward()` placed on a node that cannot consume the wrapper payload.
-8. The compiler `MUST` reject more than one `@forward()` placement per component template.
-
-No runtime forwarding object is required; the same strategy as current `component.wrap(Target, config)` is retained.
-
----
-
-## Examples
-
-The examples below are in wrapper form because they show the intended ergonomics directly. Each can also be implemented today using a pure façade component with explicit mapping.
-
-### 1. Corporate defaults + hidden unsafe knobs
+The wrapper removes selected target bindings from its external surface. Omitted bindings are **not forwarded** — the wrapper `MUST` handle them explicitly inside its template (supplying values directly to the wrapped target).
 
 ```ts
+import { component, input, output, model, fragment } from '@angular/core';
+
 export const ThirdPartyGrid = component({
   bindings: {
     rows: input.required<Row[]>(),
@@ -193,38 +78,82 @@ export const ThirdPartyGrid = component({
   setup: ({ rows, columns, density, debugMode, unsafeHtml, theme, rowClick }) => @{ ... },
 });
 
+/**
+ * CorpGrid hides debugMode, unsafeHtml, theme from consumers.
+ * Public API: rows, columns, density, rowClick (target minus omitted).
+ *
+ * The omitted bindings are supplied with hardcoded values inside the template.
+ */
 export const CorpGrid = component.wrap(ThirdPartyGrid, {
   omitBindings: {
     debugMode: true,
     unsafeHtml: true,
     theme: true,
   },
-  addBindings: {
-    corporateDensity: input<'compact' | 'comfortable'>('compact'),
-  },
-  setup: (bindings) => @{
+  bindings: {},
+  setup: () => @{
     <ThirdPartyGrid
       @forward()
       debugMode={false}
       unsafeHtml={false}
-      theme={'corporate'}
-      density={bindings.corporateDensity()} />
+      theme={'corporate'} />
   },
 });
 ```
 
-### 2. API rename façade
+### Why object form
+
+A typed marker object instead of string arrays:
 
 ```ts
-export const UserDetail = component({
-  bindings: {
-    user: input.required<User>(),
-    email: model.required<string>(),
-    makeAdmin: output<void>(),
-  },
-  setup: ({ user, email, makeAdmin }) => @{ ... },
-});
+omitBindings: {
+  debugMode: true,
+  unsafeHtml: true,
+  theme: true,
+}
+```
 
+Benefits:
+
+- autocomplete on valid keys,
+- rename-safe in editors,
+- no `as const` tuple ergonomics,
+- easier structural validation in type space.
+
+---
+
+## 2. `addBindings`: Wrapper-Local Bindings
+
+The wrapper introduces new bindings not present on the target. Added bindings appear in the wrapper's public API and in `setup`, but are **never forwarded** to the target.
+
+```ts
+import { component, input, model, output, fragment } from '@angular/core';
+import { UserDetail, User } from './user-detail.ng';
+
+/**
+ * UserCard adds a wrapper-local 'highlight' input.
+ * Public API: user, email, makeAdmin, children (target) + highlight (added).
+ */
+export const UserCard = component.wrap(UserDetail, {
+  addBindings: {
+    highlight: input<boolean>(false),
+  },
+  bindings: {},
+  setup: ({ highlight }) => @{
+    <section class:highlight={highlight()}>
+      <UserDetail @forward() />
+    </section>
+  },
+});
+```
+
+### Combining `omitBindings` + `addBindings` for rename
+
+```ts
+/**
+ * UserProfile renames 'email' → 'contactEmail'.
+ * Public API: user, makeAdmin, children (target minus omitted) + contactEmail (added).
+ */
 export const UserProfile = component.wrap(UserDetail, {
   omitBindings: {
     email: true,
@@ -232,35 +161,179 @@ export const UserProfile = component.wrap(UserDetail, {
   addBindings: {
     contactEmail: model.required<string>(),
   },
-  setup: (bindings) => @{
-    <UserDetail @forward() model:email={bindings.contactEmail} />
+  bindings: {},
+  setup: ({ contactEmail }) => @{
+    <UserDetail @forward() model:email={contactEmail} />
   },
 });
 ```
 
-### 3. Wrapper-local behavior flag (not propagated by `@forward()`)
+### Combining with `bindings` selection
+
+Selected bindings are removed from the forwarding payload (as in today's API) and become available in `setup`:
 
 ```ts
-export const UserDetail = component({
+export const EnterpriseUser = component.wrap(UserDetail, {
+  omitBindings: {
+    email: true,
+    makeAdmin: true,
+  },
+  addBindings: {
+    contactEmail: model.required<string>(),
+    readOnly: input<boolean>(true),
+  },
   bindings: {
     user: input.required<User>(),
-    email: model.required<string>(),
-    makeAdmin: output<void>(),
   },
-  setup: ({ user, email, makeAdmin }) => @{ ... },
-});
+  setup: ({ user, contactEmail, readOnly }) => {
+    const effectiveUser = computed(() => ({ ...user(), role: 'enterprise' }));
 
-export const UserCard = component.wrap(UserDetail, {
-  addBindings: {
-    highlight: input<boolean>(false),
-  },
-  setup: (bindings) => @{
-    <section class:highlight={bindings.highlight()}>
-      <UserDetail @forward() />
-    </section>
+    return @{
+      <UserDetail
+        @forward()
+        user={effectiveUser()}
+        model:email={contactEmail}
+        on:makeAdmin={() => {
+          if (!readOnly()) { /* internal policy */ }
+        }} />
+    };
   },
 });
 ```
+
+---
+
+## Compiler Lowering
+
+Given:
+
+```ts
+component.wrap(Target, {
+  omitBindings: { x: true },
+  addBindings: { y: input.required<number>() },
+  bindings: { z: input.required<string>() },
+  setup: ({ z, y }) => @{
+    <Target @forward() x={computeX()} />
+  },
+});
+```
+
+The compiler:
+
+1. `MUST` build the forwardable key set as `keys(B(Target)) \ keys(omitBindings) \ keys(bindings)`.
+2. `MUST` lower `@forward()` by unrolling only the forwardable key set.
+3. `MUST NOT` include `addBindings` keys in target forwarding.
+4. `MUST` keep existing explicit-binding precedence: explicit bindings on `<Target @forward() ...>` override forwarded ones for the same key (collision precedence from `ng-dsl-type-checking-spec.md` §6.2 `COLLISION-PRECEDENCE`).
+5. `MUST` preserve proxy-surface metadata inheritance: `P(result) = P(Target)`.
+6. `MUST` treat `@forward()` as marker-only (`ForwardMarkerNode` in `ng-ast.ts`): no forwarding object, property reads, or enumeration.
+7. `MUST` reject `@forward()` placed on a node that cannot consume the wrapper payload (D032).
+8. `MUST` reject more than one `@forward()` placement per component template (D031).
+9. `MUST` reject absence of `@forward()` when `WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never` (D025).
+10. `MUST` validate that omitted keys exist in `B(Target)`.
+11. `MUST` validate that `addBindings` keys do NOT collide with non-omitted target keys.
+
+No runtime forwarding object is required.
+
+---
+
+## Type-Level Integration
+
+The following type snippets are **proposed deltas** to the current type model in `types/ng-types.ts`.
+
+### Omit map utility
+
+```ts
+type OmitMap<B> = Partial<Record<Extract<keyof B, string>, true>>;
+
+type KeysMarkedTrue<M> = {
+  [K in keyof M]: M[K] extends true ? K : never;
+}[keyof M];
+```
+
+### Effective public API
+
+```ts
+// The wrapper's public API after omit + add
+type EffectivePublicBindings<
+  C extends ComponentInstance<any, any, any>,
+  Added extends Record<string, ComponentBindingValue>,
+  OmitM extends OmitMap<TargetBindings<C>>,
+> = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>> & Added;
+
+// What @forward() can deliver (target minus omitted minus selected)
+type ForwardableTargetBindings<
+  C extends ComponentInstance<any, any, any>,
+  OmitM extends OmitMap<TargetBindings<C>>,
+> = Omit<TargetBindings<C>, KeysMarkedTrue<OmitM>>;
+```
+
+### Extended `wrap` overload
+
+This is a **proposed** extension of `component.wrap(Target, config)`, not the current signature.
+
+```ts
+export declare function wrap<
+  ExplicitWrapperGenericsAreNotAllowed extends never = never,
+  C extends ComponentInstance<unknown, unknown, any>,
+  Sel extends Record<string, ComponentBindingValue> = {},
+  Added extends Record<string, ComponentBindingValue> = {},
+  OmitM extends OmitMap<TargetBindings<C>> = {},
+  E = void,
+  TMarkup extends TemplateMarkup = TemplateMarkup,
+>(
+  target: C,
+  config: {
+    omitBindings?: OmitM;
+    addBindings?: Added;
+    bindings: ValidateWrapSelection<Sel, ForwardableTargetBindings<C, OmitM>>;
+    setup: (bindings: SetupBindings<Sel & Added>) => SetupReturn<E, TMarkup>;
+    providers?: (inputs: InputsOnly<Sel & Added>) => Provider[];
+    style?: string;
+    styleUrl?: string;
+  },
+): ComponentInstance<
+  EffectivePublicBindings<C, Added, OmitM>,
+  E,
+  ProxySurfaceOf<C>,
+  TMarkup
+>;
+```
+
+### Differences from current API
+
+| Aspect | Current | Proposed |
+|--------|---------|----------|
+| Public API | `TargetBindings<C>` | `TargetBindings<C>` minus omitted, plus added |
+| `setup` receives | `SetupBindings<Sel>` | `SetupBindings<Sel & Added>` |
+| `@forward()` delivers | `B(Target) \ Sel` | `B(Target) \ Omitted \ Sel` |
+| `addBindings` in forward | N/A | Never forwarded |
+| `bindings` validates against | `TargetBindings<C>` | `ForwardableTargetBindings<C, OmitM>` |
+
+---
+
+## Interaction Between `omitBindings`, `addBindings`, and Forwarding
+
+| Target binding | In `omitBindings`? | In `bindings` (selected)? | Result |
+|:---|:---|:---|:---|
+| `user` | No | No | Forwarded via `@forward()` to target |
+| `user` | No | Yes | Handled in `setup`; explicit binding on target overrides |
+| `debugMode` | Yes | — | Removed from public API; wrapper supplies value directly |
+| — | — | — | `addBindings: { highlight }` → in public API + `setup`, never forwarded |
+
+---
+
+## Constraints and Diagnostics
+
+| Rule | Diagnostic |
+|:---|:---|
+| `omitBindings` key not in `B(Target)` | `WRAP001` — unknown omit key |
+| `addBindings` key collides with non-omitted target key | `WRAP002` — name collision |
+| `addBindings` key collides with omitted target key | Valid — this is a rename pattern |
+| Omitted required binding not explicitly supplied in template | D013 — missing required component input/model/fragment (enforced on `<Target @forward() ...>`) |
+| `@forward()` absent when payload exists | D025 |
+| Multiple `@forward()` placements | D031 |
+| `@forward()` on incompatible node | D032 |
+| `bindings` selection references an omitted key | `WRAP003` — omitted keys are not selectable |
 
 ---
 
@@ -268,19 +341,19 @@ export const UserCard = component.wrap(UserDetail, {
 
 This can be introduced as a backward-compatible extension:
 
-- Existing wrappers without `addBindings` / `omitBindings` behave exactly the same.
-- Existing compiler lowering of `@forward()` is unchanged unless `omitBindings` is present.
-- Type-level changes are additive.
+- Existing wrappers without `addBindings` / `omitBindings` produce `EffectivePublicBindings<C, {}, {}>` = `Omit<TargetBindings<C>, never> & {}` = `TargetBindings<C>` — identical to current behavior.
+- Existing compiler lowering of `@forward()` is unchanged when both fields are absent.
+- Type-level changes are additive (new generics default to `{}`).
 - Setup parameter style remains binding-only (`setup(bindings)`); parameter destructuring with spread is not part of the model.
 
 ---
 
-## Ivy bridge considerations
+## Ivy Bridge Considerations
 
 `addBindings` / `omitBindings` is primarily a **compiler + type-system** evolution.
 
-- **Type system** computes effective wrapper API.
-- **Compiler** adjusts key expansion set for `@forward()`, enforces non-forwarding of wrapper-local keys, and rejects placements that cannot consume the wrapper payload.
-- **Runtime** remains unchanged in principle; generated instructions stay in the same class as those emitted today.
+- **Type system** computes `EffectivePublicBindings` as the wrapper's external surface.
+- **Compiler** adjusts the key expansion set for `@forward()`, enforces non-forwarding of added keys, validates omit key existence, and rejects name collisions.
+- **Runtime** remains unchanged — generated instructions stay in the same class as those emitted today for `component.wrap`.
 
 **Change Class:** Compiler + Type-level (no new runtime primitive).
