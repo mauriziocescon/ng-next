@@ -29,24 +29,22 @@ From the binding prefix reference (`readme.md`):
 
 ```ts
 import { component, signal } from '@angular/core';
-import { UserDetail, User } from './user-detail.ng';
+import { Panel } from './panel.ng';
 
 export const Consumer = component({
   setup: () => {
-    const user = signal<User>({ name: 'Alice', role: 'admin' });
-    const email = signal('alice@example.com');
-
-    function makeAdmin() {/** ... **/}
+    const title = signal('Dashboard');
+    const mode = signal<'light' | 'dark'>('light');
 
     /**
-     * once:user — evaluated once at creation, never updated.
-     * email and makeAdmin remain reactive.
+     * once:title — evaluated once at creation, never updated.
+     * mode remains reactive.
      */
     return @{
-      <UserDetail
-        once:user={user()}
-        model:email={email}
-        on:makeAdmin={makeAdmin} />
+      <Panel
+        once:title={title()}
+        collapsible={true}
+        mode={mode()} />
     };
   },
 });
@@ -100,12 +98,12 @@ interface DerivationInputNode extends BaseNode {
 
 ### Compiler Lowering
 
-When the consumer writes `once:user={user()}`, the compiler:
+When the consumer writes `once:title={title()}`, the compiler:
 
 1. `MUST` emit the value in the creation pass (seed).
 2. `MUST` skip emitting update-pass property writes for this binding.
 
-The target `InputSignal<User>` is written once through the normal input-write path and never written again. No runtime flag or special signal variant is needed.
+The target `InputSignal<string>` is written once through the normal input-write path and never written again. No runtime flag or special signal variant is needed.
 
 ### Interaction with directives and derivations
 

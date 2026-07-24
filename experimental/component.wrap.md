@@ -68,7 +68,6 @@ The wrapper removes selected target bindings from its external surface. Omitted 
  */
 export const CorpGrid = component.wrap(ThirdPartyGrid, {
   omitBindings: ['debugMode', 'unsafeHtml', 'theme'],
-  bindings: {},
   setup: () => @{
     <ThirdPartyGrid
       @forward()
@@ -105,7 +104,6 @@ export const CorpGrid = component.wrap(ThirdPartyGrid, {
   addBindings: {
     highlight: input<boolean>(false),
   },
-  bindings: {},
   setup: ({ highlight }) => @{
     <section class:highlight={highlight()}>
       <ThirdPartyGrid @forward() />
@@ -127,7 +125,6 @@ export const CorpGrid = component.wrap(ThirdPartyGrid, {
   addBindings: {
     order: model<SortOrder>('none'),
   },
-  bindings: {},
   setup: ({ order }) => @{
     <ThirdPartyGrid @forward() model:sortOrder={order} />
   },
@@ -216,9 +213,10 @@ No runtime forwarding object is required.
 
 The following type snippets are **proposed deltas** to the current type model in `types/ng-types.ts`.
 
-### Current `wrap` signature (from `types/ng-types.ts`)
+### Current `wrap` signatures (from `types/ng-types.ts`)
 
 ```ts
+// With bindings (selected subset of target bindings)
 export declare function wrap<
   ExplicitWrapperGenericsAreNotAllowed extends never = never,
   C extends ComponentInstance<unknown, unknown, any>,
@@ -236,6 +234,23 @@ export declare function wrap<
         styleUrl?: string;
       }
     : never,
+): ComponentInstance<TargetBindings<C>, E, ProxySurfaceOf<C>, TMarkup>;
+
+// No bindings (forward everything)
+export declare function wrap<
+  ExplicitWrapperGenericsAreNotAllowed extends never = never,
+  C extends ComponentInstance<unknown, unknown, any>,
+  E = void,
+  TMarkup extends TemplateMarkup = TemplateMarkup,
+>(
+  target: C,
+  config: {
+    bindings?: never;
+    setup: () => SetupReturn<E, TMarkup>;
+    providers?: () => Provider[];
+    style?: string;
+    styleUrl?: string;
+  },
 ): ComponentInstance<TargetBindings<C>, E, ProxySurfaceOf<C>, TMarkup>;
 ```
 
@@ -268,7 +283,7 @@ type ForwardableTargetBindings<
 
 ### Extended `wrap` overload
 
-This is a **proposed** extension of `component.wrap(Target, config)`, not the current signature.
+This is a **proposed** extension of `component.wrap(Target, config)`, not the current signature. It subsumes both current overloads.
 
 ```ts
 export declare function wrap<
@@ -284,7 +299,7 @@ export declare function wrap<
   config: {
     omitBindings?: Omitted;
     addBindings?: Added;
-    bindings: ValidateWrapSelection<Sel, ForwardableTargetBindings<C, Omitted>>;
+    bindings?: ValidateWrapSelection<Sel, ForwardableTargetBindings<C, Omitted>>;
     setup: (bindings: SetupBindings<Sel & Added>) => SetupReturn<E, TMarkup>;
     providers?: (inputs: InputsOnly<Sel & Added>) => Provider[];
     style?: string;
