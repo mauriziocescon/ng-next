@@ -202,7 +202,7 @@ The compiler:
 8. `MUST` reject more than one `@forward()` placement per component template (D031).
 9. `MUST` reject absence of `@forward()` when `WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never` (D025).
 10. `MUST` validate that every element in `omitBindings` exists in `keys(B(Target))`.
-11. `MUST` validate that `addBindings` keys do NOT collide with non-omitted target keys.
+11. Type-level enforcement: `addBindings` keys that collide with non-omitted target keys are rejected by `ValidateAddBindings` (no separate compiler diagnostic needed).
 12. `MUST` deduplicate `omitBindings` entries internally. Duplicate entries `MAY` produce a warning but are not errors.
 
 No runtime forwarding object is required.
@@ -274,11 +274,20 @@ type EffectivePublicBindings<
   Omitted extends readonly string[],
 > = Omit<TargetBindings<C>, OmittedKeys<Omitted>> & Added;
 
-// What @forward() can deliver (target minus omitted minus selected)
+// Pre-selection target bindings: target minus omitted.
+// Used as the validation domain for `bindings` selection and `addBindings`.
 type ForwardableTargetBindings<
   C extends ComponentInstance<any, any, any>,
   Omitted extends readonly string[],
 > = Omit<TargetBindings<C>, OmittedKeys<Omitted>>;
+
+// Post-selection forwarding payload: target minus omitted minus selected.
+// This is what @forward() actually delivers to the wrapped target.
+type ForwardPayloadBindings<
+  C extends ComponentInstance<any, any, any>,
+  Omitted extends readonly string[],
+  Sel extends Record<string, ComponentBindingValue>,
+> = Omit<ForwardableTargetBindings<C, Omitted>, keyof Sel>;
 ```
 
 ### Extended `wrap` overload
@@ -286,6 +295,21 @@ type ForwardableTargetBindings<
 This is a **proposed** extension of `component.wrap(Target, config)`, not the current signature. It subsumes both current overloads.
 
 ```ts
+// Added keys must not collide with non-omitted target keys.
+// Reusing an omitted key is valid (rename pattern).
+type ValidateAddBindings<
+  Added extends Record<string, ComponentBindingValue>,
+  C extends ComponentInstance<any, any, any>,
+  Omitted extends readonly string[],
+> = keyof Added & keyof ForwardableTargetBindings<C, Omitted> extends never
+  ? Added
+  : Added & {
+      __add_bindings_collision__: {
+        message: 'addBindings keys must not collide with non-omitted target bindings';
+        keys: keyof Added & keyof ForwardableTargetBindings<C, Omitted>;
+      };
+    };
+
 export declare function wrap<
   ExplicitWrapperGenericsAreNotAllowed extends never = never,
   C extends ComponentInstance<unknown, unknown, any>,
@@ -298,7 +322,7 @@ export declare function wrap<
   target: C,
   config: {
     omitBindings?: Omitted;
-    addBindings?: Added;
+    addBindings?: ValidateAddBindings<Added, C, Omitted>;
     bindings?: ValidateWrapSelection<Sel, ForwardableTargetBindings<C, Omitted>>;
     setup: (bindings: SetupBindings<Sel & Added>) => SetupReturn<E, TMarkup>;
     providers?: (inputs: InputsOnly<Sel & Added>) => Provider[];
@@ -317,9 +341,9 @@ export declare function wrap<
 
 | Aspect | Current | Proposed |
 |--------|---------|----------|
-| Public API | `TargetBindings<C>` | `TargetBindings<C>` minus omitted, plus added |
+| Public API | `TargetBindings<C>` | `EffectivePublicBindings<C, Added, Omitted>` |
 | `setup` receives | `SetupBindings<Sel>` | `SetupBindings<Sel & Added>` |
-| `@forward()` delivers | `B(Target) \ Sel` | `B(Target) \ Omitted \ Sel` |
+| `@forward()` delivers | `B(Target) \ Sel` | `ForwardPayloadBindings<C, Omitted, Sel>` |
 | `addBindings` in forward | N/A | Never forwarded |
 | `bindings` validates against | `TargetBindings<C>` | `ForwardableTargetBindings<C, Omitted>` |
 
@@ -341,7 +365,6 @@ export declare function wrap<
 | Rule | Diagnostic |
 |:---|:---|
 | `omitBindings` element not in `keys(B(Target))` | `WRAP001` — unknown omit key |
-| `addBindings` key collides with non-omitted target key | `WRAP002` — name collision |
 | `addBindings` key collides with omitted target key | Valid — this is a rename pattern |
 | Omitted required binding not explicitly supplied in template | D013 — missing required component input/model/fragment (enforced on `<Target @forward() ...>`) |
 | `@forward()` absent when payload exists | D025 |
