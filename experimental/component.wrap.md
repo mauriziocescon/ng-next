@@ -364,10 +364,9 @@ export declare function wrap<
 
 | Rule | Diagnostic |
 |:---|:---|
-| `omitBindings` element not in `keys(B(Target))` | `WRAP001` — unknown omit key |
 | `addBindings` key collides with omitted target key | Valid — this is a rename pattern |
 | Omitted required binding not explicitly supplied in template | D013 — missing required component input/model/fragment (enforced on `<Target @forward() ...>`) |
 | `@forward()` absent when payload exists | D025 |
 | Multiple `@forward()` placements | D031 |
 | `@forward()` on incompatible node | D032 |
-| `bindings` selection references an omitted key | `WRAP003` — omitted keys are not selectable |
+
