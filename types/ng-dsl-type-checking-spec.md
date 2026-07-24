@@ -615,7 +615,7 @@ WRAPPER-SELECTION
 ─────────────────────────────────────────────────────────────────
 component.wrap(Target, config)
 Target : ComponentInstance<B_Target, E_Target, S_Target, M_Target>
-Selected = B(config)
+Selected = B(config)    (defaults to {} when bindings is omitted)
 
 keys(Selected) ⊆ keys(B_Target)
 ∀ k ∈ keys(Selected):

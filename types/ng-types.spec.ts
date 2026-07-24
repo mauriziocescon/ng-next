@@ -818,7 +818,6 @@ const WrapperProvidersSelectedKinds = component.wrap(Base, {
 
 // Wrapper preserves proxy surface from target
 const ProxyWrapper = component.wrap(ButtonProxy, {
-  bindings: {},
   setup: () => tmpl,
 });
 type _ProxyWrapperPreservesHost = Assert<
@@ -832,7 +831,6 @@ const InputProxy = component.proxy<HTMLInputElement>({
   setup: () => tmpl,
 });
 const InputProxyWrapper = component.wrap(InputProxy, {
-  bindings: {},
   setup: () => tmpl,
 });
 type _InputProxyWrapperPreservesHost = Assert<
@@ -846,7 +844,6 @@ const NoForwardingTarget = component({
   setup: () => tmpl,
 });
 const NoProxyWrapper = component.wrap(NoForwardingTarget, {
-  bindings: {},
   setup: () => tmpl,
 });
 type _NoProxyWrapperKeepsNever = Assert<
@@ -858,7 +855,6 @@ type _NoProxyWrapperKeepsNever = Assert<
 const _NegWrapperExplicitGeneric = component.wrap<HTMLButtonElement>(
   UserDetail,
   {
-    bindings: {},
     setup: () => tmpl,
   },
 );
