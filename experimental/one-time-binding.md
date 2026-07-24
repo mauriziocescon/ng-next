@@ -29,24 +29,22 @@ From the binding prefix reference (`readme.md`):
 
 ```ts
 import { component, signal } from '@angular/core';
-import { UserDetail, User } from './user-detail.ng';
+import { Panel } from './panel.ng';
 
 export const Consumer = component({
   setup: () => {
-    const user = signal<User>({ name: 'Alice', role: 'admin' });
-    const email = signal('alice@example.com');
-
-    function makeAdmin() {/** ... **/}
+    const title = signal('Dashboard');
+    const mode = signal<'light' | 'dark'>('light');
 
     /**
-     * once:user — evaluated once at creation, never updated.
-     * email and makeAdmin remain reactive.
+     * once:title — evaluated once at creation, never updated.
+     * mode remains reactive.
      */
     return @{
-      <UserDetail
-        once:user={user()}
-        model:email={email}
-        on:makeAdmin={makeAdmin} />
+      <Panel
+        once:title={title()}
+        collapsible={true}
+        mode={mode()} />
     };
   },
 });
@@ -100,12 +98,12 @@ interface DerivationInputNode extends BaseNode {
 
 ### Compiler Lowering
 
-When the consumer writes `once:user={user()}`, the compiler:
+When the consumer writes `once:title={title()}`, the compiler:
 
 1. `MUST` emit the value in the creation pass (seed).
 2. `MUST` skip emitting update-pass property writes for this binding.
 
-The target `InputSignal<User>` is written once through the normal input-write path and never written again. No runtime flag or special signal variant is needed.
+The target `InputSignal<string>` is written once through the normal input-write path and never written again. No runtime flag or special signal variant is needed.
 
 ### Interaction with directives and derivations
 
@@ -141,13 +139,13 @@ import { component, input, signal } from '@angular/core';
 export const Panel = component({
   bindings: {
     /**
-     * input.once<T>()          — optional, InputSignal<T | undefined>
-     * input.once<T>(default)   — optional with default, InputSignal<T>
-     * input.once.required<T>() — required, InputSignal<T>
+     * input.once<T>()            — optional, InputSignal<T | undefined>
+     * input.once<T>(default)     — optional with default, InputSignal<T>
+     * input.required.once<T>()   — required, InputSignal<T>
      *
      * Still an InputSignal — just never updated after creation.
      */
-    title: input.once.required<string>(),
+    title: input.required.once<string>(),
     collapsible: input.once<boolean>(true),
     mode: input<'light' | 'dark'>('light'),
   },
@@ -196,7 +194,7 @@ class PanelService {
 
 export const Panel = component({
   bindings: {
-    title: input.once.required<string>(),
+    title: input.required.once<string>(),
   },
   setup: () => {
     const svc = inject(PanelService);
@@ -244,7 +242,7 @@ No new branded type or type-level changes are required. `input.once<T>()` produc
 | `once:` + `on:` on the same binding | D018 — `once:on:*` is invalid |
 | `once:prop` and `prop` on the same element | D019 — duplicate binding name |
 | `input.once` receives later parent changes | No error — updates are silently ignored by contract |
-| `once:prop` / `input.once.required` without an initial value | D013/D014/D038 — standard required-input diagnostic |
+| `once:prop` / `input.required.once` without an initial value | D013/D014/D038 — standard required-input diagnostic |
 | `input.once` in directive bindings | Valid |
 | `input.once` in `@derive` bindings | Valid |
 | `once:` on a `fragment` binding | D018 — fragments are not inputs |

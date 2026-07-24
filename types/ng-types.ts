@@ -473,6 +473,7 @@ export namespace component {
         },
   ): ComponentInstance<{}, E, S, TMarkup>;
 
+  // With bindings (selected subset of target bindings)
   export declare function wrap<
     ExplicitWrapperGenericsAreNotAllowed extends never = never,
     C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
@@ -494,6 +495,32 @@ export namespace component {
           styleUrl?: string;
         }
       : never,
+  ): ComponentInstance<
+    TargetBindings<C>,
+    E,
+    ProxySurfaceOf<C>,
+    TMarkup
+  >;
+
+  // No bindings (forward everything)
+  export declare function wrap<
+    ExplicitWrapperGenericsAreNotAllowed extends never = never,
+    C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
+      unknown,
+      unknown,
+      any
+    >,
+    E = void,
+    TMarkup extends TemplateMarkup = TemplateMarkup,
+  >(
+    target: C,
+    config: {
+      bindings?: never;
+      setup: () => SetupReturn<E, TMarkup>;
+      providers?: () => Provider[];
+      style?: string;
+      styleUrl?: string;
+    },
   ): ComponentInstance<
     TargetBindings<C>,
     E,
