@@ -746,7 +746,7 @@ export const Counter = component({
 - `pipes`: can be modeled with derivations — derivations cover the same transform use case and also support DI,
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers),
 - `@let`: unchanged,
-- `bindings aliasing` at the setup level (ts destructuring),
+- `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
 - `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
 - `template reference variables`: likely modeled with `ref`,
@@ -758,6 +758,7 @@ export const Counter = component({
 
 - other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`) should probably remain. They are not covered here to avoid scope creep;
 - `providers` defined at `directive` level: the added value is unclear, and the resulting mental model can be difficult to follow; it is uncertain whether this concept remains meaningful;
+- programmatic view creation (dialogs, overlays): not covered here; likely requires a dedicated API — `createComponent` / `renderFragment` with an attachment target — rather than `ViewContainerRef`;
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign).
