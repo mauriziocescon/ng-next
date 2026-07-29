@@ -156,13 +156,13 @@ const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
   }
 
   .quiz-btn.valid.chosen {
-    border-color: var(--success);
-    background: rgba(34, 197, 94, 0.1);
+    border-color: var(--accent);
+    background: var(--accent-glow);
   }
 
   .quiz-btn.invalid.chosen {
-    border-color: var(--error);
-    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--accent);
+    background: var(--accent-glow);
   }
 
   .quiz-btn.next {
@@ -184,10 +184,20 @@ const nextHref = index < total - 1 ? `${base}quiz/${index + 2}/` : null;
 
   .quiz-result.correct {
     color: var(--success);
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid var(--success);
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    display: inline-block;
   }
 
   .quiz-result.wrong {
     color: var(--error);
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--error);
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    display: inline-block;
   }
 
   .quiz-feedback p {
