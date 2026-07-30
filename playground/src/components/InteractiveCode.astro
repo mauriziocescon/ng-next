@@ -70,7 +70,7 @@ const variantHtmls = variants.map(v => highlight(v.code));
           type="button"
         >
           {v.invalid && <span class="ic-variant-icon" aria-hidden="true">✗</span>}
-          {!v.invalid && <span class="ic-variant-icon" aria-hidden="true">↻</span>}
+          {!v.invalid && <span class="ic-variant-icon" aria-hidden="true">✓</span>}
           {v.label}
         </button>
       ))}

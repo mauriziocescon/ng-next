@@ -1,0 +1,315 @@
+---
+import Base from '../layouts/Base.astro';
+import InteractiveCode from '../components/InteractiveCode.astro';
+
+// Main example code
+const originalCode = `import { directive, ref, input, output, inject, DestroyRef, afterRenderEffect } from '@angular/core';
+import { component, signal } from '@angular/core';
+
+export const tooltip = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    message: input.required<string>(),
+    dismiss: output<void>(),
+  },
+  setup: ({ message, dismiss }, { host }) => {
+    const destroyRef = inject(DestroyRef);
+
+    afterRenderEffect(() => {
+      const hostEl: HTMLElement | undefined = host();
+    });
+
+    destroyRef.onDestroy(() => {
+      // cleanup logic
+    });
+  },
+});
+
+export const TextSearch = component({
+  setup: () => {
+    const text = signal('');
+    const message = signal('Message');
+
+    function doSomething() {/** ... **/}
+
+    return @{
+      <input
+        type="text"
+        model:value={text}
+        use:tooltip(message={message()} on:dismiss={doSomething}) />
+
+      <p>Value: {text()}</p>
+    };
+  },
+});`;
+
+// Annotations for the main code
+const annotations = [
+  {
+    token: 'tooltip',
+    explanation: 'Named export. Used with use:tooltip(...) in templates.',
+    category: 'keyword',
+  },
+  {
+    token: 'directive({',
+    explanation: 'Factory function. Config shape: host → bindings → setup. No template, no providers.',
+    category: 'keyword',
+  },
+  {
+    token: 'host: ref<HTMLElement>()',
+    explanation: 'Constrains which elements this directive can attach to. The compiler rejects incompatible targets at build time.',
+    category: 'type',
+  },
+  {
+    token: 'bindings:',
+    explanation: 'Public API — inputs, models, outputs, fragments. Same shape as component bindings.',
+    category: 'keyword',
+  },
+  {
+    token: '({ message, dismiss }, { host })',
+    explanation: 'First arg: destructured bindings. Second arg: framework context with the host element ref.',
+    category: 'type',
+  },
+  {
+    token: 'use:tooltip(message={message()} on:dismiss={doSomething})',
+    explanation: 'Attaches the directive. Inputs and outputs listed inside parentheses — same bind:/on: rules as components.',
+    category: 'directive',
+  },
+];
+
+// Variant 1: Directive with expose (valid)
+const variantExpose = `import { directive, ref, signal, component, afterNextRender } from '@angular/core';
+
+export const tooltip = directive({
+  host: ref<HTMLElement>(),
+  setup: (_, { host }) => {
+    const visible = signal(false);
+
+    function toggle() { visible.set(!visible()); }
+    function show() { visible.set(true); }
+    function hide() { visible.set(false); }
+
+    return { toggle, show, hide };
+  },
+});
+
+export const Consumer = component({
+  setup: () => {
+    const tip = ref<typeof tooltip>();
+
+    afterNextRender(() => {
+      tip()?.toggle();
+    });
+
+    return @{
+      <div use:tooltip():ref={tip}>Hover me</div>
+
+      <button on:click={() => tip()?.toggle()}>Toggle tooltip</button>
+    };
+  },
+});`;
+
+const variantExposeAnnotations = [
+  {
+    token: 'return { toggle, show, hide };',
+    explanation: 'Setup return becomes the expose. Only these members are reachable through :ref — internals stay private.',
+    category: 'keyword',
+  },
+  {
+    token: 'use:tooltip():ref={tip}',
+    explanation: ':ref captures the directive expose into a Ref variable. Readable after afterNextRender.',
+    category: 'directive',
+  },
+  {
+    token: 'ref<typeof tooltip>()',
+    explanation: 'Typed ref — resolves to Signal<{ toggle, show, hide } | undefined>. The type is inferred from the directive expose.',
+    category: 'type',
+  },
+];
+
+// Variant 2: Host type mismatch (invalid — D022)
+const variantHostMismatch = `import { directive, ref, input } from '@angular/core';
+import { component } from '@angular/core';
+
+export const inputMask = directive({
+  host: ref<HTMLInputElement>(),
+  bindings: {
+    mask: input.required<string>(),
+  },
+  setup: ({ mask }, { host }) => {
+    // host() is HTMLInputElement — can access .value, .selectionStart, etc.
+  },
+});
+
+export const Consumer = component({
+  setup: () => @{
+    <div use:inputMask(mask={'###-##-####'})>
+      Content
+    </div>
+  },
+});`;
+
+const variantHostMismatchAnnotations = [
+  {
+    token: 'host: ref<HTMLInputElement>()',
+    explanation: 'This directive requires an HTMLInputElement host. Only <input> elements are compatible.',
+    category: 'type',
+  },
+  {
+    token: "use:inputMask(mask={'###-##-####'})",
+    explanation: '❌ HTMLDivElement is not assignable to HTMLInputElement. The compiler rejects this — no runtime surprise.',
+    category: 'error',
+  },
+];
+
+// Variant 3: Same directive applied twice (invalid — D023)
+const variantDuplicate = `import { directive, ref, input } from '@angular/core';
+import { component, signal } from '@angular/core';
+
+export const tooltip = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    message: input.required<string>(),
+  },
+  setup: ({ message }, { host }) => {
+    // tooltip logic
+  },
+});
+
+export const Consumer = component({
+  setup: () => {
+    const primary = signal('Primary tooltip');
+    const secondary = signal('Secondary tooltip');
+
+    return @{
+      <button
+        use:tooltip(message={primary()})
+        use:tooltip(message={secondary()})>
+        Click me
+      </button>
+    };
+  },
+});`;
+
+const variantDuplicateAnnotations = [
+  {
+    token: 'use:tooltip(message={primary()})',
+    explanation: 'First application — valid on its own.',
+    category: 'directive',
+  },
+  {
+    token: 'use:tooltip(message={secondary()})',
+    explanation: '❌ Same directive applied twice to the same element. Each directive can appear at most once per resolved host.',
+    category: 'error',
+  },
+];
+
+// Variant 4: Directive on a proxy component (valid)
+const variantProxy = `import { directive, ref, input } from '@angular/core';
+import { component, signal, fragment } from '@angular/core';
+
+export const tooltip = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    message: input.required<string>(),
+  },
+  setup: ({ message }, { host }) => {
+    // tooltip logic
+  },
+});
+
+const Button = component.proxy<HTMLButtonElement>({
+  bindings: {
+    disabled: input<boolean>(false),
+    children: fragment.required<void>(),
+  },
+  setup: ({ disabled, children }) => @{
+    <button @forward() disabled={disabled()}>
+      @render(children())
+    </button>
+  },
+});
+
+export const Consumer = component({
+  setup: () => @{
+    <Button use:tooltip(message={'Save changes'}) disabled={false}>
+      Save
+    </Button>
+  },
+});`;
+
+const variantProxyAnnotations = [
+  {
+    token: 'component.proxy<HTMLButtonElement>({',
+    explanation: 'Declares a proxy surface. Directives applied to <Button /> are forwarded to the @forward() target inside.',
+    category: 'keyword',
+  },
+  {
+    token: '@forward()',
+    explanation: 'Marks where forwarded directives land. The element type must be assignable to the proxy surface (HTMLButtonElement).',
+    category: 'keyword',
+  },
+  {
+    token: "use:tooltip(message={'Save changes'})",
+    explanation: 'Valid — Button exposes an HTMLButtonElement proxy surface, which satisfies tooltip\'s host: ref<HTMLElement>(). The directive is placed on the internal <button>.',
+    category: 'directive',
+  },
+];
+
+// All variants
+const variants = [
+  {
+    label: 'With expose',
+    code: variantExpose,
+    annotations: variantExposeAnnotations,
+    note: 'Valid. A directive\'s setup return becomes its expose — reachable through :ref. Only exposed members are public; internals stay private.',
+    invalid: false,
+  },
+  {
+    label: 'Host mismatch',
+    code: variantHostMismatch,
+    annotations: variantHostMismatchAnnotations,
+    note: 'Compile error: the directive declares host: ref<HTMLInputElement>() but is applied to a <div>. HTMLDivElement is not assignable to HTMLInputElement — the compiler catches this at build time.',
+    invalid: true,
+  },
+  {
+    label: 'Same directive twice',
+    code: variantDuplicate,
+    annotations: variantDuplicateAnnotations,
+    note: 'Compile error: the same directive cannot be applied more than once to the same resolved host element. This also applies across forwarding — if a proxy component already applies tooltip internally, adding it externally is rejected.',
+    invalid: true,
+  },
+  {
+    label: 'With proxy',
+    code: variantProxy,
+    annotations: variantProxyAnnotations,
+    note: 'Valid. component.proxy<HTMLButtonElement> declares a directive-compatible surface. Directives applied to <Button /> are forwarded to the @forward() target — the internal <button> element.',
+    invalid: false,
+  },
+];
+---
+
+<Base title="Element Directives">
+  <h2>Element Directives</h2>
+  <p class="subtitle">Directives are always explicit — no selector matching, just <code>use:</code>.</p>
+
+  <p>
+    A directive declares its <code>host</code> type and <code>bindings</code>.
+    The compiler ensures it only attaches to compatible elements — no runtime
+    surprises from CSS-like selector matching.
+  </p>
+
+  <InteractiveCode
+    code={originalCode}
+    label="tooltip"
+    annotations={annotations}
+    variants={variants}
+  />
+
+  <div class="annotation" role="note">
+    <strong>No magic selectors:</strong> directives are applied where you see them (<code>use:</code>),
+    type-checked against the host element, and conditionally toggled with <code>:when</code> —
+    e.g. <code>use:tooltip(message=&#123;tip()&#125;):when=&#123;showTip()&#125;</code>.
+  </div>
+
+</Base>
