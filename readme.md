@@ -761,7 +761,8 @@ export const Counter = component({
 - programmatic view creation (dialogs, overlays): not covered here; likely requires a dedicated API — `createComponent` / `renderFragment` with an attachment target — rather than `ViewContainerRef`;
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
-  - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign).
+  - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
+- testing story: not covered here — large topic on its own. `TestBed` and `ComponentFixture` are a poor fit for this architecture. It likely requires new APIs — a `runInInjectionContext` helper for unit-testing `setup` directly, and a thin `render(Component, { bindings, providers })` harness for DOM tests closer to [`@testing-library/angular`](https://github.com/testing-library/angular-testing-library/tree/main) than to `TestBed`. Default mantra: "test behavior, not implementation" — query by role/label/text, interact as a user would, assert on visible output.
 
 ### Pros and cons
 
