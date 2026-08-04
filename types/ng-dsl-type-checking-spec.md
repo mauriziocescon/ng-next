@@ -735,11 +735,10 @@ D : DirectiveInstance<H_D, B_D, E_D>
 HOST-COMPAT:  H_host ⊑ H_D                         → D022
 UNIQUE:       D at most once per element in R_host  → D023
 
-∀ input ∈ dir.inputs:
-  if B_D[input.name] : FragmentBinding<T>  → Γ ⊢ input.value : U    U ⊑ FragmentBinding<T>
-  else                                     → CHECK-INPUT(Γ, B_D, input)
-∀ output ∈ dir.outputs: CHECK-OUTPUT(Γ, B_D, output)
-∀ model ∈ dir.models:   CHECK-MODEL(Γ, B_D, model)
+∀ input ∈ dir.inputs:       CHECK-INPUT(Γ, B_D, input)
+∀ output ∈ dir.outputs:     CHECK-OUTPUT(Γ, B_D, output)
+∀ model ∈ dir.models:       CHECK-MODEL(Γ, B_D, model)
+∀ frag ∈ dir.fragments:     CHECK-DIRECTIVE-FRAGMENT(Γ, B_D, frag)
 CHECK-REQUIRED(B_D, provided, "directive")
 NO-UNKNOWN-BINDINGS(B_D, dir)
 
@@ -749,7 +748,18 @@ if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 Γ ⊢ use:D(...) ✓
 ```
 
-Inline `@fragment` delivery is supported only on component elements. Directives receive fragments exclusively by reference via `name={expr}` syntax inside `use:dir(...)`.
+Fragment-specific check for directives:
+
+```
+CHECK-DIRECTIVE-FRAGMENT(Γ, B_D, frag)
+─────────────────────────────────────────────────
+frag.name ∈ keys(B_D)
+B_D[frag.name] : FragmentBinding<T>
+Γ ⊢ frag.value : U    U ⊑ FragmentBinding<T>
+─────────────────────────────────────────────────
+```
+
+Inline `@fragment` delivery is supported only on component elements. Directives receive fragments exclusively by reference via `name={expr}` syntax inside `use:dir(...)` — inline `@fragment` declarations are rejected (D036).
 
 ### 7.1 Uniqueness Note
 
