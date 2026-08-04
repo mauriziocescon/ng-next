@@ -100,6 +100,8 @@ export interface ElementNode extends BaseNode {
   inputs: BoundAttributeNode[];
   outputs: BoundEventNode[];
   models: BoundModelNode[];
+  classes: ClassBindingNode[];
+  styles: StyleBindingNode[];
   animations: AnimateBindingNode[];
   references: RefNode[];
   directives: DirectiveBindingNode[];
@@ -112,13 +114,31 @@ export interface ElementNode extends BaseNode {
 // 5. ATTRIBUTE & BINDING NODES
 // ────────────────────────────────────────────────────────────────
 
-export enum BindingType {
-  Property = 0,
-  Attribute = 1,
-  Class = 2,
-  Style = 3,
-  Animation = 4,
-  Input = 5,
+/**
+ * class:name={expr} — conditional CSS class binding.
+ * Multiple class bindings per element are allowed (repeatable).
+ * Applies only to native elements.
+ */
+export interface ClassBindingNode extends BaseNode {
+  type: 'ClassBinding';
+  name: string;
+  value: AST;
+  keySpan?: SourceSpan;
+  valueSpan?: SourceSpan;
+}
+
+/**
+ * style:prop={expr} — conditional inline style binding.
+ * Multiple style bindings per element are allowed (repeatable).
+ * Applies only to native elements.
+ */
+export interface StyleBindingNode extends BaseNode {
+  type: 'StyleBinding';
+  name: string;
+  value: AST;
+  unit?: string;
+  keySpan?: SourceSpan;
+  valueSpan?: SourceSpan;
 }
 
 export interface TextAttributeNode extends BaseNode {
@@ -133,7 +153,6 @@ export interface TextAttributeNode extends BaseNode {
 export interface BoundAttributeNode extends BaseNode {
   type: 'BoundAttribute';
   name: string;
-  bindingType: BindingType;
   value: AST;
   once: boolean;
   unit?: string;
@@ -694,6 +713,8 @@ export interface TemplateAstVisitor<T = void> {
   visitBoundAttribute(attr: BoundAttributeNode, context: T): void;
   visitBoundEvent(event: BoundEventNode, context: T): void;
   visitBoundModel(model: BoundModelNode, context: T): void;
+  visitClassBinding(classBinding: ClassBindingNode, context: T): void;
+  visitStyleBinding(styleBinding: StyleBindingNode, context: T): void;
   visitAnimateBinding(animate: AnimateBindingNode, context: T): void;
   visitRef(ref: RefNode, context: T): void;
   visitDirectiveBinding(directive: DirectiveBindingNode, context: T): void;
@@ -719,6 +740,8 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
         for (const input of node.inputs) visitor.visitBoundAttribute(input, context);
         for (const output of node.outputs) visitor.visitBoundEvent(output, context);
         for (const model of node.models) visitor.visitBoundModel(model, context);
+        for (const cls of node.classes) visitor.visitClassBinding(cls, context);
+        for (const sty of node.styles) visitor.visitStyleBinding(sty, context);
         for (const anim of node.animations) visitor.visitAnimateBinding(anim, context);
         for (const ref of node.references) visitor.visitRef(ref, context);
         for (const dir of node.directives) {

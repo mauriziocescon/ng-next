@@ -363,7 +363,8 @@ NO-DUPLICATE-BINDINGS(node)
 ∀ name: |{b ∈ outputs | b.name = name}| ≤ 1
 ∀ name: |{b ∈ fragments | b.name = name}| ≤ 1
 |references| ≤ 1
-class: and style: are repeatable
+classes: repeatable (multiple class:name allowed per element)
+styles: repeatable (multiple style:prop allowed per element)
 animate: uses ANIMATE-CONSTRAINTS (§4.2)
 use: uniqueness per DIRECTIVE-SET-UNIQUENESS (§7.1)
 ─────────────────────────────────────────────────
@@ -373,7 +374,7 @@ NO-STATIC-DYNAMIC-CLASH(node)
 ─────────────────────────────────────────────────
 ∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}
 
-class:* and style:* may coexist with a static attribute or
+classes and styles may coexist with a static attribute or
 dynamic binding for the same base name on native elements.
 ─────────────────────────────────────────────────
 ```
@@ -436,13 +437,15 @@ INTRINSIC-ELEMENT
 ─────────────────────────────────────────────────────────────────
 tag ∈ IntrinsicElements    H = I(tag)
 
-∀ attr ∈ node.attributes:  CHECK-NATIVE-TEXT-ATTR(Γ, H, attr)
-∀ input ∈ node.inputs:     CHECK-NATIVE-INPUT(Γ, H, input)
-∀ output ∈ node.outputs:   CHECK-NATIVE-OUTPUT(Γ, H, output)
-∀ model ∈ node.models:     CHECK-NATIVE-MODEL(Γ, H, model)
-∀ anim ∈ node.animations:  CHECK-ANIMATE-BINDING(Γ, anim)
-∀ dir ∈ node.directives:   CHECK-DIRECTIVE-USE(Γ, H, {node}, dir)
-∀ ref ∈ node.references:   CHECK-REF(Γ, H, ref)
+∀ attr ∈ node.attributes:       CHECK-NATIVE-TEXT-ATTR(Γ, H, attr)
+∀ input ∈ node.inputs:          CHECK-NATIVE-INPUT(Γ, H, input)
+∀ output ∈ node.outputs:        CHECK-NATIVE-OUTPUT(Γ, H, output)
+∀ model ∈ node.models:          CHECK-NATIVE-MODEL(Γ, H, model)
+∀ cls ∈ node.classes:           CLASS-BINDING(Γ, cls)
+∀ sty ∈ node.styles:           STYLE-BINDING(Γ, sty)
+∀ anim ∈ node.animations:       CHECK-ANIMATE-BINDING(Γ, anim)
+∀ dir ∈ node.directives:        CHECK-DIRECTIVE-USE(Γ, H, {node}, dir)
+∀ ref ∈ node.references:        CHECK-REF(Γ, H, ref)
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
 ─────────────────────────────────────────────────────────────────
@@ -531,6 +534,10 @@ ANIMATE-CONSTRAINTS
 COMPONENT-ELEMENT
 ─────────────────────────────────────────────────────────────────
 C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
+
+node.classes ≠ []        → D021
+node.styles ≠ []        → D021
+node.animations ≠ []     → D040
 
 ∀ attr ∈ node.attributes:  CHECK-COMP-TEXT-INPUT(Γ, B, attr)
 ∀ input ∈ node.inputs:     CHECK-INPUT(Γ, B, input)
