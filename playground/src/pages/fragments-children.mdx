@@ -34,7 +34,7 @@ export const Menu = component({
   },
   setup: ({ children }) => @{
     @if (children) {
-      @render(children())
+      <ul>@render(children())</ul>
     } @else {
       <span>Empty</span>
     }
