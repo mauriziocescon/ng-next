@@ -461,7 +461,6 @@ export interface SafeKeyedRead extends BaseAST {
 
 export interface FunctionCall extends BaseAST {
   type: 'FunctionCall';
-  target: AST | null;
   name: string;
   args: AST[];
 }
