@@ -783,7 +783,7 @@ Cons:
 
 ## Appendix: Co-located templates in Angular via `.ng` files
 
-`tsx` does not support Angular control flow/directives today, so co-located templates likely require an Angular DSL in `*.ng` files plus dedicated tooling/parser support.
+`tsx` does not support Angular control flow/directives today, so co-located templates likely require an Angular DSL in `*.ng` files plus dedicated tooling/parser support (TypeScript 7's content mappers - `https://github.com/microsoft/typescript-go/pull/4712` - could help, though Angular-specific template parsing would still be needed upstream).
 
 Co-locating template and logic is not just a style preference. At the component boundary, the two usually change together: a meaningful change to one often requires a change to the other.
 

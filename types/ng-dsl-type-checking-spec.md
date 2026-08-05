@@ -900,6 +900,9 @@ Optional: if options.injector present:
 Γ ⊢ @render(expr, { injector? }) ✓
 ```
 
+When `expr` is `undefined`, nothing is rendered (no-op).
+This supports `@render(optionalFragment?.())` directly.
+
 ---
 
 ## 11. @let
