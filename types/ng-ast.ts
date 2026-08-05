@@ -52,8 +52,6 @@ export interface BaseAST {
 // 3. TEMPLATE ROOT & NODE UNION
 // ────────────────────────────────────────────────────────────────
 
-// Root of a parsed `@{ … }` markup literal: the `@{ … }` surface syntax
-// parses into a TemplateAST whose `nodes` are the literal's contents.
 export interface TemplateAST extends BaseNode {
   type: 'Template';
   nodes: TemplateNode[];
@@ -72,34 +70,20 @@ export type TemplateNode =
 // 4. ELEMENT NODE
 // ────────────────────────────────────────────────────────────────
 
-/**
- * Placement marker for the forwarding payload declared by the enclosing
- * component API. The checker validates the marked node.
- */
 export interface ForwardMarkerNode extends BaseNode {
   type: 'ForwardMarker';
 }
 
-/**
- * Nested DOM content is lowered into a synthetic FragmentNode named
- * "children" and appended to `fragments`. Explicit @fragment declarations use
- * the same node shape, with `origin` preserving the authoring form.
- */
 export interface ElementNode extends BaseNode {
   type: 'Element';
-  /**
-   * Raw tag name from the template. For native elements, the type checker
-   * resolves this name through the Angular DSL IntrinsicElements map.
-   * Component names resolve through lexical scope instead. If this element
-   * carries @forward(), the checker validates that the resolved node can
-   * consume the enclosing component's forwarding payload.
-   */
   name: string;
   forwardMarker?: ForwardMarkerNode;
   attributes: TextAttributeNode[];
   inputs: BoundAttributeNode[];
   outputs: BoundEventNode[];
   models: BoundModelNode[];
+  classes: ClassBindingNode[];
+  styles: StyleBindingNode[];
   animations: AnimateBindingNode[];
   references: RefNode[];
   directives: DirectiveBindingNode[];
@@ -112,13 +96,21 @@ export interface ElementNode extends BaseNode {
 // 5. ATTRIBUTE & BINDING NODES
 // ────────────────────────────────────────────────────────────────
 
-export enum BindingType {
-  Property = 0,
-  Attribute = 1,
-  Class = 2,
-  Style = 3,
-  Animation = 4,
-  Input = 5,
+export interface ClassBindingNode extends BaseNode {
+  type: 'ClassBinding';
+  name: string;
+  value: AST;
+  keySpan?: SourceSpan;
+  valueSpan?: SourceSpan;
+}
+
+export interface StyleBindingNode extends BaseNode {
+  type: 'StyleBinding';
+  name: string;
+  value: AST;
+  unit?: string;
+  keySpan?: SourceSpan;
+  valueSpan?: SourceSpan;
 }
 
 export interface TextAttributeNode extends BaseNode {
@@ -133,7 +125,6 @@ export interface TextAttributeNode extends BaseNode {
 export interface BoundAttributeNode extends BaseNode {
   type: 'BoundAttribute';
   name: string;
-  bindingType: BindingType;
   value: AST;
   once: boolean;
   unit?: string;
@@ -161,11 +152,6 @@ export interface BoundModelNode extends BaseNode {
   i18n?: I18nMeta;
 }
 
-/**
- * animate:enter / animate:leave binding.
- * Class form: value is an expression resolving to string | string[].
- * Event form: handler is an AnimationFunction ((event: AnimationCallbackEvent) => void).
- */
 export interface AnimateBindingNode extends BaseNode {
   type: 'AnimateBinding';
   phase: 'enter' | 'leave';
@@ -181,10 +167,6 @@ export interface AnimateBindingNode extends BaseNode {
 // 6. REF NODES
 // ────────────────────────────────────────────────────────────────
 
-/**
- * Unified ref node for elements, components, and directives.
- * `target` is always a Variable — the framework wires it at creation time.
- */
 export interface RefNode extends BaseNode {
   type: 'Ref';
   target: Variable;
@@ -202,6 +184,7 @@ export interface DirectiveBindingNode extends BaseNode {
   inputs: DirectiveInputNode[];
   outputs: DirectiveOutputNode[];
   models: DirectiveModelNode[];
+  fragments: DirectiveFragmentNode[];
   when?: DirectiveWhenNode;
   ref?: RefNode;
   keySpan?: SourceSpan;
@@ -226,6 +209,14 @@ export interface DirectiveOutputNode extends BaseNode {
 
 export interface DirectiveModelNode extends BaseNode {
   type: 'DirectiveModel';
+  name: string;
+  value: AST;
+  keySpan?: SourceSpan;
+  valueSpan?: SourceSpan;
+}
+
+export interface DirectiveFragmentNode extends BaseNode {
+  type: 'DirectiveFragment';
   name: string;
   value: AST;
   keySpan?: SourceSpan;
@@ -470,7 +461,6 @@ export interface SafeKeyedRead extends BaseAST {
 
 export interface FunctionCall extends BaseAST {
   type: 'FunctionCall';
-  target: AST | null;
   name: string;
   args: AST[];
 }
@@ -694,12 +684,15 @@ export interface TemplateAstVisitor<T = void> {
   visitBoundAttribute(attr: BoundAttributeNode, context: T): void;
   visitBoundEvent(event: BoundEventNode, context: T): void;
   visitBoundModel(model: BoundModelNode, context: T): void;
+  visitClassBinding(classBinding: ClassBindingNode, context: T): void;
+  visitStyleBinding(styleBinding: StyleBindingNode, context: T): void;
   visitAnimateBinding(animate: AnimateBindingNode, context: T): void;
   visitRef(ref: RefNode, context: T): void;
   visitDirectiveBinding(directive: DirectiveBindingNode, context: T): void;
   visitDirectiveInput(input: DirectiveInputNode, context: T): void;
   visitDirectiveOutput(output: DirectiveOutputNode, context: T): void;
   visitDirectiveModel(model: DirectiveModelNode, context: T): void;
+  visitDirectiveFragment(fragment: DirectiveFragmentNode, context: T): void;
   visitDirectiveWhen(when: DirectiveWhenNode, context: T): void;
   visitFragmentParameter(param: FragmentParameterNode, context: T): void;
   visitRenderOptions(options: RenderOptionsNode, context: T): void;
@@ -719,6 +712,8 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
         for (const input of node.inputs) visitor.visitBoundAttribute(input, context);
         for (const output of node.outputs) visitor.visitBoundEvent(output, context);
         for (const model of node.models) visitor.visitBoundModel(model, context);
+        for (const cls of node.classes) visitor.visitClassBinding(cls, context);
+        for (const sty of node.styles) visitor.visitStyleBinding(sty, context);
         for (const anim of node.animations) visitor.visitAnimateBinding(anim, context);
         for (const ref of node.references) visitor.visitRef(ref, context);
         for (const dir of node.directives) {
@@ -726,6 +721,7 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
           for (const input of dir.inputs) visitor.visitDirectiveInput(input, context);
           for (const output of dir.outputs) visitor.visitDirectiveOutput(output, context);
           for (const model of dir.models) visitor.visitDirectiveModel(model, context);
+          for (const frag of dir.fragments) visitor.visitDirectiveFragment(frag, context);
           if (dir.when) visitor.visitDirectiveWhen(dir.when, context);
           if (dir.ref) visitor.visitRef(dir.ref, context);
         }
