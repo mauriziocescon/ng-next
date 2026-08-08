@@ -1,7 +1,7 @@
 ---
 const base = import.meta.env.BASE_URL;
-const llmsFullUrl = 'https://mauriziocescon.github.io/ng-next/llms-full.txt';
-const prompt = encodeURIComponent(`Read from this URL: ${llmsFullUrl} — explain it to me as an Angular developer working on large-scale enterprise projects with AI-assisted workflows. What problems does it try to solve and how?`);
+const llmsUrl = 'https://mauriziocescon.github.io/ng-next/llms.txt';
+const prompt = encodeURIComponent(`Read from this URL: ${llmsUrl} — explain it to me as an Angular developer working on large-scale enterprise projects with AI-assisted workflows. What problems does it try to solve and how?`);
 
 const links = [
   { label: 'Open in Claude', href: `https://claude.ai/new?q=${prompt}`, icon: '⬡' },
@@ -27,10 +27,10 @@ const links = [
     ))}
     <hr class="ai-divider" />
     <button type="button" role="menuitem" tabindex="-1" class="ai-menu-item" data-action="copy">
-      <span class="ai-icon" aria-hidden="true">📋</span> Copy full spec
+      <span class="ai-icon" aria-hidden="true">📋</span> Copy spec
     </button>
-    <a href={`${base}llms-full.txt`} download="llms-full.txt" role="menuitem" tabindex="-1" class="ai-menu-item">
-      <span class="ai-icon" aria-hidden="true">⬇</span> Download llms-full.txt
+    <a href={`${base}llms.txt`} download="llms.txt" role="menuitem" tabindex="-1" class="ai-menu-item">
+      <span class="ai-icon" aria-hidden="true">⬇</span> Download llms.txt
     </a>
   </div>
   </div>
@@ -101,7 +101,7 @@ const links = [
   // Copy action
   copyBtn.addEventListener('click', async () => {
     try {
-      const res = await fetch(`${base}llms-full.txt`);
+      const res = await fetch(`${base}llms.txt`);
       const text = await res.text();
       await navigator.clipboard.writeText(text);
       copyBtn.querySelector('.ai-icon')!.textContent = '✓';
