@@ -37,6 +37,7 @@ Highlights:
 - [Appendix: Co-located templates in Angular via `.ng` files](#appendix-co-located-templates-in-angular-via-ng-files)
 - [Appendix: Binding prefix and modifier reference](#appendix-binding-prefix-and-modifier-reference)
 - [Appendix: Integrating decorator-based components](#appendix-integrating-decorator-based-components)
+- [Appendix: Relevant GitHub issues](#appendix-relevant-github-issues)
 
 </details>
 
@@ -1051,3 +1052,23 @@ Rules:
 - Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
 - The same binding prefixes (`bind:`, `model:`, `on:`, `once:`, `:when`, `:ref`) apply.
 - Type checking uses the class's declared inputs/outputs — invalid bindings are compile-time errors.
+
+
+---
+
+## Appendix: Relevant GitHub issues
+
+This is not an exhaustive list. These are well-known community requests that are related — directly or indirectly — to the proposals in this document.
+
+- Hostless components — `https://github.com/angular/angular/issues/18877`
+- Allow constants, enums, functions in templates — `https://github.com/angular/angular/issues/25963`
+- Support Input/Output spread — `https://github.com/angular/angular/issues/14545`
+- Define generic of ng-template — `https://github.com/angular/angular/issues/28731`
+- One-time bindings — `https://github.com/angular/angular/issues/14033`
+- Localized compilation — `https://github.com/angular/angular/issues/43165`
+- Template expressions should be plain TypeScript — `https://github.com/angular/angular/issues/43485`
+- Content projection (canonical) — `https://github.com/angular/angular/issues/64504`
+- Transparent wrapper components — `https://github.com/angular/angular/issues/41993`
+- Pipes in a signal world / template-defined computed — `https://github.com/angular/angular/issues/61501`
+- Compiler gaps with attribute selectors — `https://github.com/angular/angular/issues/46351`
+- Undefined outputs not reported in templates — `https://github.com/angular/angular/issues/43603`

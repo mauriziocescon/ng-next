@@ -30,6 +30,7 @@ function llmsTxt() {
     { anchor: 'appendix-co-located-templates-in-angular-via-ng-files', desc: 'Rationale for `*.ng` files; co-location benefits; boilerplate tax trade-off analysis.' },
     { anchor: 'appendix-binding-prefix-and-modifier-reference', desc: 'Canonical list of every prefix/modifier (`bind:`, `model:`, `on:`, `once:`, `class:`, `style:`, `animate:`, `use:`, `:when`, `:ref`, `ref`, `@forward()`).' },
     { anchor: 'appendix-integrating-decorator-based-components', desc: 'Using existing `@Component`/`@Directive`/`@Pipe` classes in `.ng` files; `ngProjectAs`, `@fragment` for `ng-template`, `:element` suffix, pipe-to-derivation wrapping.' },
+    { anchor: 'appendix-relevant-github-issues', desc: 'Well-known community requests related to these proposals.' },
   ];
 
   const tocTitles = [
@@ -46,6 +47,7 @@ function llmsTxt() {
     'Appendix: Co-located templates in Angular via `.ng` files',
     'Appendix: Binding prefix and modifier reference',
     'Appendix: Integrating decorator-based components',
+    'Appendix: Relevant GitHub issues',
   ];
 
   return {
