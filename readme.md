@@ -1071,4 +1071,5 @@ This is not an exhaustive list. These are well-known community requests that are
 - Transparent wrapper components — `https://github.com/angular/angular/issues/41993`
 - Pipes in a signal world / template-defined computed — `https://github.com/angular/angular/issues/61501`
 - Compiler gaps with attribute selectors — `https://github.com/angular/angular/issues/46351`
+- Detect dangling/unknown attributes on elements — `https://github.com/angular/angular/issues/3425`
 - Undefined outputs not reported in templates — `https://github.com/angular/angular/issues/43603`
