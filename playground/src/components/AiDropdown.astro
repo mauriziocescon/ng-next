@@ -1,7 +1,7 @@
 ---
 const base = import.meta.env.BASE_URL;
 const llmsUrl = 'https://mauriziocescon.github.io/ng-next/llms.txt';
-const prompt = encodeURIComponent(`Read from this URL: ${llmsUrl} — Explain it for me as an Angular developer working on large-scale enterprise projects with AI-assisted workflows. Focus on the proposed APIs, the template DSL design choices, and how explicit contracts support tooling and agents.`);
+const prompt = encodeURIComponent(`Read from this URL: ${llmsUrl} — Explain it to me as an Angular developer working on large-scale enterprise projects with AI-assisted workflows. Focus on the proposed APIs, the template DSL design choices, and how explicit contracts support tooling and agents.`);
 
 const links = [
   { label: 'Open in Claude', href: `https://claude.ai/new?q=${prompt}`, icon: '⬡' },
