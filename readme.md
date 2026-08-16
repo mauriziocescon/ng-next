@@ -36,7 +36,7 @@ Highlights:
 - [Final considerations](#final-considerations)
 - [Appendix: Co-located templates in Angular via `.ng` files](#appendix-co-located-templates-in-angular-via-ng-files)
 - [Appendix: Binding prefix and modifier reference](#appendix-binding-prefix-and-modifier-reference)
-- [Appendix: Integrating decorator-based classes](#appendix-integrating-decorator-based-classes)
+- [Appendix: Consuming decorator-based classes](#appendix-consuming-decorator-based-classes)
 - [Appendix: Relevant GitHub issues](#appendix-relevant-github-issues)
 
 </details>
@@ -900,7 +900,7 @@ Avoid `on` prefix in input / model / output names:
 
 ---
 
-## Appendix: Integrating decorator-based classes
+## Appendix: Consuming decorator-based classes
 
 Existing decorator-based (`@Component`, `@Directive`, `@Pipe`) classes work in `.ng` files without wrappers or adapters.
 
