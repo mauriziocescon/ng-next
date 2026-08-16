@@ -1056,10 +1056,8 @@ export const EventList = component({
 
 Rules:
 
-- Components → the class is used as a tag (`<ClassName ... />`).
-- `:element` suffix disambiguates multi-selector components (`<MatButton:a>`).
-- Directives → attached via `use:ClassName(input={expr} on:output={handler})`.
-- Structural directives → not supported; `@if`, `@for`, `@switch`, and fragments replace them.
+- Components → the class is used as a tag (`<ClassName ... />`). `:element` suffix disambiguates multi-selector components (`<MatButton:a>`).
+- Directives → attached via `use:ClassName(input={expr} on:output={handler})`. The `use:` syntax on decorator-based components adds the directive to the host element.
 - Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
 - The same binding prefixes (`bind:`, `model:`, `on:`, `:use`, `:ref`) apply.
 
