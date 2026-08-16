@@ -759,10 +759,17 @@ export const Counter = component({
 
 - other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`) should probably remain. They are not covered here to avoid scope creep;
 - `providers` defined at `directive` level: the added value is unclear, and the resulting mental model can be difficult to follow; it is uncertain whether this concept remains meaningful;
-- programmatic view creation (dialogs, overlays): not covered here; likely requires a dedicated API — `createComponent` / `renderFragment` with an attachment target — rather than `ViewContainerRef`;
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
+- programmatic view creation (dialogs, overlays): not covered here; likely requires a dedicated API — `createComponent` / `renderFragment` with an attachment target — rather than `ViewContainerRef`;
+- `formField` integration with Signal Forms: not considered here. On a `component.proxy` component, all `use:` directives forward to `@forward()` — but a form field directive needs the *component's* binding surface (its `value` model, `disabled`, `errors`, etc.), not the inner native element. This likely requires `formField` to be a reserved binding name (alongside `ref` and `children`) with dedicated compiler support, so the form system can target the component boundary directly:
+  ```ts
+  <TextInput
+    formField={signupForm.username}
+    use:autoFocus()
+    ariaLabel="Username" />
+  ```
 - testing story: not covered here — large topic on its own. `TestBed` and `ComponentFixture` are a poor fit for this architecture. It likely requires new APIs — a `runInInjectionContext` helper for unit-testing `setup` directly, and a thin `render(Component, { bindings, providers })` harness for DOM tests closer to [`@testing-library/angular`](https://github.com/testing-library/angular-testing-library/tree/main) than to `TestBed`. Default mantra: "test behavior, not implementation" — query by role/label/text, interact as a user would, assert on visible output.
 
 ### Pros and cons
