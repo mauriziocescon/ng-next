@@ -918,7 +918,7 @@ export const Settings = component({
     const darkMode = signal(false);
 
     return @{
-      <MatSlideToggle model:checked={darkMode}>
+      <MatSlideToggle checked={darkMode()} on:change={() => darkMode.update(v => !v)}>
         Dark mode
       </MatSlideToggle>
     };
