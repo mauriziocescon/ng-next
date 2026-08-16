@@ -912,8 +912,6 @@ The class symbol is used directly as a tag — bindings follow the same `bind:` 
 import { component, signal } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatButton } from '@angular/material/button';
-import { MyCard } from '@mylib/card'; // decorator-based component
-import { MyList } from '@mylib/list'; // decorator-based component
 
 // Basic usage — class symbol as a tag
 export const Settings = component({
@@ -924,31 +922,6 @@ export const Settings = component({
       <MatSlideToggle model:checked={darkMode}>
         Dark mode
       </MatSlideToggle>
-    };
-  },
-});
-
-// ngProjectAs for named ng-content slots
-export const MyPage = component({
-  setup: () => @{
-    <MyCard>
-      <div ngProjectAs="my-card-header">header</div>
-      <div ngProjectAs="my-card-content">content</div>
-    </MyCard>
-  },
-});
-
-// @fragment replaces ng-template
-export const ListPage = component({
-  setup: () => {
-    const items = signal([{ id: '1', name: 'Item 1' }, { id: '2', name: 'Item 2' }]);
-
-    return @{
-      <MyList items={items()}>
-        @fragment itemTemplate(item: { id: string; name: string }) {
-          <span>{item.name}</span>
-        }
-      </MyList>
     };
   },
 });
@@ -969,7 +942,7 @@ export const Nav = component({
 
 ### Directives
 
-Directives are attached with `use:Class(...)` — inputs and outputs are listed explicitly inside the parentheses:
+Directives are attached with use:Class(...) — inputs and outputs are listed explicitly inside the parentheses. The use: syntax on decorator-based components adds the directive to the host element.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -1012,9 +985,46 @@ export const DraggableCard = component({
 });
 ```
 
+```ts
+import { component, ref } from '@angular/core';
+import { NgAccordionGroup, NgAccordionTrigger, NgAccordionPanel, NgAccordionContent } from '@angular/aria';
+
+export const AccordionExample = component({
+  setup: () => {
+    const panel1 = ref<typeof NgAccordionPanel>();
+    const panel2 = ref<typeof NgAccordionPanel>();
+
+    return @{
+      <div use:NgAccordionGroup(multiExpandable={true})>
+        <div class="accordion-item">
+          <h3>
+            <button use:NgAccordionTrigger(panel={panel1()})>Item 1</button>
+          </h3>
+          <div use:NgAccordionPanel():ref={panel1}>
+            <ng-template use:NgAccordionContent()>
+              <p>Content for Item 1.</p>
+            </ng-template>
+          </div>
+        </div>
+        <div class="accordion-item">
+          <h3>
+            <button use:NgAccordionTrigger(panel={panel2()})>Item 2</button>
+          </h3>
+          <div use:NgAccordionPanel():ref={panel2}>
+            <ng-template use:NgAccordionContent()>
+              <p>Content for Item 2.</p>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    };
+  },
+});
+```
+
 ### Pipes
 
-The template DSL has no pipe operator (`|`). Decorator-based pipes are consumed by wrapping them in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps):
+The template DSL has no pipe operator (`|`). Decorator-based pipes are consumed by wrapping them in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps). 
 
 ```ts
 import { component, derivation, computed, inject, input, LOCALE_ID } from '@angular/core';
@@ -1047,8 +1057,6 @@ export const EventList = component({
 Rules:
 
 - Components → the class is used as a tag (`<ClassName ... />`).
-- `ngProjectAs` projects native elements into named `ng-content` slots.
-- `@fragment` replaces `ng-template` for components expecting a `TemplateRef`.
 - `:element` suffix disambiguates multi-selector components (`<MatButton:a>`).
 - Directives → attached via `use:ClassName(input={expr} on:output={handler})`.
 - Structural directives → not supported; `@if`, `@for`, `@switch`, and fragments replace them.
