@@ -1061,9 +1061,7 @@ Rules:
 - Directives → attached via `use:ClassName(input={expr} on:output={handler})`.
 - Structural directives → not supported; `@if`, `@for`, `@switch`, and fragments replace them.
 - Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
-- The same binding prefixes (`bind:`, `model:`, `on:`, `once:`, `:when`, `:ref`) apply.
-- Type checking uses the class's declared inputs/outputs — invalid bindings are compile-time errors.
-
+- The same binding prefixes (`bind:`, `model:`, `on:`, `:use`, `:ref`) apply.
 
 ---
 
