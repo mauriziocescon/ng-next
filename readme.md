@@ -36,7 +36,7 @@ Highlights:
 - [Final considerations](#final-considerations)
 - [Appendix: Co-located templates in Angular via `.ng` files](#appendix-co-located-templates-in-angular-via-ng-files)
 - [Appendix: Binding prefix and modifier reference](#appendix-binding-prefix-and-modifier-reference)
-- [Appendix: Integrating decorator-based components](#appendix-integrating-decorator-based-components)
+- [Appendix: Consuming decorator-based classes](#appendix-consuming-decorator-based-classes)
 - [Appendix: Relevant GitHub issues](#appendix-relevant-github-issues)
 
 </details>
@@ -739,26 +739,25 @@ export const Counter = component({
 
 ## Final considerations
 
-### Concepts Impacted by These Changes
+### Concept mapping
 
 - `ng-content`: can be modeled with `fragments`,
-- `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): likely modeled with `fragments`,
-- structural directives: likely modeled with `fragments`,
-- `pipes`: can be modeled with derivations — derivations cover the same transform use case and also support DI,
-- `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers),
+- `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): can be modeled with `fragments`,
+- structural directives: can be modeled with `fragments`,
+- `pipes`: can be modeled with derivations or a component (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
-- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
+- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (proxy),
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
-- `template reference variables`: likely modeled with `ref`,
-- `queries`: likely modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
-- `component and directive injection`: the preferred interaction model is an explicit `ref` passed as an `input`. Nevertheless, with `ref`/`expose` in place, component and directive injection can be made safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of unintended coupling that `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`, `ref`);
+- `template reference variables`: can be modeled with `ref`,
+- `queries`: can be modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
+- `component and directive injection`: with `ref`/`expose` in place, component and directive injection can be made safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of unintended coupling that `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`, `ref`);
 - `interface conformance`: opt-in via `satisfies` on `bindings` and `expose` — the same structural check that `implements` provides for classes.
 
-### Notes
+### Scope and caveats
 
-- other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`) should probably remain. They are not covered here to avoid scope creep;
-- `providers` defined at `directive` level: they should probably stay for backward compatibility (@angular/aria), even if the resulting mental model can be difficult to follow;
+- other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
+- `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
@@ -900,24 +899,18 @@ Avoid `on` prefix in input / model / output names:
 
 ---
 
-## Appendix: Integrating decorator-based components
+## Appendix: Consuming decorator-based classes
 
 Existing decorator-based (`@Component`, `@Directive`, `@Pipe`) classes work in `.ng` files without wrappers or adapters.
 
 ### Components
 
-The class symbol is used directly as a tag — bindings follow the same `bind:` / `model:` / `on:` rules.
-
-- For named `ng-content` slots, `ngProjectAs` on native elements projects content into the correct slot — unknown element names are compile-time errors.
-- Where a decorator-based component expects an `ng-template` (via `@ContentChild(TemplateRef)` or a `TemplateRef` input), a `@fragment` takes its place.
-- For components with multiple element selectors (e.g. `button[mat-button], a[mat-button]`), the `:element` suffix disambiguates the host element — invalid element names are compile-time errors.
+The class symbol is used directly as a tag — bindings follow the same `bind:` / `model:` / `on:` rules. For components with multiple element selectors (e.g. `button[mat-button], a[mat-button]`), the `:element` suffix disambiguates the host element.
 
 ```ts
 import { component, signal } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatButton } from '@angular/material/button';
-import { MyCard } from '@mylib/card'; // decorator-based component
-import { MyList } from '@mylib/list'; // decorator-based component
 
 // Basic usage — class symbol as a tag
 export const Settings = component({
@@ -925,34 +918,9 @@ export const Settings = component({
     const darkMode = signal(false);
 
     return @{
-      <MatSlideToggle model:checked={darkMode}>
+      <MatSlideToggle checked={darkMode()} on:change={() => darkMode.update(v => !v)}>
         Dark mode
       </MatSlideToggle>
-    };
-  },
-});
-
-// ngProjectAs for named ng-content slots
-export const MyPage = component({
-  setup: () => @{
-    <MyCard>
-      <div ngProjectAs="my-card-header">header</div>
-      <div ngProjectAs="my-card-content">content</div>
-    </MyCard>
-  },
-});
-
-// @fragment replaces ng-template
-export const ListPage = component({
-  setup: () => {
-    const items = signal([{ id: '1', name: 'Item 1' }, { id: '2', name: 'Item 2' }]);
-
-    return @{
-      <MyList items={items()}>
-        @fragment itemTemplate(item: { id: string; name: string }) {
-          <span>{item.name}</span>
-        }
-      </MyList>
     };
   },
 });
@@ -973,7 +941,7 @@ export const Nav = component({
 
 ### Directives
 
-Directives are attached with `use:Class(...)` — inputs and outputs are listed explicitly inside the parentheses:
+Directives are attached with `use:Class(...)` — inputs and outputs are listed explicitly inside the parentheses. The `use:` syntax on decorator-based components adds the directive to the host element.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -1016,9 +984,46 @@ export const DraggableCard = component({
 });
 ```
 
+```ts
+import { component, ref } from '@angular/core';
+import { AccordionGroup, AccordionTrigger, AccordionPanel, AccordionContent } from '@angular/aria/accordion';
+
+export const AccordionExample = component({
+  setup: () => {
+    const panel1 = ref<AccordionPanel>();
+    const panel2 = ref<AccordionPanel>();
+
+    return @{
+      <div use:AccordionGroup(multiExpandable={true})>
+        <div class="accordion-item">
+          <h3>
+            <button use:AccordionTrigger(panel={panel1()!})>Item 1</button>
+          </h3>
+          <div use:AccordionPanel():ref={panel1}>
+            <ng-template use:AccordionContent()>
+              <p>Content for Item 1.</p>
+            </ng-template>
+          </div>
+        </div>
+        <div class="accordion-item">
+          <h3>
+            <button use:AccordionTrigger(panel={panel2()!})>Item 2</button>
+          </h3>
+          <div use:AccordionPanel():ref={panel2}>
+            <ng-template use:AccordionContent()>
+              <p>Content for Item 2.</p>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    };
+  },
+});
+```
+
 ### Pipes
 
-The template DSL has no pipe operator (`|`). Decorator-based pipes are consumed by wrapping them in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps):
+The template DSL has no pipe operator (`|`). Decorator-based pipes are consumed by wrapping them in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps). 
 
 ```ts
 import { component, derivation, computed, inject, input, LOCALE_ID } from '@angular/core';
@@ -1050,16 +1055,10 @@ export const EventList = component({
 
 Rules:
 
-- Components → the class is used as a tag (`<ClassName ... />`).
-- `ngProjectAs` projects native elements into named `ng-content` slots.
-- `@fragment` replaces `ng-template` for components expecting a `TemplateRef`.
-- `:element` suffix disambiguates multi-selector components (`<MatButton:a>`).
-- Directives → attached via `use:ClassName(input={expr} on:output={handler})`.
-- Structural directives → not supported; `@if`, `@for`, `@switch`, and fragments replace them.
+- Components → the class is used as a tag (`<ClassName ... />`). `:element` suffix disambiguates multi-selector components (`<MatButton:a>`).
+- Directives → attached via `use:ClassName(input={expr} on:output={handler})`. The `use:` syntax on decorator-based components adds the directive to the host element.
 - Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
-- The same binding prefixes (`bind:`, `model:`, `on:`, `once:`, `:when`, `:ref`) apply.
-- Type checking uses the class's declared inputs/outputs — invalid bindings are compile-time errors.
-
+- The same binding prefixes (`bind:`, `model:`, `on:`, `use:`, `:ref`) apply.
 
 ---
 
