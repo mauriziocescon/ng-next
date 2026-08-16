@@ -739,11 +739,11 @@ export const Counter = component({
 
 ## Final considerations
 
-### Concepts Impacted by These Changes
+### Concept mapping
 
 - `ng-content`: can be modeled with `fragments`,
-- `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): likely modeled with `fragments`,
-- structural directives: likely modeled with `fragments`,
+- `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): can be modeled with `fragments`,
+- structural directives: can be modeled with `fragments`,
 - `pipes`: can be modeled with derivations — derivations cover the same transform use case and also support DI,
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers),
 - `@let`: unchanged,
@@ -991,14 +991,14 @@ import { AccordionGroup, AccordionTrigger, AccordionPanel, AccordionContent } fr
 
 export const AccordionExample = component({
   setup: () => {
-    const panel1 = ref<typeof AccordionPanel>();
-    const panel2 = ref<typeof AccordionPanel>();
+    const panel1 = ref<AccordionPanel>();
+    const panel2 = ref<AccordionPanel>();
 
     return @{
       <div use:AccordionGroup(multiExpandable={true})>
         <div class="accordion-item">
           <h3>
-            <button use:AccordionTrigger(panel={panel1()})>Item 1</button>
+            <button use:AccordionTrigger(panel={panel1()!})>Item 1</button>
           </h3>
           <div use:AccordionPanel():ref={panel1}>
             <ng-template use:AccordionContent()>
@@ -1008,7 +1008,7 @@ export const AccordionExample = component({
         </div>
         <div class="accordion-item">
           <h3>
-            <button use:AccordionTrigger(panel={panel2()})>Item 2</button>
+            <button use:AccordionTrigger(panel={panel2()!})>Item 2</button>
           </h3>
           <div use:AccordionPanel():ref={panel2}>
             <ng-template use:AccordionContent()>
