@@ -750,12 +750,12 @@ export const Counter = component({
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
 - `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
-- `template reference variables`: likely modeled with `ref`,
-- `queries`: likely modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
-- `component and directive injection`: the preferred interaction model is an explicit `ref` passed as an `input`. Nevertheless, with `ref`/`expose` in place, component and directive injection can be made safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of unintended coupling that `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`, `ref`);
+- `template reference variables`: can be modeled with `ref`,
+- `queries`: can be modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
+- `component and directive injection`: with `ref`/`expose` in place, component and directive injection can be made safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of unintended coupling that `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`, `ref`);
 - `interface conformance`: opt-in via `satisfies` on `bindings` and `expose` — the same structural check that `implements` provides for classes.
 
-### Notes
+### Scope and caveats
 
 - other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`) should probably remain. They are not covered here to avoid scope creep;
 - `providers` defined at `directive` level: they should probably stay for backward compatibility (@angular/aria), even if the resulting mental model can be difficult to follow;
