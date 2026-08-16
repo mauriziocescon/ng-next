@@ -987,31 +987,31 @@ export const DraggableCard = component({
 
 ```ts
 import { component, ref } from '@angular/core';
-import { NgAccordionGroup, NgAccordionTrigger, NgAccordionPanel, NgAccordionContent } from '@angular/aria';
+import { AccordionGroup, AccordionTrigger, AccordionPanel, AccordionContent } from '@angular/aria/accordion';
 
 export const AccordionExample = component({
   setup: () => {
-    const panel1 = ref<typeof NgAccordionPanel>();
-    const panel2 = ref<typeof NgAccordionPanel>();
+    const panel1 = ref<typeof AccordionPanel>();
+    const panel2 = ref<typeof AccordionPanel>();
 
     return @{
-      <div use:NgAccordionGroup(multiExpandable={true})>
+      <div use:AccordionGroup(multiExpandable={true})>
         <div class="accordion-item">
           <h3>
-            <button use:NgAccordionTrigger(panel={panel1()})>Item 1</button>
+            <button use:AccordionTrigger(panel={panel1()})>Item 1</button>
           </h3>
-          <div use:NgAccordionPanel():ref={panel1}>
-            <ng-template use:NgAccordionContent()>
+          <div use:AccordionPanel():ref={panel1}>
+            <ng-template use:AccordionContent()>
               <p>Content for Item 1.</p>
             </ng-template>
           </div>
         </div>
         <div class="accordion-item">
           <h3>
-            <button use:NgAccordionTrigger(panel={panel2()})>Item 2</button>
+            <button use:AccordionTrigger(panel={panel2()})>Item 2</button>
           </h3>
-          <div use:NgAccordionPanel():ref={panel2}>
-            <ng-template use:NgAccordionContent()>
+          <div use:AccordionPanel():ref={panel2}>
+            <ng-template use:AccordionContent()>
               <p>Content for Item 2.</p>
             </ng-template>
           </div>
