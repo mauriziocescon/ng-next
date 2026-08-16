@@ -758,7 +758,7 @@ export const Counter = component({
 ### Notes
 
 - other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`) should probably remain. They are not covered here to avoid scope creep;
-- `providers` defined at `directive` level: the added value is unclear, and the resulting mental model can be difficult to follow; it is uncertain whether this concept remains meaningful;
+- `providers` defined at `directive` level: they should probably stay for backward compatibility (@angular/aria), even if the resulting mental model can be difficult to follow;
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
