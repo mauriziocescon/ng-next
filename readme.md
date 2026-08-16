@@ -744,7 +744,7 @@ export const Counter = component({
 - `ng-content`: can be modeled with `fragments`,
 - `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): can be modeled with `fragments`,
 - structural directives: can be modeled with `fragments`,
-- `pipes`: can be modeled with derivations or a component (since hostless),
+- `pipes`: can be modeled with derivations or components (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
 - `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (proxy),
