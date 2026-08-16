@@ -744,8 +744,7 @@ export const Counter = component({
 - `ng-content`: can be modeled with `fragments`,
 - `ng-template` (`let-*` shorthands + `ngTemplateGuard_*`): can be modeled with `fragments`,
 - structural directives: can be modeled with `fragments`,
-- `pipes`: can be modeled with derivations — derivations cover the same transform use case and also support DI,
-- `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers),
+- `pipes`: can be modeled with derivations or a component (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
 - `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
@@ -757,8 +756,8 @@ export const Counter = component({
 
 ### Scope and caveats
 
-- other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`) should probably remain. They are not covered here to avoid scope creep;
-- `providers` defined at `directive` level: they should probably stay for backward compatibility (@angular/aria), even if the resulting mental model can be difficult to follow;
+- other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
+- `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
