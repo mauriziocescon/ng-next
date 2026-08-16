@@ -747,7 +747,7 @@ export const Counter = component({
 - `pipes`: can be modeled with derivations or a component (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
-- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements,
+- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (proxy),
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
 - `template reference variables`: can be modeled with `ref`,
 - `queries`: can be modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
