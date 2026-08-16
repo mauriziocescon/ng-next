@@ -941,7 +941,7 @@ export const Nav = component({
 
 ### Directives
 
-Directives are attached with use:Class(...) — inputs and outputs are listed explicitly inside the parentheses. The use: syntax on decorator-based components adds the directive to the host element.
+Directives are attached with `use:Class(...)` — inputs and outputs are listed explicitly inside the parentheses. The `use:` syntax on decorator-based components adds the directive to the host element.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -1058,7 +1058,7 @@ Rules:
 - Components → the class is used as a tag (`<ClassName ... />`). `:element` suffix disambiguates multi-selector components (`<MatButton:a>`).
 - Directives → attached via `use:ClassName(input={expr} on:output={handler})`. The `use:` syntax on decorator-based components adds the directive to the host element.
 - Pipes → wrapped in a `derivation`, instantiated with `new` inside `setup` (injection context resolves constructor deps).
-- The same binding prefixes (`bind:`, `model:`, `on:`, `:use`, `:ref`) apply.
+- The same binding prefixes (`bind:`, `model:`, `on:`, `use:`, `:ref`) apply.
 
 ---
 
