@@ -906,11 +906,7 @@ Existing decorator-based (`@Component`, `@Directive`, `@Pipe`) classes work in `
 
 ### Components
 
-The class symbol is used directly as a tag — bindings follow the same `bind:` / `model:` / `on:` rules.
-
-- For named `ng-content` slots, `ngProjectAs` on native elements projects content into the correct slot — unknown element names are compile-time errors.
-- Where a decorator-based component expects an `ng-template` (via `@ContentChild(TemplateRef)` or a `TemplateRef` input), a `@fragment` takes its place.
-- For components with multiple element selectors (e.g. `button[mat-button], a[mat-button]`), the `:element` suffix disambiguates the host element — invalid element names are compile-time errors.
+The class symbol is used directly as a tag — bindings follow the same `bind:` / `model:` / `on:` rules. For components with multiple element selectors (e.g. `button[mat-button], a[mat-button]`), the `:element` suffix disambiguates the host element.
 
 ```ts
 import { component, signal } from '@angular/core';
