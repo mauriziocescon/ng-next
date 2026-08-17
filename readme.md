@@ -17,7 +17,7 @@ Highlights:
 6. Expose and Template Refs,
 7. Composition with Fragments, Directives, and Forwarding,
 8. Dependency Injection Enhancements,
-9. Final considerations (`!important`) + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
+9. Final considerations + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
 **Template syntax note**: template markup is written inside a `@{ }` markup literal (the `@` marks the TypeScript→DSL boundary). It supports Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
 

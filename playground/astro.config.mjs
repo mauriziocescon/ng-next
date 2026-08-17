@@ -29,8 +29,8 @@ function llmsTxt() {
     { anchor: 'final-considerations', desc: 'Concepts impacted (ng-content, ng-template, structural directives, pipes, queries, etc.); pros and cons of the approach.' },
     { anchor: 'appendix-co-located-templates-in-angular-via-ng-files', desc: 'Rationale for `*.ng` files; co-location benefits; boilerplate tax trade-off analysis.' },
     { anchor: 'appendix-binding-prefix-and-modifier-reference', desc: 'Canonical list of every prefix/modifier (`bind:`, `model:`, `on:`, `once:`, `class:`, `style:`, `animate:`, `use:`, `:when`, `:ref`, `ref`, `@forward()`).' },
-    { anchor: 'appendix-integrating-decorator-based-components', desc: 'Using existing `@Component`/`@Directive`/`@Pipe` classes in `.ng` files; `ngProjectAs`, `@fragment` for `ng-template`, `:element` suffix, pipe-to-derivation wrapping.' },
     { anchor: 'appendix-relevant-github-issues', desc: 'Well-known community requests related to these proposals.' },
+    { anchor: 'appendix-consuming-decorator-based-classes-sketch', desc: 'Consuming existing `@Component`/`@Directive`/`@Pipe` classes in `.ng` files; `:element` suffix for multi-selector components, `use:ClassName(...)` for directives, pipe-to-derivation wrapping.' },
   ];
 
   const tocTitles = [
@@ -46,8 +46,8 @@ function llmsTxt() {
     'Final considerations',
     'Appendix: Co-located templates in Angular via `.ng` files',
     'Appendix: Binding prefix and modifier reference',
-    'Appendix: Integrating decorator-based components',
     'Appendix: Relevant GitHub issues',
+    'Appendix: Consuming decorator-based classes (sketch)',
   ];
 
   return {
@@ -70,7 +70,7 @@ function llmsTxt() {
           'Highlights:',
           '',
           '1. Building blocks as functions:',
-          '   - `*.ng` files with template DSL,',
+          '   - `*.ng` files with template DSL (see appendix),',
           '   - `component`: a `setup` with scoped logic that returns a `template` or `{ template, expose }`,',
           '   - `directive`: a `setup` that can change the appearance or behavior of DOM elements,',
           '   - `derivation`: a factory for template-scoped computed values that requires DI,',
