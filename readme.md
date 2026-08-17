@@ -756,6 +756,7 @@ export const Counter = component({
 
 ### Scope and caveats
 
+- `interoperability layer`: the full incremental migration story (mixed projects, build boundaries) is not covered intentionally — the topic is important but requires many micro-decisions that depend on compiler architecture choices out of scope for this proposal;
 - other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
