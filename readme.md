@@ -905,15 +905,16 @@ Avoid `on` prefix in input / model / output names:
 This is not an exhaustive list. These are well-known community requests that are related — directly or indirectly — to the proposals in this document.
 
 - Hostless components — `https://github.com/angular/angular/issues/18877`
-- Allow constants, enums, functions in templates — `https://github.com/angular/angular/issues/25963`
+- Allow constants, enums, functions in templates (canonical) — `https://github.com/angular/angular/issues/25963`
 - Support Input/Output spread — `https://github.com/angular/angular/issues/14545`
 - Define generic of ng-template — `https://github.com/angular/angular/issues/28731`
 - One-time bindings — `https://github.com/angular/angular/issues/14033`
 - Localized compilation — `https://github.com/angular/angular/issues/43165`
-- Template expressions should be plain TypeScript — `https://github.com/angular/angular/issues/43485`
+- Template expressions should be plain TypeScript (canonical) — `https://github.com/angular/angular/issues/43485`
+- Unexpected behavior related to selector matching (canonical) — `https://github.com/angular/angular/issues/47085`
 - Content projection (canonical) — `https://github.com/angular/angular/issues/64504`
 - Transparent wrapper components — `https://github.com/angular/angular/issues/41993`
-- Pipes in a signal world / template-defined computed — `https://github.com/angular/angular/issues/61501`
+- Pipes in a signal world / template-defined computed (canonical) — `https://github.com/angular/angular/issues/61501`
 - Compiler gaps with attribute selectors — `https://github.com/angular/angular/issues/46351`
 - Detect dangling/unknown attributes on elements — `https://github.com/angular/angular/issues/3425`
 - Undefined outputs not reported in templates — `https://github.com/angular/angular/issues/43603`
