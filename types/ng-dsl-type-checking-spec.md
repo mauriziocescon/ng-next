@@ -903,6 +903,11 @@ Optional: if options.injector present:
 When `expr` is `undefined`, nothing is rendered (no-op).
 This supports `@render(optionalFragment?.())` directly.
 
+**Injector resolution.** `@render` is an inline outlet: providers inside the rendered
+fragment resolve against the **render site's** injector, not the definition site's.
+When `options.injector` is provided it overrides this default; when omitted the
+enclosing component's injector at the `@render` call site is used.
+
 ---
 
 ## 11. @let
