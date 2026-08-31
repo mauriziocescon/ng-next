@@ -305,14 +305,15 @@ export const Consumer = component({
 Inputs hoisted to the component level for use in provider initialization (`providers` receives only inputs — not models or outputs). Provider factories run in an injection context — `inject()` works inside them:
 
 ```ts
-import { component, linkedSignal, input, WritableSignal, provide, inject } from '@angular/core';
+import { component, linkedSignal, input, WritableSignal, Signal, provide, inject } from '@angular/core';
 
 class CounterStore {
   private readonly counter: WritableSignal<number>;
-  readonly value = this.counter.asReadonly();
+  readonly value: Signal<number>;
 
   constructor(c = () => 0) {
     this.counter = linkedSignal(() => c());
+    this.value = this.counter.asReadonly();
   }
 
   decrease() {/** ... **/}
@@ -412,7 +413,9 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Forwarding has two component APIs and one marker: `component.proxy<T>()` exposes a directive-compatible native surface, `component.wrap(Target)` forwards a wrapped component's remaining API, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings/directive instructions.
+Forwarding has two component APIs and one marker: `component.proxy<T>()(config)` exposes a directive-compatible native surface, `component.wrap(Target, config)` forwards a wrapped component's remaining API, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings/directive instructions.
+
+`component.proxy` applies its surface type in a separate call so that `T` stays explicit while `bindings`, `expose`, and the template type are inferred from `config` — TypeScript does not infer the remaining type arguments of a partially-specified list.
 
 ### Implicit children fragment
 
@@ -550,7 +553,7 @@ export const Consumer = component({
 // -- button in @mylib/button --------------------
 import { component, input, output, computed, fragment } from '@angular/core';
 
-export const Button = component.proxy<HTMLButtonElement>({
+export const Button = component.proxy<HTMLButtonElement>()({
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -628,7 +631,7 @@ export interface User {
   role: string;
 }
 
-export const Target = component.proxy<HTMLDivElement>({
+export const Target = component.proxy<HTMLDivElement>()({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -730,7 +733,7 @@ export const Counter = component({
     provide(multiToken),                    // shorthand
     provide(multiToken),                    // multiple contributions
     provide(multiToken, () => 10),          // explicit factory override
-    provide(multiToken, () => initialValue()),
+    provide(multiToken, () => initialValue() ?? 0),
     provide(otherCompToken, () => ''),      // no factory on token — explicit required
     provide(Store, () => new Store()),      // class
   ],

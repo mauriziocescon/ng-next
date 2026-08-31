@@ -203,8 +203,8 @@ type UserDetailBindings = {
   children: OptionalFragmentBinding<void>;
 };
 
-// TS-only spec: spell out bindings after the explicit proxy surface generic.
-const UserDetail = component.proxy<HTMLElement, UserDetailBindings>({
+// Surface-first call: S is explicit, bindings are inferred from the object.
+const UserDetail = component.proxy<HTMLElement>()({
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -221,6 +221,18 @@ const UserDetail = component.proxy<HTMLElement, UserDetailBindings>({
     return tmpl;
   },
 });
+
+// The bindings record is inferred from the object, not hand-written: the
+// UserDetailBindings alias (reused by the §20 diagnostic contracts) must stay
+// in sync with what component.proxy actually infers.
+type _UserDetailBindingsInferred = Assert<
+  IsEqual<
+    typeof UserDetail extends ComponentInstance<infer B, any, any, any>
+      ? B
+      : never,
+    UserDetailBindings
+  >
+>;
 
 // fragment.required: children must be present in setup
 const RequiredChildren = component({
@@ -344,6 +356,54 @@ const RenderArrayPayloadFragment = component({
   },
 });
 
+// input<T>() vs input<T>(default): supplying a default removes undefined from
+// the signal type. This is the distinction that decides what a provider factory
+// closing over the input is allowed to return (see §7).
+const InputDefaults = component({
+  bindings: {
+    req: input.required<string>(),
+    optional: input<'info' | 'warn'>(),
+    defaulted: input<'info' | 'warn'>('info'),
+  },
+  setup: ({ req, optional, defaulted }) => {
+    const _r: string = req();
+    const _o: 'info' | 'warn' | undefined = optional();
+    const _d: 'info' | 'warn' = defaulted();
+    // @ts-expect-error an input without a default may be undefined
+    const _oNarrowed: 'info' | 'warn' = optional();
+    return tmpl;
+  },
+});
+
+// Optional *parameterized* fragment: undefined in setup, and still requires its
+// declared arguments once narrowed. Mirrors the readme's DataTable rowTemplate.
+interface Row {
+  id: string;
+}
+
+const DataTable = component({
+  bindings: {
+    rows: input.required<Row[]>(),
+    selected: model<Row | null>(),
+    sort: output<{ key: string }>(),
+    rowTemplate: fragment<[Row]>(),
+  },
+  setup: ({ rows, selected, sort, rowTemplate }) => {
+    const _rows: Row[] = rows();
+    const _sel: Row | null | undefined = selected();
+    sort.emit({ key: 'id' });
+
+    const _frag: OptionalFragmentBinding<[Row]> | undefined = rowTemplate;
+    const _args: Assert<
+      IsEqual<Parameters<NonNullable<typeof rowTemplate>>, [Row]>
+    > = true;
+    const _rendered: TemplateMarkup | undefined = rowTemplate?.(rows()[0]);
+    // @ts-expect-error optional parameterized fragment still requires its argument
+    rowTemplate?.();
+    return tmpl;
+  },
+});
+
 // ────────────────────────────────────────────────────────────────
 // 6. COMPONENT — bindings aliasing (TS destructuring in setup)
 //
@@ -417,6 +477,40 @@ const Counter = component({
     const _cInput: InputSignal<number> = c;
     return [provide(Store, () => new Store())];
   },
+});
+
+// A provider factory may close over an input and pass the InputSignal itself
+// as a () => T getter (the readme's input-driven CounterStore).
+class CounterStore {
+  readonly value: Signal<number>;
+
+  constructor(initial: () => number) {
+    this.value = computed(() => initial());
+  }
+}
+
+const CounterWithStore = component({
+  bindings: {
+    c: input.required<number>(),
+  },
+  setup: () => tmpl,
+  providers: ({ c }) => [provide(CounterStore, () => new CounterStore(c))],
+});
+
+// An input without a default reads as T | undefined, so it is not assignable
+// where the factory must return T. Documented examples have hit this.
+const seedToken = injectionToken.multi({ factory: () => 0 });
+
+const SeededFromInput = component({
+  bindings: {
+    initialValue: input<number>(),
+  },
+  setup: () => tmpl,
+  providers: ({ initialValue }) => [
+    // @ts-expect-error input<number>() reads as number | undefined; factory must return number
+    provide(seedToken, () => initialValue()),
+    provide(seedToken, () => initialValue() ?? 0),
+  ],
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -543,6 +637,17 @@ const highlight = directive({
 const highlightRef = ref<typeof highlight>();
 const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
 
+// Zero-parameter setup returning expose: neither bindings nor host are needed
+// in the body, and the expose still flows through ref (readme's tooltip sketch).
+const toggleOnly = directive({
+  host: ref<HTMLElement>(),
+  setup: () => ({ toggle: () => {} }),
+});
+
+const toggleOnlyRef = ref<typeof toggleOnly>();
+const _toggleOnlyRefType: Ref<{ toggle: () => void } | undefined> =
+  toggleOnlyRef;
+
 // Directive accepts fragment bindings (TemplateRef-style use cases)
 const directiveWithFragment = directive({
   host: ref<HTMLElement>(),
@@ -627,12 +732,12 @@ const Sibling = component({
 // 11. COMPONENT — proxy, directive forwarding surface
 // ────────────────────────────────────────────────────────────────
 
-const _NegProxyRequiresExplicitSurface = component.proxy({
-  // @ts-expect-error component.proxy requires an explicit proxy surface type
+// @ts-expect-error component.proxy requires an explicit proxy surface type
+const _NegProxyRequiresExplicitSurface = component.proxy()({
   setup: () => tmpl,
 });
 
-const ButtonProxy = component.proxy<HTMLButtonElement>({
+const ButtonProxy = component.proxy<HTMLButtonElement>()({
   setup: () => tmpl,
 });
 type _ButtonProxyType = Assert<
@@ -642,15 +747,78 @@ type _ButtonProxyType = Assert<
   >
 >;
 
+// Proxy WITH bindings: the surface is explicit while B, E and TMarkup are all
+// inferred from config. Mirrors the readme's Button (proxying directives to an
+// internal element), including class/style binding names aliased in setup.
+const ButtonWithBindings = component.proxy<HTMLButtonElement>()({
+  bindings: {
+    type: input<'button' | 'submit' | 'reset'>('button'),
+    class: input<string>(''),
+    style: input<string>(''),
+    disabled: input<boolean>(false),
+    click: output<void>(),
+    children: fragment.required<void>(),
+  },
+  setup: ({ type, class: className, style, disabled, click, children }) => {
+    const _t: 'button' | 'submit' | 'reset' = type();
+    const _c: string = className();
+    const _s: string = style();
+    const _d: boolean = disabled();
+    const _rendered: TemplateMarkup = children();
+    click.emit();
+    return specificTmpl;
+  },
+  providers: (inputs) => {
+    const _type: InputSignal<'button' | 'submit' | 'reset'> = inputs.type;
+    // @ts-expect-error click is an output, excluded from providers
+    inputs.click;
+    // @ts-expect-error children is a fragment, excluded from providers
+    inputs.children;
+    return [];
+  },
+});
+
+// The bindings record is inferred from the object — never hand-written.
+type _ButtonWithBindingsInferred = Assert<
+  IsEqual<
+    typeof ButtonWithBindings extends ComponentInstance<infer B, any, any, any>
+      ? B
+      : never,
+    {
+      type: InputSignal<'button' | 'submit' | 'reset'>;
+      class: InputSignal<string>;
+      style: InputSignal<string>;
+      disabled: InputSignal<boolean>;
+      click: OutputEmitterRef<void>;
+      children: RequiredFragmentBinding<void>;
+    }
+  >
+>;
+
+// TemplateMarkup<TAst> survives the surface-first call. RESOLVED-FORWARD-HOSTS
+// reads T(C) to locate the single @forward() placement, so a proxy component is
+// precisely the case that must not lose its template AST.
+type _ProxyKeepsTemplateAst = Assert<
+  IsEqual<
+    TemplateAstOf<ComponentTemplateOf<typeof ButtonWithBindings>>,
+    SpecificTemplateAST
+  >
+>;
+
 // @ts-expect-error proxy surface must be an HTMLElement subtype
-const _NegInvalidProxySurface = component.proxy<string>({
+const _NegInvalidProxySurface = component.proxy<string>()({
   setup: () => tmpl,
 });
 
-const _NegProxyMetadataInSetup = component.proxy<
-  HTMLElement,
-  { label: InputSignal<string | undefined> }
->({
+// The surface is applied by the outer call only — the old single-call form
+// took bindings as a second type argument and could not infer them.
+type LabelBindings = { label: InputSignal<string | undefined> };
+// @ts-expect-error component.proxy takes only the surface type argument
+const _NegProxyTwoTypeArguments = component.proxy<HTMLElement, LabelBindings>()({
+  setup: () => tmpl,
+});
+
+const _NegProxyMetadataInSetup = component.proxy<HTMLElement>()({
   bindings: {
     label: input<string>(),
   },
@@ -663,13 +831,13 @@ const _NegProxyMetadataInSetup = component.proxy<
 
 const _NegComponentAsProxySurface = (
   // @ts-expect-error component instances are not valid proxy surface types
-  component.proxy<typeof UserDetail>({
+  component.proxy<typeof UserDetail>()({
     setup: () => tmpl,
   })
 );
 
 // @ts-expect-error directive instances are not valid proxy surface types
-const _NegDirectiveAsProxySurface = component.proxy<typeof tooltip>({
+const _NegDirectiveAsProxySurface = component.proxy<typeof tooltip>()({
   setup: () => tmpl,
 });
 
@@ -827,7 +995,7 @@ type _ProxyWrapperPreservesHost = Assert<
   >
 >;
 
-const InputProxy = component.proxy<HTMLInputElement>({
+const InputProxy = component.proxy<HTMLInputElement>()({
   setup: () => tmpl,
 });
 const InputProxyWrapper = component.wrap(InputProxy, {

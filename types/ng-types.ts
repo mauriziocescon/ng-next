@@ -381,19 +381,25 @@ export function refMany(): any {
 // component(...) declares a normal component. `bindings` is the public API;
 // setup receives those binding objects; providers receive inputs only.
 //
-// component.proxy<S>(...) declares a public directive-compatible surface.
-// S is explicit, must extend HTMLElement, and is realized by one or more
-// compatible native @forward() placements in the template.
+// component.proxy<S>()(...) declares a public directive-compatible surface.
+// S is explicit, must extend HTMLElement, and is realized by exactly one
+// compatible native @forward() placement in the template (D031 on multiple).
+//
+// The call is deliberately split in two. TypeScript does not infer the
+// remaining type arguments of a partially-specified list, so a single-call
+// proxy<S>(config) would silently drop B, E and TMarkup to their defaults —
+// rejecting `bindings` and typing setup's parameters as `any`. Applying S
+// first keeps it explicit while everything else is inferred from config.
 //
 // component.wrap(Target, ...) declares a wrapper around Target. Selected
-// bindings go to setup; the target remainder is placed on wrapped target
-// placement(s) by @forward(). If Target has a proxy surface, the wrapper
-// inherits that surface and can pass directives through the same @forward()
-// chain. A non-proxy target cannot receive forwarded directives.
+// bindings go to setup; the target remainder is placed on the single wrapped
+// target placement marked by @forward(). If Target has a proxy surface, the
+// wrapper inherits that surface and can pass directives through the same
+// @forward() chain. A non-proxy target cannot receive forwarded directives.
 //
 // @forward() is marker-only: no runtime forwarding object, no spread. The
-// enclosing component API defines the payload; marked nodes define where it
-// lands. Explicit bindings on a wrapped target override forwarded ones.
+// enclosing component API defines the payload; the marked node defines where
+// it lands. Explicit bindings on a wrapped target override forwarded ones.
 // ────────────────────────────────────────────────────────────────
 
 type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
@@ -434,44 +440,43 @@ export function component(config: any): any {
 
 // Component namespace helpers
 export namespace component {
-  export declare function proxy<
-    S extends HTMLElement = never,
-    B extends Record<string, ComponentBindingValue> = never,
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    config: [S] extends [never]
-      ? {
-          __proxy_surface_error__:
-            'component.proxy requires an explicit HTMLElement surface type';
-        }
-      : {
-          bindings: B & ValidateComponentBindings<B>;
-          setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
-          providers?: (inputs: InputsOnly<B>) => Provider[];
-          style?: string;
-          styleUrl?: string;
-        },
-  ): ComponentInstance<B, E, S, TMarkup>;
+  // Surface-first: S is applied by the outer call and stays explicit, so the
+  // inner call can infer B, E and TMarkup from config. A single-call form
+  // cannot do both — see the section note above.
+  export declare function proxy<S extends HTMLElement = never>(): [S] extends [
+    never,
+  ]
+    ? {
+        __proxy_surface_error__:
+          'component.proxy requires an explicit HTMLElement surface type';
+      }
+    : {
+        // With bindings
+        <
+          B extends Record<string, ComponentBindingValue>,
+          E = void,
+          TMarkup extends TemplateMarkup = TemplateMarkup,
+        >(
+          config: {
+            bindings: B & ValidateComponentBindings<B>;
+            setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
+            providers?: (inputs: InputsOnly<B>) => Provider[];
+            style?: string;
+            styleUrl?: string;
+          },
+        ): ComponentInstance<B, E, S, TMarkup>;
 
-  export declare function proxy<
-    S extends HTMLElement = never,
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    config: [S] extends [never]
-      ? {
-          __proxy_surface_error__:
-            'component.proxy requires an explicit HTMLElement surface type';
-        }
-      : {
-          bindings?: never;
-          setup: () => SetupReturn<E, TMarkup>;
-          providers?: () => Provider[];
-          style?: string;
-          styleUrl?: string;
-        },
-  ): ComponentInstance<{}, E, S, TMarkup>;
+        // No bindings
+        <E = void, TMarkup extends TemplateMarkup = TemplateMarkup>(
+          config: {
+            bindings?: never;
+            setup: () => SetupReturn<E, TMarkup>;
+            providers?: () => Provider[];
+            style?: string;
+            styleUrl?: string;
+          },
+        ): ComponentInstance<{}, E, S, TMarkup>;
+      };
 
   // With bindings (selected subset of target bindings)
   export declare function wrap<
@@ -529,7 +534,7 @@ export namespace component {
   >;
 }
 
-(component as any).proxy = (config: any) => config;
+(component as any).proxy = () => (config: any) => config;
 (component as any).wrap = (_target: any, config: any) => config;
 
 // ────────────────────────────────────────────────────────────────

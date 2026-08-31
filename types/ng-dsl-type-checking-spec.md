@@ -613,9 +613,16 @@ if "ref" ∈ keys(B) (component only):  → D005
 
 PROXY-SURFACE
 ─────────────────────────────────────────────────────────────────
-component.proxy<S>(config)
+component.proxy<S>()(config)
 S ⊑ HTMLElement    S must be explicit
+B, E, M are inferred from config
 result : ComponentInstance<B, E, S, M>
+
+Surface-first: S is applied by the outer call so that it stays explicit while
+B, E and M are inferred by the inner call. A single-call component.proxy<S>(config)
+is not viable — TypeScript does not infer the remaining type arguments of a
+partially-specified list, so B, E and M would fall back to their defaults,
+rejecting `bindings` and typing setup's parameters as `any`.
 
 
 WRAPPER-SELECTION
@@ -670,7 +677,7 @@ native hosts via RESOLVED-FORWARD-HOSTS.
 ```
 FORWARD-PROXY
 ─────────────────────────────────────────────────────────────────
-Enclosing component declared by component.proxy<S>(...)
+Enclosing component declared by component.proxy<S>()(...)
 Exactly one native element with @forward() must exist → D031 on multiple
 H = I(tag of that element)
 H ⊑ S → D026 on failure
@@ -708,7 +715,7 @@ RESOLVED-FORWARD-HOSTS
 Native element N:
   RESOLVED-FORWARD-HOSTS(N) = {N}
 
-component.proxy<S>(...) C:
+component.proxy<S>()(...) C:
   target = the single @forward() placement in T(C)
   I(tag(target)) ⊑ S
   RESOLVED-FORWARD-HOSTS(C) = {target}
@@ -1021,6 +1028,9 @@ const Broken = component({
 // D004 — children is not a fragment
 bindings: { children: input<string>() } // ❌ D004
 
+// D005 — reserved `ref` binding declared on a component
+bindings: { ref: input<string>() } // ❌ D005
+
 // D006 — providers reads non-input
 providers: (inputs) => { inputs.selected; return []; } // ❌ D006
 
@@ -1095,7 +1105,7 @@ bindings: { onSubmit: output<void>() } // ⚠️ D020
 <button use:tooltip(message={'A'}) use:tooltip(message={'B'})>X</button> // ❌ D023
 
 // D023 — via proxy forwarding
-const Button = component.proxy<HTMLButtonElement>({
+const Button = component.proxy<HTMLButtonElement>()({
   setup: () => @{ <button @forward() use:tooltip(message={'Internal'})>X</button> },
 });
 <Button use:tooltip(message={'External'}) /> // ❌ D023: collides on resolved host
@@ -1110,7 +1120,7 @@ const Broken = component.wrap(UserDetail, {
 });
 
 // D026 — @forward() type mismatch
-const Button = component.proxy<HTMLButtonElement>({
+const Button = component.proxy<HTMLButtonElement>()({
   setup: () => @{ <span @forward()>X</span> }, // ❌ D026: HTMLSpanElement ⊄ HTMLButtonElement
 });
 
@@ -1120,15 +1130,26 @@ component.wrap(Target, { bindings: { save: input<void>() } })     // ❌ D028
 component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ D029
 
 // D030 — proxy component missing @forward()
-const Button = component.proxy<HTMLButtonElement>({
+const Button = component.proxy<HTMLButtonElement>()({
   setup: () => @{ <span>no forward</span> }, // ❌ D030
 });
 
 // D031 — multiple @forward() placements
-const SplitPanel = component.proxy<HTMLDivElement>({
+const SplitPanel = component.proxy<HTMLDivElement>()({
   setup: () => @{
     <div @forward()>Left</div>
     <div @forward()>Right</div>  // ❌ D031
+  },
+});
+
+// D032 — @forward() placement cannot consume the enclosing payload.
+// A wrapper's payload targets Target; a native element cannot receive it.
+const Wrapper = component.wrap(Target, {
+  bindings: { user: input.required<User>() },
+  setup: ({ user }) => @{
+    <div @forward()>            // ❌ D032: expected @forward() on <Target />
+      <Target user={user()} />
+    </div>
   },
 });
 
