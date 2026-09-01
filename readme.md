@@ -866,7 +866,7 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `bind:` | native elements, components | No (per property) | One-way property binding. Can be omitted (`prop={expr}` is shorthand for `bind:prop={expr}`). |
 | `model:` | native elements, components | No (per property) | Two-way binding. On native elements: `<input>`, `<select>`, `<textarea>`. On components: binds to a `model()` binding. |
 | `on:` | native elements, components | No (per event) | Event listener. On native elements: DOM events. On components: binds to an `output()` binding. |
-| `once:` | inputs only | No (per property) | Freezes the input value at creation time; never updated afterwards. `once:model:*` and `once:on:*` are compile-time errors. |
+| `once:` | inputs only — component, directive (`use:dir(once:x={...})`) and derivation (`@derive`) inputs alike | No (per property) | Freezes the input value at creation time; never updated afterwards. `once:model:*` and `once:on:*` are compile-time errors. |
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
@@ -898,7 +898,12 @@ Invalid bindings on components:
 
 Avoid `on` prefix in input / model / output names:
 
-- `<UserDetail onInput={...} model:onModel={...} on:onEvent={...} />`
+```ts
+bindings: {
+  onSubmit: output<void>(),   // ⚠️ prefer `submit`
+  onValue: input<string>(),   // ⚠️ prefer `value`
+}
+```
 
 
 ---

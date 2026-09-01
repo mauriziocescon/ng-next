@@ -197,8 +197,8 @@ directives (§7), and derivations (§9).
 CHECK-INPUT(Γ, B, input)
 ─────────────────────────────────────────────────
 input.name ∈ keys(B)
-B[input.name] : InputSignal<T>
-Γ ⊢ input.value : U    U ⊑ T
+B[input.name] : InputSignal<T>                        → D010 if absent
+Γ ⊢ input.value : U    U ⊑ T                          → D015 on mismatch
 ─────────────────────────────────────────────────
 ```
 
@@ -208,8 +208,8 @@ B[input.name] : InputSignal<T>
 CHECK-MODEL(Γ, B, model)
 ─────────────────────────────────────────────────
 model.name ∈ keys(B)
-B[model.name] : ModelSignal<T>
-Γ ⊢ model.value : WritableSignal<T>
+B[model.name] : ModelSignal<T>                        → D010 if absent
+Γ ⊢ model.value : WritableSignal<T>                   → D016 if not writable
 ─────────────────────────────────────────────────
 ```
 
@@ -271,6 +271,8 @@ NO-UNKNOWN-BINDINGS(B, node)
 ∀ model ∈ node.models:     model.name ∈ keys(B)
 ∀ output ∈ node.outputs:   output.name ∈ keys(B)
 ∀ frag ∈ node.fragments:   frag.name ∈ keys(B)
+
+Violation → D009 (native element), D010 (component)
 ─────────────────────────────────────────────────
 ```
 
@@ -279,10 +281,12 @@ NO-UNKNOWN-BINDINGS(B, node)
 ```
 NO-DUPLICATE-BINDINGS(node)
 ─────────────────────────────────────────────────
+∀ name: |{a ∈ attributes | a.name = name}| ≤ 1
 ∀ name: |{b ∈ inputs ∪ models | b.name = name}| ≤ 1
 ∀ name: |{b ∈ outputs | b.name = name}| ≤ 1
 ∀ name: |{b ∈ fragments | b.name = name}| ≤ 1
 |references| ≤ 1
+Violation → D011
 classes: repeatable (multiple class:name allowed per element)
 styles: repeatable (multiple style:prop allowed per element)
 animate: uses ANIMATE-CONSTRAINTS (§4.2)
@@ -292,7 +296,7 @@ use: uniqueness per DIRECTIVE-SET-UNIQUENESS (§7.1)
 
 NO-STATIC-DYNAMIC-CLASH(node)
 ─────────────────────────────────────────────────
-∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}
+∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}     → D012
 
 classes and styles may coexist with a static attribute or
 dynamic binding for the same base name on native elements.
@@ -307,6 +311,7 @@ CHECK-REF(Γ, E, ref)
 ref.target.name = x
 if E = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<[]> ∈ Γ
 else:         x : Ref<E | undefined> ∈ Γ  ∨  x : Ref<E[]> ∈ Γ
+Violation → D037
 ─────────────────────────────────────────────────
 ```
 
@@ -330,6 +335,10 @@ once:on:*     → D018
 once:prop + prop on same target → D019
 ─────────────────────────────────────────────────
 ```
+
+Note: D018 is a parse-time diagnostic. `BoundModelNode` and `BoundEventNode`
+carry no `once` field, so the combination is rejected before the tree reaches
+the type checker.
 
 ### 3.10 on-Prefix Warning
 
@@ -362,10 +371,12 @@ tag ∈ IntrinsicElements    H = I(tag)
 ∀ output ∈ node.outputs:        CHECK-NATIVE-OUTPUT(Γ, H, output)
 ∀ model ∈ node.models:          CHECK-NATIVE-MODEL(Γ, H, model)
 ∀ cls ∈ node.classes:           CLASS-BINDING(Γ, cls)
-∀ sty ∈ node.styles:           STYLE-BINDING(Γ, sty)
+∀ sty ∈ node.styles:            STYLE-BINDING(Γ, sty)
 ∀ anim ∈ node.animations:       CHECK-ANIMATE-BINDING(Γ, anim)
 ∀ dir ∈ node.directives:        CHECK-DIRECTIVE-USE(Γ, H, {node}, dir)
 ∀ ref ∈ node.references:        CHECK-REF(Γ, H, ref)
+node.fragments = []             (a native tag has no binding surface
+                                 to deliver a fragment to)      → D034
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
 ─────────────────────────────────────────────────────────────────
@@ -380,12 +391,13 @@ CHECK-NATIVE-TEXT-ATTR
 ─────────────────────────────────────────────────
 attr.name ∈ Attrs(H)
   ∨ (attr.name ∈ Props(H) ∧ string ⊑ Props(H)[attr.name])
+                                                       → D009 on failure
 
 
 CHECK-NATIVE-INPUT
 ─────────────────────────────────────────────────
-input.name ∈ Props(H)    Props(H)[input.name] = T
-Γ ⊢ input.value : U     U ⊑ T
+input.name ∈ Props(H)    Props(H)[input.name] = T      → D009 if absent
+Γ ⊢ input.value : U     U ⊑ T                          → D015 on mismatch
 
 
 CHECK-NATIVE-OUTPUT
@@ -397,8 +409,8 @@ U ⊑ ((e: T) → void)    (same arity-safe rule as §3.3)
 
 CHECK-NATIVE-MODEL
 ─────────────────────────────────────────────────
-tag ∈ {"input", "select", "textarea"}
-model.name ∈ ModelableProps(H)
+tag ∈ {"input", "select", "textarea"}                  → D017 otherwise
+model.name ∈ ModelableProps(H)                         → D009 if absent
 ModelableProps(H)[model.name] = T
 Γ ⊢ model.value : WritableSignal<T>
 ```
@@ -425,13 +437,13 @@ style:prop={expr}    Γ ⊢ expr : string | number | null
 ANIMATE-CLASS-BINDING
 ─────────────────────────────────────────────────
 animate:phase={expr}   where phase ∈ {"enter", "leave"}
-Γ ⊢ expr : string | string[]
+Γ ⊢ expr : string | string[]                           → D044 on mismatch
 
 
 ANIMATE-EVENT-BINDING
 ─────────────────────────────────────────────────
 on:animate:phase={handler}   where phase ∈ {"enter", "leave"}
-Γ ⊢ handler : (event: AnimationCallbackEvent) => void
+Γ ⊢ handler : (event: AnimationCallbackEvent) => void   → D045 on mismatch
 
 AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction; }
 
@@ -439,9 +451,10 @@ AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction; }
 ANIMATE-CONSTRAINTS
 ─────────────────────────────────────────────────
 - applies ONLY to native elements (not components → D040)
-- phase must be "enter" or "leave" → D041
-- at most one animate:enter and one animate:leave (class form) per element
-- at most one on:animate:enter and one on:animate:leave per element
+- phase must be "enter" or "leave" → D041 (parse-time: `AnimateBindingNode.phase`
+  is already `'enter' | 'leave'`)
+- at most one animate:enter and one animate:leave (class form) per element → D042
+- at most one on:animate:enter and one on:animate:leave per element        → D043
 - both phases and both forms (class + event) can coexist on the same element
 ─────────────────────────────────────────────────
 ```
@@ -456,7 +469,7 @@ COMPONENT-ELEMENT
 C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 
 node.classes ≠ []        → D021
-node.styles ≠ []        → D021
+node.styles ≠ []         → D021
 node.animations ≠ []     → D040
 
 ∀ attr ∈ node.attributes:  CHECK-COMP-TEXT-INPUT(Γ, B, attr)
@@ -500,6 +513,7 @@ SETUP-RETURN
 ─────────────────────────────────────────────────────────────────
 setup returns: M | { template: M } | { template: M, expose: E }
 where M : TemplateMarkup<TAst>
+Any other return shape → D007
 → component(...) : ComponentInstance<B, E, S, M>
 
 
@@ -520,6 +534,15 @@ PROVIDERS-INPUTS-ONLY
 ─────────────────────────────────────────────────────────────────
 providers receives Pick<B, input keys only>.
 Models, outputs, and fragments are excluded → D006.
+
+
+BINDING-PRIMITIVE-PLACEMENT
+─────────────────────────────────────────────────────────────────
+input(), input.required(), model(), output(), fragment() and
+fragment.required() may appear only as values of the `bindings` record of
+component(...), component.proxy<S>()(...), component.wrap(...), directive(...)
+or derivation(...). Calling one anywhere else — in setup, providers, or module
+scope — is → D003.
 
 
 RESERVED-COMPONENT-BINDINGS
@@ -551,10 +574,10 @@ component.wrap(Target, config)
 Target : ComponentInstance<B_Target, E_Target, S_Target, M_Target>
 Selected = B(config)    (defaults to {} when bindings is omitted)
 
-keys(Selected) ⊆ keys(B_Target)
+keys(Selected) ⊆ keys(B_Target)                                    → D027
 ∀ k ∈ keys(Selected):
-  BindingKind(Selected[k]) ≡ BindingKind(B_Target[k])
-  Selected[k] ≡ B_Target[k]
+  BindingKind(Selected[k]) ≡ BindingKind(B_Target[k])              → D028
+  Selected[k] ≡ B_Target[k]                                        → D029
 
 setup receives SetupBindings<Selected>
 providers receives Pick<Selected, input keys only>
@@ -687,6 +710,9 @@ B_D[frag.name] : FragmentBinding<T>
 ```
 
 Inline `@fragment` delivery is supported only on component elements. Directives receive fragments exclusively by reference via `name={expr}` syntax inside `use:dir(...)` — inline `@fragment` declarations are rejected (D036).
+
+Note: D036 is a parse-time diagnostic. `DirectiveFragmentNode` carries only
+`value: AST`, so an inline declaration cannot be represented.
 
 ### 7.1 Uniqueness Note
 
@@ -858,6 +884,7 @@ LET
 FragmentArgs<T> =
   T = void                         → []
   T is tuple [T₁, ..., Tₙ]       → [T₁, ..., Tₙ]
+  T is readonly tuple             → [T₁, ..., Tₙ]   (readonly is dropped)
   T is array A[] (non-tuple)      → [A[]]
   T is readonly array (non-tuple) → [readonly A[]]
   otherwise                        → [T]
@@ -883,7 +910,7 @@ BindingKind<V> =
 | D001 | Resolution | Unresolved identifier in template expression (mapped TS diagnostic, §2) | Error |
 | D002 | Resolution | Unresolved element (neither intrinsic nor in scope) | Error |
 | D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
-| D004 | Declaration | Reserved `children` binding is not a fragment | Error |
+| D004 | Declaration | Reserved `children` binding is not a `FragmentBinding<void>` | Error |
 | D005 | Declaration | Reserved `ref` binding declared on a component | Error |
 | D006 | Declaration | `providers` reads model/output/fragment bindings | Error |
 | D007 | Declaration | Setup does not return `TemplateMarkup` or `{ template }` | Error |
@@ -985,6 +1012,9 @@ const AlsoBad = component({
 // D011 — duplicate binding
 <button disabled={true} disabled={false}>Click</button> // ❌ D011
 
+// D011 — duplicate static attribute
+<div id="a" id="b">Content</div> // ❌ D011
+
 // D011 — duplicate children (explicit prop + implicit nested content)
 <Card children={body}><p>Also children</p></Card> // ❌ D011
 
@@ -1079,6 +1109,9 @@ const Wrapper = component.wrap(Target, {
 
 // D034 — no matching parent fragment binding
 <Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D034
+
+// D034 — inline fragment delivered to a native element (no binding surface)
+<div>@fragment row(i: Item) { <span>{i.name}</span> }</div> // ❌ D034
 
 // D035 — duplicate inline fragment
 <List>

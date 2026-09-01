@@ -21,6 +21,12 @@ export interface SourceSpan {
   details?: string;
 }
 
+/**
+ * ParseSpan and AbsoluteSourceSpan are structurally identical `{start, end}`
+ * number pairs measuring different origins, so both carry a brand to keep them
+ * from being interchangeable. SourceSpan has a distinct shape (ParseLocation
+ * fields) and cannot be confused with either, so it needs none.
+ */
 export interface ParseSpan {
   readonly __brand: 'ParseSpan';
   start: number;
@@ -93,7 +99,19 @@ export interface ElementNode extends BaseNode {
   animations: AnimateBindingNode[];
   references: RefNode[];
   directives: DirectiveBindingNode[];
+  /**
+   * Child nodes. Populated for native tags. For a component element, nested
+   * content is lowered into `fragments` instead and this list stays empty.
+   */
   children: TemplateNode[];
+  /**
+   * Fragments delivered to a component element: inline `@fragment name(...)`
+   * declarations and the implicit `children` fragment.
+   *
+   * Always empty for a native tag — a native element has no binding surface to
+   * deliver a fragment to. A standalone `@fragment` declaration nested inside a
+   * native element is a `FragmentNode` in `children`, not here (spec §10.1).
+   */
   fragments: FragmentNode[];
   i18n?: I18nMeta;
 }
@@ -133,7 +151,6 @@ export interface BoundAttributeNode extends BaseNode {
   name: string;
   value: AST;
   once: boolean;
-  unit?: string;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
   i18n?: I18nMeta;
@@ -141,9 +158,12 @@ export interface BoundAttributeNode extends BaseNode {
 
 export interface BoundEventNode extends BaseNode {
   type: 'BoundEvent';
+  /**
+   * Event name. For animation callbacks this is `animate:enter` /
+   * `animate:leave`; the DSL has no global-target syntax (`window:`/`document:`),
+   * so there is no separate target field.
+   */
   name: string;
-  target?: string;
-  phase?: string;
   handler: AST;
   keySpan?: SourceSpan;
   handlerSpan?: SourceSpan;
@@ -583,6 +603,11 @@ export interface ParenthesizedType {
   type: TypeNode;
 }
 
+/**
+ * Extraction metadata attached by the i18n pipeline. Carried by the AST so the
+ * shape is not lost, but no judgment in the type-checking spec reads it —
+ * i18n is out of scope there.
+ */
 export interface I18nMeta {
   id?: string;
   customId?: string;
@@ -595,40 +620,44 @@ export interface I18nMeta {
 // 15. VISITOR
 // ────────────────────────────────────────────────────────────────
 
+/**
+ * All methods are optional: a visitor implements only the node kinds it cares
+ * about, and `walkAll` skips the rest while still traversing children.
+ */
 export interface TemplateAstVisitor<T = void> {
-  visitElement(element: ElementNode, context: T): void;
-  visitForwardMarker(marker: ForwardMarkerNode, context: T): void;
-  visitText(text: TextNode, context: T): void;
-  visitTextInterpolation(interpolation: TextInterpolationNode, context: T): void;
-  visitLet(letNode: LetNode, context: T): void;
-  visitFragment(fragmentNode: FragmentNode, context: T): void;
-  visitIf(ifNode: IfNode, context: T): void;
-  visitIfConditionBranch(branch: IfConditionBranch, context: T): void;
-  visitElseBranch(branch: ElseBranch, context: T): void;
-  visitFor(forNode: ForNode, context: T): void;
-  visitForEmpty(forEmpty: ForEmptyNode, context: T): void;
-  visitSwitch(switchNode: SwitchNode, context: T): void;
-  visitSwitchCase(switchCase: SwitchCaseNode, context: T): void;
-  visitSwitchDefault(switchDefault: SwitchDefaultNode, context: T): void;
-  visitRender(renderNode: RenderNode, context: T): void;
-  visitDerive(deriveNode: DeriveNode, context: T): void;
-  visitDerivationInput(input: DerivationInputNode, context: T): void;
-  visitTextAttribute(attr: TextAttributeNode, context: T): void;
-  visitBoundAttribute(attr: BoundAttributeNode, context: T): void;
-  visitBoundEvent(event: BoundEventNode, context: T): void;
-  visitBoundModel(model: BoundModelNode, context: T): void;
-  visitClassBinding(classBinding: ClassBindingNode, context: T): void;
-  visitStyleBinding(styleBinding: StyleBindingNode, context: T): void;
-  visitAnimateBinding(animate: AnimateBindingNode, context: T): void;
-  visitRef(ref: RefNode, context: T): void;
-  visitDirectiveBinding(directive: DirectiveBindingNode, context: T): void;
-  visitDirectiveInput(input: DirectiveInputNode, context: T): void;
-  visitDirectiveOutput(output: DirectiveOutputNode, context: T): void;
-  visitDirectiveModel(model: DirectiveModelNode, context: T): void;
-  visitDirectiveFragment(fragment: DirectiveFragmentNode, context: T): void;
-  visitDirectiveWhen(when: DirectiveWhenNode, context: T): void;
-  visitFragmentParameter(param: FragmentParameterNode, context: T): void;
-  visitRenderOptions(options: RenderOptionsNode, context: T): void;
+  visitElement?(element: ElementNode, context: T): void;
+  visitForwardMarker?(marker: ForwardMarkerNode, context: T): void;
+  visitText?(text: TextNode, context: T): void;
+  visitTextInterpolation?(interpolation: TextInterpolationNode, context: T): void;
+  visitLet?(letNode: LetNode, context: T): void;
+  visitFragment?(fragmentNode: FragmentNode, context: T): void;
+  visitIf?(ifNode: IfNode, context: T): void;
+  visitIfConditionBranch?(branch: IfConditionBranch, context: T): void;
+  visitElseBranch?(branch: ElseBranch, context: T): void;
+  visitFor?(forNode: ForNode, context: T): void;
+  visitForEmpty?(forEmpty: ForEmptyNode, context: T): void;
+  visitSwitch?(switchNode: SwitchNode, context: T): void;
+  visitSwitchCase?(switchCase: SwitchCaseNode, context: T): void;
+  visitSwitchDefault?(switchDefault: SwitchDefaultNode, context: T): void;
+  visitRender?(renderNode: RenderNode, context: T): void;
+  visitDerive?(deriveNode: DeriveNode, context: T): void;
+  visitDerivationInput?(input: DerivationInputNode, context: T): void;
+  visitTextAttribute?(attr: TextAttributeNode, context: T): void;
+  visitBoundAttribute?(attr: BoundAttributeNode, context: T): void;
+  visitBoundEvent?(event: BoundEventNode, context: T): void;
+  visitBoundModel?(model: BoundModelNode, context: T): void;
+  visitClassBinding?(classBinding: ClassBindingNode, context: T): void;
+  visitStyleBinding?(styleBinding: StyleBindingNode, context: T): void;
+  visitAnimateBinding?(animate: AnimateBindingNode, context: T): void;
+  visitRef?(ref: RefNode, context: T): void;
+  visitDirectiveBinding?(directive: DirectiveBindingNode, context: T): void;
+  visitDirectiveInput?(input: DirectiveInputNode, context: T): void;
+  visitDirectiveOutput?(output: DirectiveOutputNode, context: T): void;
+  visitDirectiveModel?(model: DirectiveModelNode, context: T): void;
+  visitDirectiveFragment?(fragment: DirectiveFragmentNode, context: T): void;
+  visitDirectiveWhen?(when: DirectiveWhenNode, context: T): void;
+  visitFragmentParameter?(param: FragmentParameterNode, context: T): void;
+  visitRenderOptions?(options: RenderOptionsNode, context: T): void;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -639,82 +668,82 @@ export function walkAll<T>(nodes: TemplateNode[], visitor: TemplateAstVisitor<T>
   for (const node of nodes) {
     switch (node.type) {
       case 'Element':
-        visitor.visitElement(node, context);
-        if (node.forwardMarker) visitor.visitForwardMarker(node.forwardMarker, context);
-        for (const attr of node.attributes) visitor.visitTextAttribute(attr, context);
-        for (const input of node.inputs) visitor.visitBoundAttribute(input, context);
-        for (const output of node.outputs) visitor.visitBoundEvent(output, context);
-        for (const model of node.models) visitor.visitBoundModel(model, context);
-        for (const cls of node.classes) visitor.visitClassBinding(cls, context);
-        for (const sty of node.styles) visitor.visitStyleBinding(sty, context);
-        for (const anim of node.animations) visitor.visitAnimateBinding(anim, context);
-        for (const ref of node.references) visitor.visitRef(ref, context);
+        visitor.visitElement?.(node, context);
+        if (node.forwardMarker) visitor.visitForwardMarker?.(node.forwardMarker, context);
+        for (const attr of node.attributes) visitor.visitTextAttribute?.(attr, context);
+        for (const input of node.inputs) visitor.visitBoundAttribute?.(input, context);
+        for (const output of node.outputs) visitor.visitBoundEvent?.(output, context);
+        for (const model of node.models) visitor.visitBoundModel?.(model, context);
+        for (const cls of node.classes) visitor.visitClassBinding?.(cls, context);
+        for (const sty of node.styles) visitor.visitStyleBinding?.(sty, context);
+        for (const anim of node.animations) visitor.visitAnimateBinding?.(anim, context);
+        for (const ref of node.references) visitor.visitRef?.(ref, context);
         for (const dir of node.directives) {
-          visitor.visitDirectiveBinding(dir, context);
-          for (const input of dir.inputs) visitor.visitDirectiveInput(input, context);
-          for (const output of dir.outputs) visitor.visitDirectiveOutput(output, context);
-          for (const model of dir.models) visitor.visitDirectiveModel(model, context);
-          for (const frag of dir.fragments) visitor.visitDirectiveFragment(frag, context);
-          if (dir.when) visitor.visitDirectiveWhen(dir.when, context);
-          if (dir.ref) visitor.visitRef(dir.ref, context);
+          visitor.visitDirectiveBinding?.(dir, context);
+          for (const input of dir.inputs) visitor.visitDirectiveInput?.(input, context);
+          for (const output of dir.outputs) visitor.visitDirectiveOutput?.(output, context);
+          for (const model of dir.models) visitor.visitDirectiveModel?.(model, context);
+          for (const frag of dir.fragments) visitor.visitDirectiveFragment?.(frag, context);
+          if (dir.when) visitor.visitDirectiveWhen?.(dir.when, context);
+          if (dir.ref) visitor.visitRef?.(dir.ref, context);
         }
         for (const frag of node.fragments) {
-          visitor.visitFragment(frag, context);
-          for (const param of frag.parameters) visitor.visitFragmentParameter(param, context);
+          visitor.visitFragment?.(frag, context);
+          for (const param of frag.parameters) visitor.visitFragmentParameter?.(param, context);
           walkAll(frag.children, visitor, context);
         }
         walkAll(node.children, visitor, context);
         break;
       case 'Text':
-        visitor.visitText(node, context);
+        visitor.visitText?.(node, context);
         break;
       case 'TextInterpolation':
-        visitor.visitTextInterpolation(node, context);
+        visitor.visitTextInterpolation?.(node, context);
         break;
       case 'Let':
-        visitor.visitLet(node, context);
+        visitor.visitLet?.(node, context);
         break;
       case 'If':
-        visitor.visitIf(node, context);
+        visitor.visitIf?.(node, context);
         for (const branch of node.branches) {
           if (branch.type === 'IfConditionBranch') {
-            visitor.visitIfConditionBranch(branch, context);
+            visitor.visitIfConditionBranch?.(branch, context);
           } else {
-            visitor.visitElseBranch(branch, context);
+            visitor.visitElseBranch?.(branch, context);
           }
           walkAll(branch.children, visitor, context);
         }
         break;
       case 'For':
-        visitor.visitFor(node, context);
+        visitor.visitFor?.(node, context);
         walkAll(node.children, visitor, context);
         if (node.empty) {
-          visitor.visitForEmpty(node.empty, context);
+          visitor.visitForEmpty?.(node.empty, context);
           walkAll(node.empty.children, visitor, context);
         }
         break;
       case 'Switch':
-        visitor.visitSwitch(node, context);
+        visitor.visitSwitch?.(node, context);
         for (const branch of node.cases) {
           if (branch.type === 'SwitchCase') {
-            visitor.visitSwitchCase(branch, context);
+            visitor.visitSwitchCase?.(branch, context);
           } else {
-            visitor.visitSwitchDefault(branch, context);
+            visitor.visitSwitchDefault?.(branch, context);
           }
           walkAll(branch.children, visitor, context);
         }
         break;
       case 'Render':
-        visitor.visitRender(node, context);
-        if (node.options) visitor.visitRenderOptions(node.options, context);
+        visitor.visitRender?.(node, context);
+        if (node.options) visitor.visitRenderOptions?.(node.options, context);
         break;
       case 'Derive':
-        visitor.visitDerive(node, context);
-        for (const input of node.inputs) visitor.visitDerivationInput(input, context);
+        visitor.visitDerive?.(node, context);
+        for (const input of node.inputs) visitor.visitDerivationInput?.(input, context);
         break;
       case 'Fragment':
-        visitor.visitFragment(node, context);
-        for (const param of node.parameters) visitor.visitFragmentParameter(param, context);
+        visitor.visitFragment?.(node, context);
+        for (const param of node.parameters) visitor.visitFragmentParameter?.(param, context);
         walkAll(node.children, visitor, context);
         break;
     }
