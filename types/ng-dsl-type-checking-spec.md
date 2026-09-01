@@ -2,17 +2,25 @@
 
 ## Angular Signal Components — Template DSL
 
-This document defines what the **template type checker** must verify — constructs
-inside `@{ ... }` that TypeScript cannot check because they are not plain TS expressions.
+This document defines what the **template type checker** must verify — the
+structure inside `@{ ... }` that TypeScript cannot check on its own: element and
+component bindings, directives, forwarding, fragments, control flow, and refs.
+
+Expressions are **not** in that set. Everything inside `{ ... }` is a plain
+TypeScript expression, typed by TypeScript; §2 states only the scope, the forms
+the DSL rejects, and how TypeScript's diagnostics are mapped back into the
+`.ng` file. This specification does not restate TypeScript's typing rules.
 
 Out of scope: parser, lowering pipeline, non-template TS helper APIs (`inject()`,
 `provide()`, `injectionToken()`, opt-in `satisfies`).
 
 Expected pipeline:
 
-1. parse `@{ ... }` into `TemplateAST`;
+1. parse `@{ ... }` into `TemplateAST`, handing each `{ ... }` region to the
+   TypeScript parser and carrying the result as `TemplateExpression`;
 2. assign the markup literal the type `TemplateMarkup<ConcreteTemplateAST>`;
-3. check the `TemplateAST` using the judgments below;
+3. check the `TemplateAST` using the judgments below, delegating expression
+   typing to TypeScript;
 4. lower the checked tree to runtime instructions.
 
 Normative language follows RFC 2119: **must** / **must not** are required for
@@ -71,175 +79,76 @@ expressions, or any non-identifier forms are parse errors.
 
 ---
 
-## 2. Expression Typing
+## 2. Expressions
 
-Template expressions use `{expr}` syntax.
+Template expressions use `{expr}` syntax and are **plain TypeScript expressions**.
+
+This specification does not restate TypeScript's typing rules. The `.ng` parser
+owns the template grammar; each `{ ... }` region is handed to the TypeScript
+parser and TypeScript assigns the expression its type. What follows is only
+what the DSL adds: the scope the expression is checked in, the forms the DSL
+rejects, and how TypeScript's diagnostics are reported.
 
 ```
-VAR
-─────────────────────────────────────────────────
-x : T ∈ Γ
-─────────────────────────────────────────────────
-Γ ⊢ x : T
+EXPRESSION
+─────────────────────────────────────────────────────────────────
+{ e }    where e is a TypeScript expression
+Γ        the template scope from §1 (SCOPE-RESOLVE)
+
+TypeScript assigns   Γ ⊢ e : T
+─────────────────────────────────────────────────────────────────
+Γ ⊢ { e } ✓
 
 
-PROPERTY-READ
-─────────────────────────────────────────────────
-Γ ⊢ e : T    name ∈ keys(T)    T[name] = U
-─────────────────────────────────────────────────
-Γ ⊢ e.name : U
+RESTRICTED-FORMS
+─────────────────────────────────────────────────────────────────
+The following TypeScript forms must be rejected inside `{ ... }`:
+
+  assignment (=, +=, ++, --, ...)      declaration statements
+  await, yield                          class expressions
+  import()                              comma operator
+  new                                   satisfies
+  type assertions (as, <T>)
+
+Rejection must name the offending form           → D046
+
+Scope of the ban: it applies to the binding expression and to every
+expression nested within it, but NOT to the body of an arrow function
+appearing in the expression. An arrow body is ordinary TypeScript — a
+handler such as `on:click={() => { count.set(0); log(); }}` may contain
+statements, and the DSL does not reach inside it.
+─────────────────────────────────────────────────────────────────
 
 
-SAFE-PROPERTY-READ
-─────────────────────────────────────────────────
-Γ ⊢ e : T | null | undefined    name ∈ keys(T)    T[name] = U
-─────────────────────────────────────────────────
-Γ ⊢ e?.name : U | undefined
+DIAGNOSTIC-MAPPING
+─────────────────────────────────────────────────────────────────
+TypeScript diagnostics for e are reported at sourceSpan(e) in the `.ng` file.
 
-
-FUNCTION-CALL
-─────────────────────────────────────────────────
-Γ ⊢ f : (a₁: A₁, ..., aₙ: Aₙ) → R
-Γ ⊢ eᵢ : Tᵢ    Tᵢ ⊑ Aᵢ  for i ∈ 1..n
-─────────────────────────────────────────────────
-Γ ⊢ f(e₁, ..., eₙ) : R
-
-
-METHOD-CALL
-─────────────────────────────────────────────────
-Γ ⊢ e : T    T has method name : (a₁: A₁, ..., aₙ: Aₙ) → R
-Γ ⊢ argᵢ : Tᵢ    Tᵢ ⊑ Aᵢ  for i ∈ 1..n
-─────────────────────────────────────────────────
-Γ ⊢ e.name(arg₁, ..., argₙ) : R
-
-
-SAFE-METHOD-CALL
-─────────────────────────────────────────────────
-Γ ⊢ e : T | null | undefined    T has method name : (a₁: A₁, ..., aₙ: Aₙ) → R
-Γ ⊢ argᵢ : Tᵢ    Tᵢ ⊑ Aᵢ  for i ∈ 1..n
-─────────────────────────────────────────────────
-Γ ⊢ e?.name(arg₁, ..., argₙ) : R | undefined
-
-
-BINARY-ARITHMETIC
-─────────────────────────────────────────────────
-Γ ⊢ left : L    Γ ⊢ right : R
-op ∈ {-, *, /, %}    L ⊑ number    R ⊑ number
-─────────────────────────────────────────────────
-Γ ⊢ left op right : number
-
-
-BINARY-ADD
-─────────────────────────────────────────────────
-Γ ⊢ left : L    Γ ⊢ right : R
-L ⊑ string ∨ R ⊑ string → result = string
-L ⊑ number ∧ R ⊑ number → result = number
-─────────────────────────────────────────────────
-Γ ⊢ left + right : result
-
-
-BINARY-COMPARISON
-─────────────────────────────────────────────────
-Γ ⊢ left : L    Γ ⊢ right : R
-op ∈ {==, !=, ===, !==, <, >, <=, >=}
-─────────────────────────────────────────────────
-Γ ⊢ left op right : boolean
-
-
-BINARY-LOGICAL-AND
-─────────────────────────────────────────────────
-Γ ⊢ left : L    Γ ⊢ right : R
-─────────────────────────────────────────────────
-Γ ⊢ left && right : L | R
-
-
-BINARY-LOGICAL-OR
-─────────────────────────────────────────────────
-Γ ⊢ left : L    Γ ⊢ right : R
-─────────────────────────────────────────────────
-Γ ⊢ left || right : L | R
-
-
-BINARY-NULLISH-COALESCING
-─────────────────────────────────────────────────
-Γ ⊢ left : L    Γ ⊢ right : R
-─────────────────────────────────────────────────
-Γ ⊢ left ?? right : NonNullable<L> | R
-
-
-UNARY-NOT
-─────────────────────────────────────────────────
-Γ ⊢ e : T
-─────────────────────────────────────────────────
-Γ ⊢ !e : boolean
-
-
-UNARY-NEGATE
-─────────────────────────────────────────────────
-Γ ⊢ e : T    T ⊑ number
-─────────────────────────────────────────────────
-Γ ⊢ -e : number
-
-
-UNARY-PLUS
-─────────────────────────────────────────────────
-Γ ⊢ e : T
-─────────────────────────────────────────────────
-Γ ⊢ +e : number
-
-
-CONDITIONAL
-─────────────────────────────────────────────────
-Γ ⊢ cond : C    Γ ⊢ trueExpr : T    Γ ⊢ falseExpr : F
-─────────────────────────────────────────────────
-Γ ⊢ cond ? trueExpr : falseExpr : T | F
-
-
-LITERAL-ARRAY
-─────────────────────────────────────────────────
-Γ ⊢ eᵢ : Tᵢ  for i ∈ 1..n
-─────────────────────────────────────────────────
-Γ ⊢ [e₁, ..., eₙ] : (T₁ | ... | Tₙ)[]
-
-
-LITERAL-MAP
-─────────────────────────────────────────────────
-Γ ⊢ vᵢ : Tᵢ  for i ∈ 1..n    keys k₁..kₙ are string literals
-─────────────────────────────────────────────────
-Γ ⊢ { k₁: v₁, ..., kₙ: vₙ } : { k₁: T₁, ..., kₙ: Tₙ }
-
-
-KEYED-READ
-─────────────────────────────────────────────────
-Γ ⊢ e : T    Γ ⊢ key : K
-K is literal ∧ K ∈ keys(T)                          → T[K]
-K ⊑ number ∧ T has [n: number]: V                   → V
-K ⊑ string ∧ T has [s: string]: V                   → V
-otherwise                                            → error
-─────────────────────────────────────────────────
-Γ ⊢ e[key] : Result
-
-
-SAFE-KEYED-READ
-─────────────────────────────────────────────────
-Γ ⊢ e : T | null | undefined    Γ ⊢ key : K
-Result follows KEYED-READ rules on T
-─────────────────────────────────────────────────
-Γ ⊢ e?.[key] : Result | undefined
+D001 (unresolved identifier) and D015 (expression not assignable to a
+binding type) are TypeScript diagnostics surfaced through this mapping, not
+independent judgments of this specification.
+─────────────────────────────────────────────────────────────────
 
 
 TEXT-INTERPOLATION
-─────────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────
 Γ ⊢ e : T    (any type — stringified at render;
               null/undefined render as empty string)
-─────────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────
 Γ ⊢ {e} ✓
 ```
 
-Template expressions are a subset of TypeScript expressions. The following are
-**not** permitted inside `{...}`: assignments (`=`, `+=`, etc.), `await`,
-`import()`, type assertions (`as`, `<T>`), `satisfies`, `new`, and declaration
-statements. Anything not covered by the rules above is a parse error.
+**Why delegation rather than a curated subset.** An enumerated expression
+grammar has to track TypeScript's forever, and each omission is a construct
+the DSL silently cannot express — arrow-function handlers, `f?.()`, postfix
+`!`, template literals. A rejection pass over a real TypeScript expression
+also produces a better diagnostic than a parse failure: `count = 5` reports
+*assignment is not allowed in a template expression* (D046) rather than an
+unexplained syntax error.
+
+Correspondingly, `ng-ast.ts` carries expressions opaquely as
+`TemplateExpression<TNode>` (spans plus the TypeScript node) and does not model
+their internals.
 
 ### 2.1 Markup Literal Typing
 
@@ -263,6 +172,17 @@ CHECK-NODES
 Child TemplateNode[] lists are checked under the node's scoped Γ.
 ─────────────────────────────────────────────────────────────────
 ```
+
+### 2.3 Comments
+
+`//` line comments and `/* */` block comments are permitted in markup and are
+**discarded at parse time**. There is no comment node in `TemplateNode`, and no
+judgment applies to them.
+
+A comment is recognized only where a template node may begin. Inside text
+content and attribute values, `//` and `/*` are ordinary characters — so
+`<p>https://example.com</p>` is text, not a comment. Comments inside `{ ... }`
+are TypeScript's, handled by the TypeScript parser.
 
 ---
 
@@ -960,7 +880,7 @@ BindingKind<V> =
 
 | Code | Category | Condition | Severity |
 |------|----------|-----------|----------|
-| D001 | Resolution | Unresolved identifier in template expression | Error |
+| D001 | Resolution | Unresolved identifier in template expression (mapped TS diagnostic, §2) | Error |
 | D002 | Resolution | Unresolved element (neither intrinsic nor in scope) | Error |
 | D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
 | D004 | Declaration | Reserved `children` binding is not a fragment | Error |
@@ -974,7 +894,7 @@ BindingKind<V> =
 | D012 | Binding: Existence | Static attribute + dynamic binding clash (same name) | Error |
 | D013 | Binding: Required | Missing required component input/model/fragment | Error |
 | D014 | Binding: Required | Missing required directive input/model/fragment | Error |
-| D015 | Binding: Types | Type mismatch (expression not assignable to binding type) | Error |
+| D015 | Binding: Types | Type mismatch (expression not assignable to binding type; mapped TS diagnostic, §2) | Error |
 | D016 | Binding: Types | `model:` bound to non-writable signal | Error |
 | D017 | Binding: Types | `model:` on non-modelable native element | Error |
 | D018 | Binding: Modifiers | `once:model:*` or `once:on:*` | Error |
@@ -1005,6 +925,7 @@ BindingKind<V> =
 | D043 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
 | D044 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
 | D045 | Animate | `on:animate:` handler type mismatch | Error |
+| D046 | Expressions | Restricted TypeScript form used inside `{ ... }` | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1195,4 +1116,11 @@ const child = ref<HTMLDivElement>();
 
 // D045 — on:animate: handler type mismatch
 <div on:animate:enter={(x: string) => {}}>X</div> // ❌ D045
+
+// D046 — restricted form inside { }
+<button on:click={count = 5}>X</button>              // ❌ D046: assignment
+<span>{value as string}</span>                        // ❌ D046: type assertion
+<span>{new Date().getFullYear()}</span>               // ❌ D046: new
+// Permitted: an arrow body is ordinary TypeScript, statements included
+<button on:click={() => { count.set(0); log(); }}>X</button> // ✅
 ```

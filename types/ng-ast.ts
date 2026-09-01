@@ -43,6 +43,12 @@ export interface BaseNode {
   endSourceSpan?: SourceSpan;
 }
 
+/**
+ * Span pair for anything lifted out of the markup literal and handed to the
+ * TypeScript layer: `span` is relative to the enclosing `@{ }`, `sourceSpan`
+ * is absolute in the file so TypeScript diagnostics can be mapped back
+ * (spec §2, DIAGNOSTIC-MAPPING).
+ */
 export interface BaseAST {
   span: ParseSpan;
   sourceSpan: AbsoluteSourceSpan;
@@ -169,7 +175,7 @@ export interface AnimateBindingNode extends BaseNode {
 
 export interface RefNode extends BaseNode {
   type: 'Ref';
-  target: Variable;
+  target: TemplateIdentifier;
   keySpan?: SourceSpan;
   valueSpan?: SourceSpan;
 }
@@ -345,7 +351,7 @@ export interface RenderOptionsNode extends BaseNode {
 export interface DeriveNode extends BaseNode {
   type: 'Derive';
   name: string;
-  derivation: Variable;
+  derivation: TemplateIdentifier;
   inputs: DerivationInputNode[];
 }
 
@@ -375,121 +381,42 @@ export interface FragmentParameterNode extends BaseNode {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 13. EXPRESSION AST
+// 13. EXPRESSIONS
+//
+// Template expressions are plain TypeScript expressions. The `.ng` parser
+// owns the template grammar; each `{ ... }` region is handed to the
+// TypeScript parser, and the resulting expression node is carried opaquely
+// here. Typing is TypeScript's job — see spec §2 (EXPRESSION,
+// RESTRICTED-FORMS, DIAGNOSTIC-MAPPING).
+//
+// This file deliberately does not model expression internals. A curated
+// subset would have to track TypeScript's grammar forever, and every
+// omission becomes a construct the DSL silently cannot express.
+//
+// TNode is generic so this file stays dependency-free as a specification;
+// a compiler instantiates it with `ts.Expression`.
 // ────────────────────────────────────────────────────────────────
 
-export type AST =
-  | LiteralPrimitive
-  | LiteralArray
-  | LiteralMap
-  | Binary
-  | Conditional
-  | PropertyRead
-  | SafePropertyRead
-  | KeyedRead
-  | SafeKeyedRead
-  | FunctionCall
-  | SafeMethodCall
-  | MethodCall
-  | Variable
-  | Unary;
-
-export interface LiteralPrimitive extends BaseAST {
-  type: 'LiteralPrimitive';
-  value: string | number | boolean | null | undefined;
+export interface TemplateExpression<TNode = unknown> extends BaseAST {
+  readonly __brand: 'TemplateExpression';
+  /** The TypeScript expression parsed from this region. */
+  readonly node: TNode;
 }
 
-export interface LiteralArray extends BaseAST {
-  type: 'LiteralArray';
-  expressions: AST[];
-}
+/**
+ * Alias kept so every binding/handler/condition site reads as `AST`, matching
+ * the spec's `Γ ⊢ e : T` judgments.
+ */
+export type AST<TNode = unknown> = TemplateExpression<TNode>;
 
-export interface LiteralMap extends BaseAST {
-  type: 'LiteralMap';
-  keys: LiteralMapKey[];
-  values: AST[];
-}
-
-export interface LiteralMapKey {
-  key: string;
-  quoted: boolean;
-}
-
-export type BinaryOperator =
-  | '+' | '-' | '*' | '/' | '%'
-  | '==' | '!=' | '===' | '!=='
-  | '<' | '>' | '<=' | '>='
-  | '&&' | '||' | '??';
-
-export interface Binary extends BaseAST {
-  type: 'Binary';
-  operation: BinaryOperator;
-  left: AST;
-  right: AST;
-}
-
-export interface Conditional extends BaseAST {
-  type: 'Conditional';
-  condition: AST;
-  trueExp: AST;
-  falseExp: AST;
-}
-
-export interface PropertyRead extends BaseAST {
-  type: 'PropertyRead';
-  receiver: AST;
+/**
+ * A single lexical name. Used where the DSL grammar admits only a bare
+ * identifier rather than an arbitrary expression (spec §1): `ref` targets and
+ * the derivation reference in `@derive name = derivation(...)`.
+ */
+export interface TemplateIdentifier extends BaseAST {
+  readonly __brand: 'TemplateIdentifier';
   name: string;
-}
-
-export interface SafePropertyRead extends BaseAST {
-  type: 'SafePropertyRead';
-  receiver: AST;
-  name: string;
-}
-
-export interface KeyedRead extends BaseAST {
-  type: 'KeyedRead';
-  receiver: AST;
-  key: AST;
-}
-
-export interface SafeKeyedRead extends BaseAST {
-  type: 'SafeKeyedRead';
-  receiver: AST;
-  key: AST;
-}
-
-export interface FunctionCall extends BaseAST {
-  type: 'FunctionCall';
-  name: string;
-  args: AST[];
-}
-
-export interface SafeMethodCall extends BaseAST {
-  type: 'SafeMethodCall';
-  receiver: AST;
-  name: string;
-  args: AST[];
-}
-
-export interface MethodCall extends BaseAST {
-  type: 'MethodCall';
-  receiver: AST;
-  name: string;
-  args: AST[];
-}
-
-export interface Variable extends BaseAST {
-  type: 'Variable';
-  name: string;
-}
-
-export type UnaryOperator = '-' | '+' | '!';
-
-export interface Unary extends BaseAST {
-  type: 'Unary';
-  operator: UnaryOperator;
-  expression: AST;
 }
 
 // ────────────────────────────────────────────────────────────────
