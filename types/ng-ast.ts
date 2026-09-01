@@ -406,6 +406,12 @@ export interface TemplateExpression<TNode = unknown> extends BaseAST {
 /**
  * Alias kept so every binding/handler/condition site reads as `AST`, matching
  * the spec's `Γ ⊢ e : T` judgments.
+ *
+ * Note on TNode: the node interfaces below declare bare `AST`, i.e.
+ * `TemplateExpression<unknown>`. A typed expression is assignable *into* a
+ * node, but reading `node.value.node` back yields `unknown` — a compiler
+ * narrows once at the boundary. Threading TNode through every node interface
+ * would parameterize the whole tree for little gain in a specification.
  */
 export type AST<TNode = unknown> = TemplateExpression<TNode>;
 
