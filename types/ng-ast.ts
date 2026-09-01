@@ -159,8 +159,7 @@ export interface BoundAttributeNode extends BaseNode {
 export interface BoundEventNode extends BaseNode {
   type: 'BoundEvent';
   /**
-   * Event name. For animation callbacks this is `animate:enter` /
-   * `animate:leave`; the DSL has no global-target syntax (`window:`/`document:`),
+   * DOM event name. The DSL has no global-target syntax (`window:`/`document:`),
    * so there is no separate target field.
    */
   name: string;
