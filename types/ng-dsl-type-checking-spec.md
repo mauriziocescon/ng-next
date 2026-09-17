@@ -894,7 +894,7 @@ BindingKind<V> =
 | D031 | Forwarding | Multiple `@forward()` placements in one component | Error |
 | D032 | Forwarding | `@forward()` on a node that is not a native element | Error |
 | D033 | Fragments | Fragment argument count/type mismatch | Error |
-| D034 | Fragments | Implicit fragment has no matching parent binding or conflicts with explicit | Error |
+| D034 | Fragments | Implicit fragment has no matching parent binding, or is delivered to a native element | Error |
 | D035 | Fragments | Duplicate implicit fragment name under same parent | Error |
 | D036 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
 | D037 | Refs | `ref=` variable type incompatible with expose | Error |
