@@ -678,10 +678,20 @@ Directives do not declare `providers`.
 IF
 ─────────────────────────────────────────────────
 Γ ⊢ expression : T    (any type — truthiness)
-if alias: Γ' = Γ ∪ { alias : Narrow(T) }
+
+FLOW: branches must be checked as if lowered to a TypeScript if/else-if/else
+      chain in declaration order — own condition true, preceding ones false.
+      Regions are parsed per §2 but checked in that one flow context.
+
+if alias: Γ' = Γ ∪ { alias : expression narrowed to truthy (per FLOW) }
 else:     Γ' = Γ
 Γ' ⊢ children ✓
 ```
+
+Γ carries declarations, FLOW carries narrowing — TypeScript's, so there is no
+narrowing operator here. It reaches identifiers and property-access paths, not
+repeated calls: `@if (user()) { {user().name} }` leaves `user()` possibly-null.
+The alias form (`expressionAlias`) covers that case.
 
 ### 8.2 @for
 
@@ -711,7 +721,13 @@ SWITCH
 ∀ case:
   Γ ⊢ case.expression : U    U comparable to T
   Γ ⊢ case.children ✓
+
+FLOW: cases must be checked as if lowered to a TypeScript switch statement, so
+      a discriminant narrows in each case body and `@default` sees the residual.
 ```
+
+Same reach and limits as §8.1 — and no alias form here, so a `@switch` on a call
+expression narrows nothing.
 
 ---
 
@@ -833,9 +849,6 @@ FragmentArgs<T> =
   T is array A[] (non-tuple)      → [A[]]
   T is readonly array (non-tuple) → [readonly A[]]
   otherwise                        → [T]
-
-
-Narrow(T) = Exclude<T, null | undefined | false | 0 | "">
 
 
 BindingKind<V> =
