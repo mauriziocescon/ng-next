@@ -413,9 +413,11 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Forwarding has one component API and one marker: `component.proxy<T>()(config)` exposes a directive-compatible native surface, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary directive instructions.
+Forwarding has one declaration and one marker: `forward: surface<T>()` in the component config exposes a directive-compatible native surface, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary directive instructions.
 
-`component.proxy` applies its surface type in a separate call so that `T` stays explicit while `bindings`, `expose`, and the template type are inferred from `config` — TypeScript does not infer the remaining type arguments of a partially-specified list.
+`surface<T>()` is a declaration, not a value — a phantom brand behind a `declare function`, with nothing to call and nothing to allocate. It sits in a value position for the same reason `fragment.required<void>()` does: so `T` can be written where TypeScript will infer it, leaving `bindings`, `expose`, and the template type inferred from the same `config` object. `setup` never receives it, and the compiler erases the key.
+
+Declaring the surface rather than reading it off the `@forward()` element is deliberate. Validation checks that the marked element is assignable *to* `T`, so a component can promise a wider surface (`HTMLElement`) than the element it actually forwards to — keeping the internal tag out of its public API. Inference would always make the tightest promise, turning `<button>` → `<a>` into a silent breaking change for every consumer.
 
 ### Implicit children fragment
 
@@ -518,9 +520,9 @@ export const Menu = component({
 });
 ```
 
-### Proxying directives to an internal element
+### Forwarding directives to an internal element
 
-`Button` exposes an `HTMLButtonElement` proxy surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the `@forward()` target. The same directive cannot be applied more than once to the same final element.
+`Button` declares an `HTMLButtonElement` forward surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the `@forward()` target. The same directive cannot be applied more than once to the same final element.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -551,9 +553,10 @@ export const Consumer = component({
 });
 
 // -- button in @mylib/button --------------------
-import { component, input, output, computed, fragment } from '@angular/core';
+import { component, input, output, computed, fragment, surface } from '@angular/core';
 
-export const Button = component.proxy<HTMLButtonElement>()({
+export const Button = component({
+  forward: surface<HTMLButtonElement>(),
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -677,7 +680,7 @@ export const Counter = component({
 - `pipes`: can be modeled with derivations or components (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
-- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (proxy),
+- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (forwarding),
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
 - `template reference variables`: can be modeled with `ref`,
 - `queries`: can be modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
@@ -687,13 +690,13 @@ export const Counter = component({
 ### Scope and caveats
 
 - `interoperability layer`: the full incremental migration story (mixed projects, build boundaries) is not covered intentionally — the topic is important but requires many micro-decisions that depend on compiler architecture choices out of scope for this proposal;
-- other decorator properties: in this proposal a component config carries only `bindings`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings` and `setup` — notably no directive-level `providers`. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
+- other decorator properties: in this proposal a component config carries only `bindings`, `forward`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings` and `setup` — notably no directive-level `providers`. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
 - programmatic view creation (dialogs, overlays): not covered here; likely requires a dedicated API — `createComponent` / `renderFragment` with an attachment target — rather than `ViewContainerRef`;
-- `formField` integration with Signal Forms: not considered here. On a `component.proxy` component, all `use:` directives forward to `@forward()` — but a form field directive needs the *component's* binding surface (its `value` model, `disabled`, `errors`, etc.), not the inner native element. This likely requires `formField` to be a reserved binding name (alongside `ref` and `children`) with dedicated compiler support, so the form system can target the component boundary directly:
+- `formField` integration with Signal Forms: not considered here. On a component with a forward surface, all `use:` directives forward to `@forward()` — but a form field directive needs the *component's* binding surface (its `value` model, `disabled`, `errors`, etc.), not the inner native element. This likely requires `formField` to be a reserved binding name (alongside `ref` and `children`) with dedicated compiler support, so the form system can target the component boundary directly:
   ```ts
   <TextInput
     formField={signupForm.username}
@@ -797,11 +800,11 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native elements, `component.proxy` components | Yes (different directives) | Attaches a directive. On proxy components, directives are placed at the `@forward()` target. Same directive cannot appear twice on the same final element. |
+| `use:` | native elements, components declaring a `forward` surface | Yes (different directives) | Attaches a directive. On forwarding components, directives are placed at the `@forward()` target. Same directive cannot appear twice on the same final element. |
 | `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. Reserved — cannot be declared as a component binding. |
-| `@forward()` | compatible native element | No (exactly one per component) | Places the directive payload declared by `component.proxy`. |
+| `@forward()` | compatible native element | No (exactly one per component) | Places the directive payload declared by `forward: surface<T>()`. |
 
 `ref` and `@forward()` are special attributes, not binding prefixes — included here for completeness. Both `ref` and `children` are reserved at component level only; directives and derivations may use them as binding names (though not recommended).
 

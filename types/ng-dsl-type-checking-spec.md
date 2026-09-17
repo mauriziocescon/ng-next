@@ -43,7 +43,7 @@ conformance; **may** describes implementation freedom.
 | `E(X)` | Expose type of X |
 | `T(C)` | Template markup type of component C |
 | `H(D)` | Host element type of directive D |
-| `P(C)` | Proxy surface type of component C (`never` if none) |
+| `F(C)` | Forward surface type of component C (`never` if none) |
 | `I(tag)` | Intrinsic element host type (e.g. `I("button") = HTMLButtonElement`) |
 | `⊑` | Assignability (subtype) |
 | `≡` | Exact type equality |
@@ -54,7 +54,7 @@ Component metadata shape:
 C : ComponentInstance<B, E, S, M>
 B = bindings record
 E = expose type (void when absent)
-S = proxy surface type (never when absent)
+S = forward surface type (never when absent)
 M = TemplateMarkup<TAst>
 ```
 
@@ -486,7 +486,7 @@ tag ∈ IntrinsicElements    H = I(tag)
 ∀ anim ∈ node.animations:       CHECK-ANIMATE-BINDING(Γ, anim)
 ∀ dir ∈ node.directives:        CHECK-DIRECTIVE-USE(Γ, H, {node}, dir)
 ∀ ref ∈ node.references:        CHECK-REF(Γ, H, ref)
-node.forwardMarker ≠ ∅:         FORWARD-PROXY (§6.2)
+node.forwardMarker ≠ ∅:         FORWARD-PLACEMENT (§6.2)
 CHECK-NODES(Γ, node.children)
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
@@ -618,8 +618,8 @@ node.forwardMarker ≠ ∅   → D028   (FORWARD-INVALID, §6.2)
 node.children = []         (nested content is lowered to the
                             "implicitChildren" fragment — §10.2)
 ∀ dir ∈ node.directives:
-  P(C) = never → D024
-  else: CHECK-DIRECTIVE-USE(Γ, P(C), RESOLVED-FORWARD-HOSTS(C), dir)
+  F(C) = never → D024
+  else: CHECK-DIRECTIVE-USE(Γ, F(C), RESOLVED-FORWARD-HOSTS(C), dir)
 CHECK-REQUIRED(B, provided, "component")
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
@@ -688,8 +688,11 @@ BINDING-PRIMITIVE-PLACEMENT
 ─────────────────────────────────────────────────────────────────
 input(), input.required(), model(), output(), fragment() and
 fragment.required() may appear only as values of the `bindings` record of
-component(...), component.proxy<S>()(...), directive(...) or derivation(...).
+component(...), directive(...) or derivation(...).
 Calling one anywhere else — in setup, providers, or module scope — is → D003.
+
+surface() may appear only as the value of the `forward` key of a
+component(...) config. Anywhere else — including inside `bindings` — is → D003.
 
 
 RESERVED-COMPONENT-BINDINGS
@@ -703,26 +706,36 @@ if "ref" ∈ keys(B) (component only):  → D005
 
 ON-PREFIX-WARNING
 ─────────────────────────────────────────────────────────────────
-∀ k ∈ keys(B) of component(...), component.proxy<S>()(...),
-directive(...) or derivation(...):
+∀ k ∈ keys(B) of component(...), directive(...) or derivation(...):
   k starts with "on" → D020 (warning)
 
 Reported once at the declaration site, not at each call site.
 ─────────────────────────────────────────────────────────────────
 
 
-PROXY-SURFACE
+FORWARD-SURFACE
 ─────────────────────────────────────────────────────────────────
-component.proxy<S>()(config)
-S ⊑ HTMLElement    S must be explicit
-B, E, M are inferred from config
+component({ forward: surface<S>(), ...config })
+S ⊑ HTMLElement    (enforced by the type parameter bound on surface)
+B, E, M are inferred from the same config
 result : ComponentInstance<B, E, S, M>
 
-Surface-first: S is applied by the outer call so that it stays explicit while
-B, E and M are inferred by the inner call. A single-call component.proxy<S>(config)
-is not viable — TypeScript does not infer the remaining type arguments of a
-partially-specified list, so B, E and M would fall back to their defaults,
-rejecting `bindings` and typing setup's parameters as `any`.
+component({ ...config })        (no `forward` key)
+result : ComponentInstance<B, E, never, M>
+
+One signature covers both. S is declared in a value position, so it is
+inferred like every other config-derived parameter; omitting `forward`
+leaves no inference site and S falls back to its `never` default.
+
+surface<S>() is declaration-only: a phantom brand with no implementation.
+It is erased with the `forward` key, contributes no runtime object, and is
+never visible to setup — which is why it does not appear in B.
+
+S is a promise, not a fact. FORWARD-PLACEMENT checks H ⊑ S, so a component
+may declare a wider surface than the element it forwards to and keep the
+internal tag out of its public API. A surface read off the @forward() element
+instead would always make the tightest promise, making a change of internal
+tag a breaking change for consumers with no declaration site to report it at.
 ```
 
 ---
@@ -734,8 +747,8 @@ rejecting `bindings` and typing setup's parameters as `any`.
 ```
 PAYLOAD-DEFS
 ─────────────────────────────────────────────────────────────────
-ProxyDirectivePayload(C) =
-  directives on a <C ...> call site where P(C) ≠ never
+ForwardDirectivePayload(C) =
+  directives on a <C ...> call site where F(C) ≠ never
 
 Directives are the only forwarded payload. They resolve to native
 hosts via RESOLVED-FORWARD-HOSTS.
@@ -745,27 +758,29 @@ hosts via RESOLVED-FORWARD-HOSTS.
 ### 6.2 Placement Rules and Resolved Hosts
 
 ```
-FORWARD-PROXY
+FORWARD-PLACEMENT
 ─────────────────────────────────────────────────────────────────
-Enclosing component declared by component.proxy<S>()(...)
-  i.e. P(C) ≠ never                                → D045 otherwise
+Enclosing component declares forward: surface<S>()
+  i.e. F(C) ≠ never                                → D045 otherwise
 Exactly one native element with @forward() must exist → D027 on multiple
 H = I(tag of that element)
 H ⊑ S → D025 on failure
 If no @forward() placement exists → D026
-ProxyDirectivePayload delivered to that single target
+ForwardDirectivePayload delivered to that single target
 ─────────────────────────────────────────────────────────────────
 
-D045 is the converse of D026: D026 is a proxy component that never places its
-payload, D045 is a placement in a component that has no payload to place.
-Without it the premise would fall through to `H ⊑ never`, reporting D025 — an
-assignability message for a component that has no surface to be assignable to.
+D045 is the converse of D026: D026 is a component that declares a surface and
+never places its payload, D045 is a placement in a component that has no
+payload to place. Without it the premise would fall through to `H ⊑ never`,
+reporting D025 — an assignability message for a component that has no surface
+to be assignable to. Both remain a lookup for the sibling `forward` key in the
+same config object, not a search of an unrelated construct.
 
 
 FORWARD-INVALID
 ─────────────────────────────────────────────────────────────────
 @forward() on a node that is not a native element → D028
-Only a native element can consume a proxy directive payload.
+Only a native element can consume a forwarded directive payload.
 ─────────────────────────────────────────────────────────────────
 
 
@@ -774,7 +789,7 @@ RESOLVED-FORWARD-HOSTS
 Native element N:
   RESOLVED-FORWARD-HOSTS(N) = {N}
 
-component.proxy<S>()(...) C:
+Component C where F(C) = S ≠ never:
   target = the single @forward() placement in T(C)
   I(tag(target)) ⊑ S
   RESOLVED-FORWARD-HOSTS(C) = {target}
@@ -1118,7 +1133,7 @@ BindingKind<V> =
 |------|----------|-----------|----------|
 | D001 | Resolution | Unresolved identifier in template expression (mapped TS diagnostic, §2) | Error |
 | D002 | Resolution | Unresolved reference: element tag (neither intrinsic nor in scope), `use:` directive name, or `@derive` derivation name | Error |
-| D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
+| D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings`, or `surface()` called outside a component's `forward` key | Error |
 | D004 | Declaration | Reserved `children` binding is not a `FragmentBinding<void>` | Error |
 | D005 | Declaration | Reserved `ref` binding declared on a component | Error |
 | D006 | Declaration | `providers` reads model/output/fragment bindings | Error |
@@ -1137,11 +1152,11 @@ BindingKind<V> =
 | D019 | Binding: Modifiers | `once:prop` + `prop` duplicate on same element | Error |
 | D020 | Binding: Modifiers | `on`-prefixed binding name | Warning |
 | D021 | Binding: Scope | `class:` or `style:` on component element | Error |
-| D022 | Directives | Directive host incompatible with element/proxy surface | Error |
+| D022 | Directives | Directive host incompatible with element/forward surface | Error |
 | D023 | Directives | Same directive applied twice to same resolved host element | Error |
-| D024 | Directives | Directive on non-proxy component | Error |
-| D025 | Forwarding | `@forward()` element type not assignable to proxy surface S | Error |
-| D026 | Forwarding | No `@forward()` in proxy component | Error |
+| D024 | Directives | Directive on a component that declares no forward surface | Error |
+| D025 | Forwarding | `@forward()` element type not assignable to forward surface S | Error |
+| D026 | Forwarding | No `@forward()` in a component that declares a forward surface | Error |
 | D027 | Forwarding | Multiple `@forward()` placements in one component | Error |
 | D028 | Forwarding | `@forward()` on a node that is not a native element | Error |
 | D029 | Fragments | Fragment argument/parameter list does not match `FragmentArgs<T>` — at a `@render` invocation (§10.3) or an inline `@fragment` declaration (§3.4) | Error |
@@ -1160,7 +1175,7 @@ BindingKind<V> =
 | D042 | Expressions | Restricted TypeScript form used inside `{ ... }` | Error |
 | D043 | Derivation | `derivation(...)` declares a model, output or fragment binding | Error |
 | D044 | Resolution | Reference resolves to the wrong kind (tag that is not a component, `use:` target that is not a directive, `@derive` target that is not a derivation) | Error |
-| D045 | Forwarding | `@forward()` in a component that has no proxy surface | Error |
+| D045 | Forwarding | `@forward()` in a component that has no forward surface | Error |
 | D046 | Binding: Existence | Binding bound with the syntax of a different kind (e.g. an `output()` bound as an input) | Error |
 
 ### 13.1 Diagnostic Examples
@@ -1179,6 +1194,16 @@ const Broken = component({
   setup: () => {
     const name = input<string>(); // ❌ D003
     return @{ <span>{name()}</span> };
+  },
+});
+
+// D003 — surface() outside the `forward` key. Inside `bindings` the type
+// system already rejects it (Surface is not a ComponentBindingValue); a call
+// in setup or module scope is well-typed TypeScript, so it needs the rule.
+const AlsoBroken = component({
+  setup: () => {
+    const s = surface<HTMLButtonElement>(); // ❌ D003
+    return @{ <button @forward()>X</button> };
   },
 });
 
@@ -1267,27 +1292,31 @@ bindings: { onSubmit: output<void>() } // ⚠️ D020
 // D023 — same directive twice
 <button use:tooltip(message={'A'}) use:tooltip(message={'B'})>X</button> // ❌ D023
 
-// D023 — via proxy forwarding
-const Button = component.proxy<HTMLButtonElement>()({
+// D023 — via forwarding
+const Button = component({
+  forward: surface<HTMLButtonElement>(),
   setup: () => @{ <button @forward() use:tooltip(message={'Internal'})>X</button> },
 });
 <Button use:tooltip(message={'External'}) /> // ❌ D023: collides on resolved host
 
-// D024 — directive on non-proxy component
+// D024 — directive on a component that declares no forward surface
 <Plain label={'hi'} use:tooltip(message={'tip'}) /> // ❌ D024
 
 // D025 — @forward() type mismatch
-const Button = component.proxy<HTMLButtonElement>()({
+const Button = component({
+  forward: surface<HTMLButtonElement>(),
   setup: () => @{ <span @forward()>X</span> }, // ❌ D025: HTMLSpanElement ⊄ HTMLButtonElement
 });
 
-// D026 — proxy component missing @forward()
-const Button = component.proxy<HTMLButtonElement>()({
+// D026 — declared surface never placed
+const Button = component({
+  forward: surface<HTMLButtonElement>(),
   setup: () => @{ <span>no forward</span> }, // ❌ D026
 });
 
 // D027 — multiple @forward() placements
-const SplitPanel = component.proxy<HTMLDivElement>()({
+const SplitPanel = component({
+  forward: surface<HTMLDivElement>(),
   setup: () => @{
     <div @forward()>Left</div>
     <div @forward()>Right</div>  // ❌ D027
@@ -1295,8 +1324,9 @@ const SplitPanel = component.proxy<HTMLDivElement>()({
 });
 
 // D028 — @forward() on a node that is not a native element.
-// A proxy directive payload can only land on a native element.
-const Panel = component.proxy<HTMLDivElement>()({
+// A forwarded directive payload can only land on a native element.
+const Panel = component({
+  forward: surface<HTMLDivElement>(),
   setup: () => @{
     <Card @forward()>           // ❌ D028: component element cannot consume the payload
       <p>Body</p>
@@ -1378,8 +1408,8 @@ const helper = (x: number) => x * 2;
 // Contrast D002, where nothing resolves at all:
 <div use:noSuchDirective()>X</div>      // ❌ D002
 
-// D045 — @forward() in a component with no proxy surface.
-// Plain component(...) declares no payload, so there is nothing to place.
+// D045 — @forward() in a component with no forward surface.
+// Without a `forward` key there is no payload, so there is nothing to place.
 const Plain = component({
   setup: () => @{ <button @forward()>X</button> }, // ❌ D045
 });

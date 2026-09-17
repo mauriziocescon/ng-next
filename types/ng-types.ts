@@ -133,7 +133,7 @@ export type DerivationBindingValue = AnyBindingValue;
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
 //
-// ComponentInstance has bindings + expose + template + proxy-surface
+// ComponentInstance has bindings + expose + template + forward-surface
 // metadata.
 // DirectiveInstance adds a host element type (H) — a directive
 // must be attached to a DOM element.
@@ -151,7 +151,7 @@ declare const BINDINGS: unique symbol;
 declare const EXPOSE: unique symbol;
 declare const COMPONENT_TEMPLATE: unique symbol;
 declare const HOST: unique symbol;
-declare const PROXY_SURFACE: unique symbol;
+declare const FORWARD_SURFACE: unique symbol;
 
 export type ComponentInstance<
   B,
@@ -161,7 +161,7 @@ export type ComponentInstance<
 > = {
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
-  readonly [PROXY_SURFACE]: S;
+  readonly [FORWARD_SURFACE]: S;
   readonly [COMPONENT_TEMPLATE]: TMarkup;
 };
 
@@ -285,23 +285,38 @@ export function refMany(): any {
 //
 // setup returns TemplateMarkup directly or { template, expose? }.
 //
-// component(...) declares a normal component. `bindings` is the public API;
+// component(...) declares every component. `bindings` is the public API;
 // setup receives those binding objects; providers receive inputs only.
 //
-// component.proxy<S>()(...) declares a public directive-compatible surface.
-// S is explicit, must extend HTMLElement, and is realized by exactly one
-// compatible native @forward() placement in the template (D027 on multiple).
+// `forward: surface<S>()` declares a public directive-compatible surface.
+// S must extend HTMLElement and is realized by exactly one compatible native
+// @forward() placement in the template (D027 on multiple). Omitting `forward`
+// leaves no inference site for S, so it falls back to its `never` default —
+// a plain component and a forwarding component share one signature.
 //
-// The call is deliberately split in two. TypeScript does not infer the
-// remaining type arguments of a partially-specified list, so a single-call
-// proxy<S>(config) would silently drop B, E and TMarkup to their defaults —
-// rejecting `bindings` and typing setup's parameters as `any`. Applying S
-// first keeps it explicit while everything else is inferred from config.
+// surface<S>() is a declaration, not a value: a phantom brand behind a
+// `declare function`, with no implementation to call and nothing to allocate.
+// It sits in a value position for the same reason `fragment.required<void>()`
+// does — so the type can be written where TypeScript will infer it — and the
+// compiler erases the config key. setup never receives it.
+//
+// S is a promise, not a fact: @forward() validation checks H ⊑ S, so a
+// component may deliberately declare a wider surface (`HTMLElement`) than the
+// element it forwards to, keeping the internal tag out of its public API.
+// That is why the surface is declared rather than inferred from the template.
 //
 // @forward() is marker-only: no runtime forwarding object, no spread. The
-// enclosing component's proxy surface defines the payload — directives applied
-// at the call site — and the marked native element defines where they land.
+// enclosing component's surface defines the payload — directives applied at
+// the call site — and the marked native element defines where they land.
 // ────────────────────────────────────────────────────────────────
+
+declare const SURFACE_DECL: unique symbol;
+
+export type Surface<H extends HTMLElement> = {
+  readonly [SURFACE_DECL]: H;
+};
+
+export declare function surface<H extends HTMLElement>(): Surface<H>;
 
 type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
   | { template: TMarkup; expose: E } // full form with expose
@@ -312,76 +327,36 @@ type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
 export function component<
   B extends Record<string, ComponentBindingValue>,
   E = void,
+  S extends HTMLElement = never,
   TMarkup extends TemplateMarkup = TemplateMarkup,
 >(
   config: {
     bindings: B & ValidateComponentBindings<B>;
+    forward?: Surface<S>;
     setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
     providers?: (inputs: InputsOnly<B>) => Provider[];
     style?: string;
     styleUrl?: string;
   },
-): ComponentInstance<B, E, never, TMarkup>;
+): ComponentInstance<B, E, S, TMarkup>;
 
 // No bindings
 export function component<
   E = void,
+  S extends HTMLElement = never,
   TMarkup extends TemplateMarkup = TemplateMarkup,
 >(config: {
   bindings?: never;
+  forward?: Surface<S>;
   setup: () => SetupReturn<E, TMarkup>;
   providers?: () => Provider[];
   style?: string;
   styleUrl?: string;
-}): ComponentInstance<{}, E, never, TMarkup>;
+}): ComponentInstance<{}, E, S, TMarkup>;
 
 export function component(config: any): any {
   return config;
 }
-
-// Component namespace helpers
-export namespace component {
-  // Surface-first: S is applied by the outer call and stays explicit, so the
-  // inner call can infer B, E and TMarkup from config. A single-call form
-  // cannot do both — see the section note above.
-  export declare function proxy<S extends HTMLElement = never>(): [S] extends [
-    never,
-  ]
-    ? {
-        __proxy_surface_error__:
-          'component.proxy requires an explicit HTMLElement surface type';
-      }
-    : {
-        // With bindings
-        <
-          B extends Record<string, ComponentBindingValue>,
-          E = void,
-          TMarkup extends TemplateMarkup = TemplateMarkup,
-        >(
-          config: {
-            bindings: B & ValidateComponentBindings<B>;
-            setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
-            providers?: (inputs: InputsOnly<B>) => Provider[];
-            style?: string;
-            styleUrl?: string;
-          },
-        ): ComponentInstance<B, E, S, TMarkup>;
-
-        // No bindings
-        <E = void, TMarkup extends TemplateMarkup = TemplateMarkup>(
-          config: {
-            bindings?: never;
-            setup: () => SetupReturn<E, TMarkup>;
-            providers?: () => Provider[];
-            style?: string;
-            styleUrl?: string;
-          },
-        ): ComponentInstance<{}, E, S, TMarkup>;
-      };
-
-}
-
-(component as any).proxy = () => (config: any) => config;
 
 // ────────────────────────────────────────────────────────────────
 // 8. DIRECTIVE

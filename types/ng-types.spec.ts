@@ -29,6 +29,7 @@ import {
   type TemplateAST,
   type TemplateAstOf,
   type TemplateMarkup,
+  type Surface,
   type __ValidateComponentBindings,
   component,
   derivation,
@@ -39,6 +40,7 @@ import {
   provide,
   ref,
   refMany,
+  surface,
 } from './ng-types';
 
 declare const tmpl: TemplateMarkup;
@@ -201,8 +203,9 @@ type UserDetailBindings = {
   children: OptionalFragmentBinding<void>;
 };
 
-// Surface-first call: S is explicit, bindings are inferred from the object.
-const UserDetail = component.proxy<HTMLElement>()({
+// A declared forward surface does not change how bindings are inferred.
+const UserDetail = component({
+  forward: surface<HTMLElement>(),
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -221,7 +224,7 @@ const UserDetail = component.proxy<HTMLElement>()({
 });
 
 // The bindings record is inferred from the object, not hand-written: the
-// UserDetailBindings alias must stay in sync with what component.proxy
+// UserDetailBindings alias must stay in sync with what component(...)
 // actually infers.
 type _UserDetailBindingsInferred = Assert<
   IsEqual<
@@ -727,28 +730,30 @@ const Sibling = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// 11. COMPONENT — proxy, directive forwarding surface
+// 11. COMPONENT — forward surface
+//
+// `forward: surface<S>()` declares the surface in a value position, so one
+// component(...) signature covers plain and forwarding components: with the
+// key present S is inferred from it, with the key absent there is no
+// inference site and S falls back to its `never` default.
 // ────────────────────────────────────────────────────────────────
 
-// @ts-expect-error component.proxy requires an explicit proxy surface type
-const _NegProxyRequiresExplicitSurface = component.proxy()({
+const ForwardingButton = component({
+  forward: surface<HTMLButtonElement>(),
   setup: () => tmpl,
 });
-
-const ButtonProxy = component.proxy<HTMLButtonElement>()({
-  setup: () => tmpl,
-});
-type _ButtonProxyType = Assert<
+type _ForwardingButtonType = Assert<
   IsEqual<
-    typeof ButtonProxy,
+    typeof ForwardingButton,
     ComponentInstance<{}, void, HTMLButtonElement>
   >
 >;
 
-// Proxy WITH bindings: the surface is explicit while B, E and TMarkup are all
-// inferred from config. Mirrors the readme's Button (proxying directives to an
-// internal element), including class/style binding names aliased in setup.
-const ButtonWithBindings = component.proxy<HTMLButtonElement>()({
+// WITH bindings: S, B, E and TMarkup are all inferred from one config object —
+// no type argument anywhere. Mirrors the readme's Button (forwarding directives
+// to an internal element), including class/style binding names aliased in setup.
+const ButtonWithBindings = component({
+  forward: surface<HTMLButtonElement>(),
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -793,121 +798,128 @@ type _ButtonWithBindingsInferred = Assert<
   >
 >;
 
-// TemplateMarkup<TAst> survives the surface-first call. RESOLVED-FORWARD-HOSTS
-// reads T(C) to locate the single @forward() placement, so a proxy component is
-// precisely the case that must not lose its template AST.
-type _ProxyKeepsTemplateAst = Assert<
+// TemplateMarkup<TAst> survives a config carrying `forward`.
+// RESOLVED-FORWARD-HOSTS reads T(C) to locate the single @forward() placement,
+// so a forwarding component is precisely the case that must not lose its
+// template AST.
+type _ForwardingKeepsTemplateAst = Assert<
   IsEqual<
     TemplateAstOf<ComponentTemplateOf<typeof ButtonWithBindings>>,
     SpecificTemplateAST
   >
 >;
 
-// @ts-expect-error proxy surface must be an HTMLElement subtype
-const _NegInvalidProxySurface = component.proxy<string>()({
+const _NegInvalidSurface = component({
+  // @ts-expect-error forward surface must be an HTMLElement subtype
+  forward: surface<string>(),
   setup: () => tmpl,
 });
 
-// The surface is applied by the outer call only — the old single-call form
-// took bindings as a second type argument and could not infer them.
-type LabelBindings = { label: InputSignal<string | undefined> };
-// @ts-expect-error component.proxy takes only the surface type argument
-const _NegProxyTwoTypeArguments = component.proxy<HTMLElement, LabelBindings>()({
+const _NegComponentAsSurface = component({
+  // @ts-expect-error component instances are not valid forward surface types
+  forward: surface<typeof UserDetail>(),
   setup: () => tmpl,
 });
 
-const _NegProxyMetadataInSetup = component.proxy<HTMLElement>()({
+const _NegDirectiveAsSurface = component({
+  // @ts-expect-error directive instances are not valid forward surface types
+  forward: surface<typeof tooltip>(),
+  setup: () => tmpl,
+});
+
+// The surface is a declaration, not a binding: it is never visible in setup
+// and cannot be smuggled into the bindings record.
+const _NegSurfaceInSetup = component({
+  forward: surface<HTMLElement>(),
   bindings: {
     label: input<string>(),
   },
   setup: (bindings) => {
-    // @ts-expect-error proxy surface metadata is not visible in setup bindings
-    bindings.proxySurface;
+    // @ts-expect-error forward surface metadata is not visible in setup bindings
+    bindings.forward;
     return tmpl;
   },
 });
-
-const _NegComponentAsProxySurface = (
-  // @ts-expect-error component instances are not valid proxy surface types
-  component.proxy<typeof UserDetail>()({
-    setup: () => tmpl,
-  })
-);
-
-// @ts-expect-error directive instances are not valid proxy surface types
-const _NegDirectiveAsProxySurface = component.proxy<typeof tooltip>()({
-  setup: () => tmpl,
-});
-
-// A second proxy surface, used by §12's directive-compatibility checks.
-const InputProxy = component.proxy<HTMLInputElement>()({
-  setup: () => tmpl,
-});
-type _InputProxyType = Assert<
-  IsEqual<typeof InputProxy, ComponentInstance<{}, void, HTMLInputElement>>
+type _SurfaceIsNotABindingValue = Assert<
+  IsEqual<Surface<HTMLElement> extends ComponentBindingValue ? true : false, false>
 >;
 
-// A plain component has no proxy surface: P(C) = never.
+// A second forward surface, used by §12's directive-compatibility checks.
+const ForwardingInput = component({
+  forward: surface<HTMLInputElement>(),
+  setup: () => tmpl,
+});
+type _ForwardingInputType = Assert<
+  IsEqual<typeof ForwardingInput, ComponentInstance<{}, void, HTMLInputElement>>
+>;
+
+// `forward` omitted: no inference site, so F(C) = never.
 const NoForwardingTarget = component({
   setup: () => tmpl,
 });
-type _NoProxySurface = Assert<
+type _NoForwardSurface = Assert<
   IsEqual<typeof NoForwardingTarget, ComponentInstance<{}, void, never>>
 >;
 
 // ────────────────────────────────────────────────────────────────
 // 12. DIRECTIVE — forwarding compatibility
 //
-// Directive host must accept the component's proxy surface.
+// Directive host must accept the component's forward surface.
 // ────────────────────────────────────────────────────────────────
 
-type ProxySurface<C extends ComponentInstance<any, any, any>> =
+type ForwardSurfaceOf<C extends ComponentInstance<any, any, any>> =
   C extends ComponentInstance<any, any, infer S> ? S : never;
 type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
   D extends DirectiveInstance<infer H, any, any> ? H : never;
-type DirectiveFitsProxySurface<
+type DirectiveFitsForwardSurface<
   C extends ComponentInstance<any, any, any>,
   D extends DirectiveInstance<any, any, any>,
 > =
-  ProxySurface<C> extends never
+  ForwardSurfaceOf<C> extends never
     ? false
-    : ProxySurface<C> extends DirectiveHost<D>
+    : ForwardSurfaceOf<C> extends DirectiveHost<D>
       ? true
       : false;
 
-type _ButtonProxyAcceptsButtonDirective = Assert<
+type _ButtonAcceptsButtonDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<typeof ButtonProxy, typeof buttonOnly>,
+    DirectiveFitsForwardSurface<typeof ForwardingButton, typeof buttonOnly>,
     true
   >
 >;
-type _ButtonProxyAcceptsGenericDirective = Assert<
+type _ButtonAcceptsGenericDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<typeof ButtonProxy, typeof tooltip>,
+    DirectiveFitsForwardSurface<typeof ForwardingButton, typeof tooltip>,
     true
   >
 >;
-// @ts-expect-error input-host directive cannot attach to a button proxy surface
-const _negButtonProxyRejectsInputDirective: DirectiveFitsProxySurface<
-  typeof ButtonProxy,
+// @ts-expect-error input-host directive cannot attach to a button forward surface
+const _negButtonRejectsInputDirective: DirectiveFitsForwardSurface<
+  typeof ForwardingButton,
   typeof inputOnly
 > = true;
 
-type _InputProxyAcceptsInputDirective = Assert<
-  IsEqual<DirectiveFitsProxySurface<typeof InputProxy, typeof inputOnly>, true>
+type _InputAcceptsInputDirective = Assert<
+  IsEqual<
+    DirectiveFitsForwardSurface<typeof ForwardingInput, typeof inputOnly>,
+    true
+  >
 >;
-type _InputProxyAcceptsGenericDirective = Assert<
-  IsEqual<DirectiveFitsProxySurface<typeof InputProxy, typeof tooltip>, true>
+type _InputAcceptsGenericDirective = Assert<
+  IsEqual<
+    DirectiveFitsForwardSurface<typeof ForwardingInput, typeof tooltip>,
+    true
+  >
 >;
-// @ts-expect-error button-host directive cannot attach to an input proxy surface
-const _negInputProxyRejectsButtonDirective: DirectiveFitsProxySurface<
-  typeof InputProxy,
+// @ts-expect-error button-host directive cannot attach to an input forward surface
+const _negInputRejectsButtonDirective: DirectiveFitsForwardSurface<
+  typeof ForwardingInput,
   typeof buttonOnly
 > = true;
 
 type _PlainComponentRejectsDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<typeof NoForwardingTarget, typeof tooltip>,
+    DirectiveFitsForwardSurface<typeof NoForwardingTarget, typeof tooltip>,
     false
   >
 >;

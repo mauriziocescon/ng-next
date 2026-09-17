@@ -30,7 +30,7 @@ const OUT = join(ROOT, 'node_modules', '.readme-snippets');
 
 /** Provided by this proposal rather than by @angular/core. */
 const DSL = [
-  'component', 'directive', 'derivation', 'fragment',
+  'component', 'directive', 'derivation', 'fragment', 'surface',
   'ref', 'refMany', 'inject', 'provide', 'injectionToken',
 ];
 
