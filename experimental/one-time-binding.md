@@ -61,6 +61,7 @@ derivation inputs. It is not a DOM feature.
 once:model:*                       → D018
 once:on:*                          → D018
 once: on a native element property → D018
+once: on a fragment prop (§10.2)   → D018
 once:prop + prop on same target    → D019
 ─────────────────────────────────────────────────
 ```
