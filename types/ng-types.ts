@@ -9,8 +9,6 @@ import {
   type Signal,
 } from '@angular/core';
 
-import type { TemplateAST } from './ng-ast';
-
 // ────────────────────────────────────────────────────────────────
 // 1. TEMPLATE MARKUP
 //
@@ -19,10 +17,20 @@ import type { TemplateAST } from './ng-ast';
 // The AST payload is phantom type metadata: the compiler produces
 // TemplateMarkup<TAst> from the DSL, while public APIs can accept
 // the default TemplateMarkup alias when they do not inspect the tree.
+//
+// TemplateAST is nominal and opaque here. The shape of a parsed `@{ }`
+// literal is the compiler's concern; this layer only needs a distinct
+// token so a specific markup type cannot be mistaken for the generic
+// one. See ng-dsl-type-checking-spec.md §2.1 (MARKUP-LITERAL).
 // ────────────────────────────────────────────────────────────────
 
 declare const TEMPLATE: unique symbol;
 declare const TEMPLATE_AST: unique symbol;
+declare const TEMPLATE_AST_BRAND: unique symbol;
+
+export interface TemplateAST {
+  readonly [TEMPLATE_AST_BRAND]: true;
+}
 
 export type TemplateMarkup<TAst extends TemplateAST = TemplateAST> = {
   readonly [TEMPLATE]: true;

@@ -10,7 +10,6 @@ function llmsTxt() {
 
   const sections = [
     { file: 'readme.md', title: 'Proposal narrative, syntax, and examples — covers component/directive/derivation/fragment APIs, binding syntax, composition patterns, and DI enhancements.' },
-    { file: 'types/ng-ast.ts', title: 'Template AST type definitions — the structural representation of parsed `@{ }` markup (nodes, bindings, expressions, control flow).' },
     { file: 'types/ng-types.ts', title: 'Core runtime type contracts — `TemplateMarkup`, component/directive/derivation/fragment factories, `ref`, `expose`, `provide`, `injectionToken`.' },
     { file: 'types/ng-types.spec.ts', title: 'Type-level test suite — usage examples showing how the type system enforces binding correctness, proxy forwarding, and DI wiring.' },
     { file: 'types/ng-dsl-type-checking-spec.md', title: 'DSL type-checking specification — formal judgments for what the template type checker must verify inside `@{ }` (element resolution, binding arity, directive host constraints, etc.).' },

@@ -12,8 +12,6 @@ import {
   signal,
 } from '@angular/core';
 
-import type { TemplateAST } from './ng-ast';
-
 import {
   type ComponentInstance,
   type ComponentBindingValue,
@@ -27,6 +25,7 @@ import {
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
+  type TemplateAST,
   type TemplateAstOf,
   type TemplateMarkup,
   type __ValidateComponentBindings,

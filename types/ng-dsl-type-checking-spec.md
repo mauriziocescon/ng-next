@@ -16,12 +16,16 @@ Out of scope: parser, lowering pipeline, non-template TS helper APIs (`inject()`
 
 Expected pipeline:
 
-1. parse `@{ ... }` into `TemplateAST`, handing each `{ ... }` region to the
-   TypeScript parser and carrying the result as `TemplateExpression`;
-2. assign the markup literal the type `TemplateMarkup<ConcreteTemplateAST>`;
-3. check the `TemplateAST` using the judgments below, delegating expression
-   typing to TypeScript;
+1. parse `@{ ... }` into a template tree, handing each `{ ... }` region to the
+   TypeScript parser and carrying the resulting expression node opaquely;
+2. assign the markup literal the type `TemplateMarkup<TAst>`;
+3. check the tree using the judgments below, delegating expression typing to
+   TypeScript;
 4. lower the checked tree to runtime instructions.
+
+The tree's concrete shape is the compiler's concern and is deliberately not
+specified here — `TemplateAST` (`ng-types.ts`) is an opaque nominal token.
+The judgments are stated over the node vocabulary in Notation.
 
 Normative language follows RFC 2119: **must** / **must not** are required for
 conformance; **may** describes implementation freedom.
@@ -53,6 +57,27 @@ E = expose type (void when absent)
 S = proxy surface type (never when absent)
 M = TemplateMarkup<TAst>
 ```
+
+### Template node vocabulary
+
+The judgments are stated over the fields below. They name the **roles** a
+parsed node carries, not a data structure — a compiler is free to represent
+them however it likes.
+
+| Node | Fields |
+|------|--------|
+| element (native or component) | `name`, `attributes`, `inputs`, `models`, `outputs`, `classes`, `styles`, `animations`, `references`, `directives`, `fragments`, `children`, `forwardMarker` |
+| directive application | `directiveName`, `inputs`, `models`, `outputs`, `fragments`, `when`, `ref` |
+| fragment | `name`, `origin` (`inline` \| `implicitChildren`), `parameters`, `children` |
+| derive | `name`, `derivation`, `inputs` |
+| binding entry | `name`, plus `value` or `handler`; input entries also carry `once` |
+| animate binding | `phase` (`enter` \| `leave`), `kind` (`class` \| `event`), `value` or `handler` |
+| ref | `target` (a single identifier) |
+
+`attributes` are static `name="literal"` pairs. `inputs` are `name={expr}`
+bindings — which, per §10.2, may target either an input or a fragment binding.
+A component element's `fragments` are the fragments *delivered* to it; a
+`@fragment` declaration anywhere else is an ordinary child node (§10.1).
 
 ---
 
@@ -146,9 +171,10 @@ also produces a better diagnostic than a parse failure: `count = 5` reports
 *assignment is not allowed in a template expression* (D042) rather than an
 unexplained syntax error.
 
-Correspondingly, `ng-ast.ts` carries expressions opaquely as
-`TemplateExpression<TNode>` (spans plus the TypeScript node) and does not model
-their internals.
+Correspondingly, the template tree carries each expression opaquely — its
+spans plus the TypeScript node — and does not model its internals. The same
+holds for the type annotations on `@fragment` parameters (§10.1): they are
+TypeScript types, carried as written and resolved by TypeScript.
 
 ### 2.1 Markup Literal Typing
 
@@ -166,18 +192,39 @@ parse(@{ source }) = TAst : TemplateAST
 ### 2.2 Template Tree Traversal
 
 ```
-CHECK-NODES
+CHECK-NODES(Γ, nodes)
 ─────────────────────────────────────────────────────────────────
-∀ node ∈ nodes:  Γ ⊢ node ✓
-Child TemplateNode[] lists are checked under the node's scoped Γ.
+Declaration forms extend Γ for the nodes that follow, so a child list is
+checked left to right with Γ threaded through:
+
+  Γ₀ = Γ ∪ { every @fragment declared directly in `nodes` }   (§10.1)
+
+  for i in 0 .. n-1:
+    Γᵢ ⊢ nodesᵢ ✓
+    Γᵢ₊₁ = Γᵢ ∪ bind(nodesᵢ)
+
+  bind(@let name = e)          = { name : T }           (§11)
+  bind(@derive name = D(...))  = { name : Signal<T> }   (§9)
+  bind(_)                      = ∅
+
+Each node's own children are checked under its scoped Γ — the @for item and
+context variables, @if aliases, @fragment parameters.
 ─────────────────────────────────────────────────────────────────
 ```
+
+`@fragment` names are pre-collected into Γ₀ rather than threaded, because
+§10.1 makes a declaration visible to *every* sibling in its child list, not
+only to later ones. `@let` and `@derive` are forward-scoped, so they thread.
+Neither escapes the child list it is declared in.
+
+The template root is the entry point: `CHECK-NODES(Γ, root.nodes)`, with Γ
+assembled per §1 (SCOPE-RESOLVE).
 
 ### 2.3 Comments
 
 `//` line comments and `/* */` block comments are permitted in markup and are
-**discarded at parse time**. There is no comment node in `TemplateNode`, and no
-judgment applies to them.
+**discarded at parse time**. There is no comment node in the template tree, and
+no judgment applies to them.
 
 A comment is recognized only where a template node may begin. Inside text
 content and attribute values, `//` and `/*` are ordinary characters — so
@@ -219,9 +266,10 @@ B[model.name] : ModelSignal<T>                        → D010 if absent
 CHECK-OUTPUT(Γ, B, output)
 ─────────────────────────────────────────────────
 output.name ∈ keys(B)
-B[output.name] : OutputEmitterRef<T>
+B[output.name] : OutputEmitterRef<T>                  → D010 if absent
 Γ ⊢ output.handler : U
-U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
+U ⊑ ((e: T) → void)                                   → D015 on mismatch
+       (arity-safe: () → void is assignable)
 ─────────────────────────────────────────────────
 ```
 
@@ -231,26 +279,37 @@ U ⊑ ((e: T) → void)    (arity-safe: () → void is assignable)
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-B[frag.name] : FragmentBinding<T>
+B[frag.name] : FragmentBinding<T>                          → D030 if absent
 frag.parameters match FragmentArgs<T> positionally         → D029
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
-Γ' ⊢ frag.children ✓
+CHECK-NODES(Γ', frag.children)
 ─────────────────────────────────────────────────
 ```
 
+This is the **inline** delivery form — a `@fragment` declared as a direct
+child of a component element (§10.2). A `@fragment` anywhere else declares a
+name without delivering it and is checked by FRAGMENT-DEF (§10.1) instead.
+The by-value form `name={expr}` is CHECK-FRAGMENT-PROP (§10.2).
+
 The `children` binding name is reserved at **declaration** time (D004): if
-present in `bindings`, it must be a `FragmentBinding<void>`. Call-site delivery
-rules for all fragments (including `children`) are in §10.2.
+present in a component's `bindings`, it must be a `FragmentBinding<void>`.
+Call-site delivery rules for all fragments (including `children`) are in §10.2.
 
 ### 3.5 Required Bindings Check
 
 ```
 CHECK-REQUIRED(B, provided, context_label)
 ─────────────────────────────────────────────────
-∀ k ∈ keys(B):
-  B[k] : InputSignal.required<T>    → k ∈ provided_inputs
-  B[k] : ModelSignal.required<T>    → k ∈ provided_models
-  B[k] : RequiredFragmentBinding<T> → k ∈ provided_fragments
+required(k) is a property of how k was declared, not of its type:
+
+  input.required<T>()    required     input<T>() / input<T>(d)  optional
+  model.required<T>()    required     model<T>()                optional
+  fragment.required<T>() required     fragment<T>()             optional
+
+∀ k ∈ keys(B) where required(k):
+  BindingKind<B[k]> = input     → k ∈ provided_inputs
+  BindingKind<B[k]> = model     → k ∈ provided_models
+  BindingKind<B[k]> = fragment  → k ∈ provided_fragments
 
 Violation → D013 (component), D014 (directive), D034 (derivation)
 ─────────────────────────────────────────────────
@@ -258,20 +317,26 @@ Violation → D013 (component), D014 (directive), D034 (derivation)
 
 `provided_fragments` includes all delivery mechanisms defined in §10.2.
 
+Note that only fragments carry required-ness in the type:
+`RequiredFragmentBinding<T>` and `OptionalFragmentBinding<T>` are nominally
+distinct (`ng-types.ts`). Angular erases it for inputs and models —
+`input.required<User>()` and `input<User>(d)` are both `InputSignal<User>` —
+so a checker must read `required(k)` from the declaration site. There is no
+`InputSignal.required<T>` type to test against.
+
 ### 3.6 Unknown Bindings Check
 
 ```
 NO-UNKNOWN-BINDINGS(B, node)
 ─────────────────────────────────────────────────
-∀ b ∈ binding lists carried by node:  b.name ∈ keys(B)
+∀ b ∈ binding lists carried by node:  b.name ∈ keys(B)   → D010
 
-  element node:   attributes, inputs, models, outputs, fragments
-  directive node: inputs, models, outputs, fragments
-  derive node:    inputs
+  component element: attributes, inputs, models, outputs, fragments
+  directive:         inputs, models, outputs, fragments
+  derive:            inputs
 
-Violation → D009 (resolved against the DOM type system: native element)
-            D010 (resolved against a bindings record: component, directive,
-                  derivation)
+Native elements do not use this rule — they resolve against the DOM type
+system through the CHECK-NATIVE-* rules in §4 (→ D009).
 ─────────────────────────────────────────────────
 ```
 
@@ -283,9 +348,24 @@ NO-DUPLICATE-BINDINGS(node)
 ∀ name: |{a ∈ attributes | a.name = name}| ≤ 1
 ∀ name: |{b ∈ inputs ∪ models | b.name = name}| ≤ 1
 ∀ name: |{b ∈ outputs | b.name = name}| ≤ 1
-∀ name: |{b ∈ fragments | b.name = name}| ≤ 1
 |references| ≤ 1
 Violation → D011
+
+A fragment must be delivered once, by one mechanism (§10.2). Let
+delivered(name) = the fragment props in inputs, the inline fragments, and
+the implicit children fragment, taken together:
+
+∀ name: |delivered(name)| ≤ 1
+
+  both occurrences are inline fragments  → D031
+  otherwise (mechanisms differ)          → D011
+
+Two occurrences of the same name in the same list get the more specific
+code; a name arriving by two different mechanisms is an ordinary duplicate.
+
+Exception: a pair differing only in the once: modifier — once:prop and prop
+on the same element — is D019, not D011, for the same reason.
+
 classes: repeatable (multiple class:name allowed per element)
 styles: repeatable (multiple style:prop allowed per element)
 animate: uses ANIMATE-CONSTRAINTS (§4.2)
@@ -334,15 +414,17 @@ derivation inputs. It is not a DOM feature.
 once:model:*                       → D018
 once:on:*                          → D018
 once: on a native element property → D018
+once: on a fragment prop (§10.2)   → D018
 once:prop + prop on same target    → D019
 ─────────────────────────────────────────────────
 ```
 
-Note on when D018 fires. The `model:`/`on:` cases are parse-time:
-`BoundModelNode` and `BoundEventNode` carry no `once` field, so the combination
-cannot be represented. The native case is check-time: `BoundAttributeNode.once`
-is shared by native and component inputs, and only element resolution (§4)
-tells the two apart.
+Note on when D018 fires. The `model:`/`on:` cases are parse-time: the grammar
+admits `once:` only before an input name, so `once:model:x` and `once:on:x`
+never reach the checker. The other two are check-time — `once:prop` is
+well-formed syntax, and only element resolution (§4) and the binding record
+(§10.2) tell a component input apart from a native property or a fragment
+prop.
 
 ### 3.10 on-Prefix Warning
 
@@ -379,13 +461,18 @@ tag ∈ IntrinsicElements    H = I(tag)
 ∀ anim ∈ node.animations:       CHECK-ANIMATE-BINDING(Γ, anim)
 ∀ dir ∈ node.directives:        CHECK-DIRECTIVE-USE(Γ, H, {node}, dir)
 ∀ ref ∈ node.references:        CHECK-REF(Γ, H, ref)
-node.fragments = []             (a native tag has no binding surface
-                                 to deliver a fragment to)      → D030
+node.forwardMarker ≠ ∅:         FORWARD-PROXY (§6.2)
+CHECK-NODES(Γ, node.children)
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ <tag ...> ✓
 ```
+
+A native element has no fragment *delivery* surface, but a `@fragment`
+declared among its children is an ordinary declaration — it introduces a name
+in scope and is checked by FRAGMENT-DEF (§10.1), exactly as `<ng-template>`
+inside a `<div>` works today. It is not an error.
 
 Native-specific binding rules (resolve properties/events from the DOM type
 system rather than a `bindings` record):
@@ -439,6 +526,14 @@ style:prop={expr}    Γ ⊢ expr : string | number | null
 ### 4.2 animate: Typing
 
 ```
+CHECK-ANIMATE-BINDING(Γ, anim)
+─────────────────────────────────────────────────
+anim.kind = "class"  → ANIMATE-CLASS-BINDING(Γ, anim.value)
+anim.kind = "event"  → ANIMATE-EVENT-BINDING(Γ, anim.handler)
+Both forms are subject to ANIMATE-CONSTRAINTS.
+─────────────────────────────────────────────────
+
+
 ANIMATE-CLASS-BINDING
 ─────────────────────────────────────────────────
 animate:phase={expr}   where phase ∈ {"enter", "leave"}
@@ -456,8 +551,8 @@ AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction; }
 ANIMATE-CONSTRAINTS
 ─────────────────────────────────────────────────
 - applies ONLY to native elements (not components → D036)
-- phase must be "enter" or "leave" → D037 (parse-time: `AnimateBindingNode.phase`
-  is already `'enter' | 'leave'`)
+- phase must be "enter" or "leave" → D037 (parse-time: the grammar admits only
+  those two phase names)
 - at most one animate:enter and one animate:leave (class form) per element → D038
 - at most one on:animate:enter and one on:animate:leave per element        → D039
 - both phases and both forms (class + event) can coexist on the same element
@@ -476,15 +571,20 @@ C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
 node.classes ≠ []        → D021
 node.styles ≠ []         → D021
 node.animations ≠ []     → D036
+node.forwardMarker ≠ ∅   → D028   (FORWARD-INVALID, §6.2)
 
 ∀ attr ∈ node.attributes:  CHECK-COMP-TEXT-INPUT(Γ, B, attr)
-∀ input ∈ node.inputs:     CHECK-INPUT(Γ, B, input)
+∀ b ∈ node.inputs:         dispatch on BindingKind<B[b.name]> (§12):
+                             input    → CHECK-INPUT(Γ, B, b)
+                             fragment → CHECK-FRAGMENT-PROP(Γ, B, b)
+                             absent   → D010
 ∀ model ∈ node.models:     CHECK-MODEL(Γ, B, model)
 ∀ output ∈ node.outputs:   CHECK-OUTPUT(Γ, B, output)
-∀ frag ∈ node.fragments where frag.origin = "explicit":
+∀ frag ∈ node.fragments where frag.origin = "inline":
   CHECK-FRAGMENT(Γ, B, frag)
 ∀ frag ∈ node.fragments where frag.origin = "implicitChildren":
-  Γ ⊢ frag.children ✓
+  B["children"] : FragmentBinding<void>                    → D030
+  CHECK-NODES(Γ, frag.children)
 ∀ ref ∈ node.references:   CHECK-REF(Γ, E, ref)
 node.children = []         (nested content is lowered to the
                             "implicitChildren" fragment — §10.2)
@@ -666,8 +766,9 @@ B_D[frag.name] : FragmentBinding<T>
 
 Inline `@fragment` delivery is supported only on component elements. Directives receive fragments exclusively by reference via `name={expr}` syntax inside `use:dir(...)` — inline `@fragment` declarations are rejected (D032).
 
-Note: D032 is a parse-time diagnostic. `DirectiveFragmentNode` carries only
-`value: AST`, so an inline declaration cannot be represented.
+Note: D032 is a parse-time diagnostic. The grammar admits only `name={expr}`
+inside `use:dir(...)`, so an inline `@fragment` declaration there never reaches
+the checker.
 
 ### 7.1 Uniqueness Note
 
@@ -695,7 +796,7 @@ FLOW: branches must be checked as if lowered to a TypeScript if/else-if/else
 
 if alias: Γ' = Γ ∪ { alias : expression narrowed to truthy (per FLOW) }
 else:     Γ' = Γ
-Γ' ⊢ children ✓
+CHECK-NODES(Γ', branch.children)
 ```
 
 Γ carries declarations, FLOW carries narrowing — TypeScript's, so there is no
@@ -718,8 +819,8 @@ FOR
   $even : boolean, $odd : boolean,
 } ∪ aliases
 
-Γ' ⊢ children ✓
-if empty block: Γ ⊢ empty.children ✓
+CHECK-NODES(Γ', children)
+if empty block: CHECK-NODES(Γ, empty.children)
 ```
 
 ### 8.3 @switch
@@ -730,7 +831,7 @@ SWITCH
 Γ ⊢ expression : T
 ∀ case:
   Γ ⊢ case.expression : U    U comparable to T
-  Γ ⊢ case.children ✓
+  CHECK-NODES(Γ, case.children)
 
 FLOW: cases must be checked as if lowered to a TypeScript switch statement, so
       a discriminant narrows in each case body and `@default` sees the residual.
@@ -762,9 +863,28 @@ Any non-input binding form → D035
 Block-scoped to enclosing control-flow block. Each `@for` iteration owns an
 independent instance.
 
-Note: D035 is a parse-time diagnostic. The AST `DeriveNode` only carries
-`inputs: DerivationInputNode[]` — non-input binding forms are rejected before
-the tree reaches the type checker.
+Note: D035 is a parse-time diagnostic. The grammar admits only `name={expr}`
+input bindings inside `@derive name = D(...)`, so `model:`, `on:` and inline
+fragment forms never reach the checker.
+
+### 9.1 Derivation Declaration Contract
+
+A TypeScript API well-formedness rule (not a template-node judgment):
+
+```
+DERIVATION-BINDINGS-INPUTS-ONLY
+─────────────────────────────────────────────────────────────────
+∀ k ∈ keys(B) of derivation(...):  BindingKind<B[k]> = input
+Model, output or fragment binding → D043
+
+A derivation has no DOM surface — no host, no events, no content — so the
+only binding kind that means anything is an input.
+─────────────────────────────────────────────────────────────────
+```
+
+Enforced at the type level by `ValidateDerivationBindings` (`ng-types.ts`),
+which maps a non-input binding to `never`. D035 is the template-side
+counterpart: D043 rejects the *declaration*, D035 the *call site*.
 
 ---
 
@@ -777,39 +897,79 @@ FRAGMENT-DEF
 ─────────────────────────────────────────────────────────────────
 @fragment name(p₁: T₁, ..., pₙ: Tₙ) { children }
 
-When passed to a component: checked via CHECK-FRAGMENT(Γ, B_parent, frag).
+As a direct child of a component element: delivered to the parent's matching
+binding, checked via CHECK-FRAGMENT(Γ, B_parent, frag) — §10.2.
 
-When standalone (not passed as prop):
+Anywhere else — native element, control-flow block, template root — it is
+standalone: it declares a name without delivering it.
   Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
-  Γ' ⊢ children ✓
+  CHECK-NODES(Γ', children)
 
 In both cases introduces name : RequiredFragmentBinding<T> in its lexical
 template scope. T is derived from declared parameters: 0 params → void,
-n params → [T₁, ..., Tₙ]. Visible to sibling nodes and descendants;
-not visible outside the child-list where declared.
+n params → [T₁, ..., Tₙ]. Visible to every sibling in the child-list where it
+is declared and to their descendants; not visible outside it.
 ─────────────────────────────────────────────────────────────────
 ```
 
-### 10.2 Fragment Props
+A standalone declaration is the DSL's local named template — the role
+`<ng-template #name>` plus `ngTemplateOutlet` plays today. It is not an error:
 
-**Explicit:** `<Component fragmentName={fragmentValue} />` — checks
-`fragmentValue ⊑ FragmentBinding<T>` when `B[name] : RequiredFragmentBinding<T>`,
-or `fragmentValue ⊑ FragmentBinding<T> | undefined` when
-`B[name] : OptionalFragmentBinding<T>`.
+```ts
+<div>
+  @fragment row(i: Item) { <span>{i.desc}</span> }
+  @for (item of items(); track item.id) { @render(row(item)) }
+</div>
+```
 
-**Implicit (inline):** `@fragment name(...) { ... }` as direct child of a
-component element — auto-passed to the matching binding. Rules:
+Parameter type annotations are ordinary TypeScript types, carried as written
+and resolved by TypeScript in Γ (§2).
+
+### 10.2 Fragment Delivery
+
+Three mechanisms deliver a fragment to a component binding.
+
+**By value (fragment prop):** `<Component fragmentName={expr} />`
+
+```
+CHECK-FRAGMENT-PROP(Γ, B, prop)
+─────────────────────────────────────────────────
+prop.name ∈ keys(B)                                        → D010 if absent
+prop.once = false                                          → D018 otherwise
+
+B[prop.name] : RequiredFragmentBinding<T>
+  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T>              → D015 on mismatch
+
+B[prop.name] : OptionalFragmentBinding<T>
+  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T> | undefined  → D015 on mismatch
+─────────────────────────────────────────────────
+```
+
+**Inline:** `@fragment name(...) { ... }` as a direct child of a component
+element, delivered to the matching binding and checked by CHECK-FRAGMENT
+(§3.4).
 - Parent must have binding `name: FragmentBinding<T>` → D030
-- No explicit binding with the same name exists → D011
-- No duplicate implicit fragment with the same name → D031
+- The same name must not also arrive as a fragment prop → D011
+- No duplicate inline fragment with the same name → D031
 
-**Implicit children:** Non-fragment direct child content inside
-`<Component>...</Component>` — lowered to `FragmentNode { name: "children",
-origin: "implicitChildren" }`. Parent must have `children: FragmentBinding<void>`.
+**Implicit children:** non-fragment direct child content inside
+`<Component>...</Component>`, lowered to a fragment named `children` with
+origin `implicitChildren`. Parent must have `children: FragmentBinding<void>`
+→ D030.
 
-All three delivery mechanisms work for `children` (explicit prop, inline
-`@fragment children()`, or implicit nested content). Providing the same
-fragment name through multiple mechanisms is a duplicate error (D011/D031).
+All three work for `children`. Providing the same fragment name through more
+than one mechanism is a duplicate (D011 / D031).
+
+**On the shared syntax.** A fragment prop and an input binding are written
+identically — `name={expr}` — so the call site alone does not say which one it
+is; the component's binding record `B` is the disambiguator, through
+`BindingKind` (§12). Two consequences worth stating. A fragment prop is
+subject to the input rules that are about *position* (it occupies the same
+name-uniqueness slot, D011) but not to those about *being an input* (`once:`
+on one is D018, §3.9). And changing a declaration from `input<T>()` to
+`fragment<T>()` silently changes what every existing call site means — a
+declaration-side change a reviewer has to catch, since nothing at the call
+site marks the difference.
 
 ### 10.3 @render Invocation
 
@@ -904,7 +1064,7 @@ BindingKind<V> =
 | D027 | Forwarding | Multiple `@forward()` placements in one component | Error |
 | D028 | Forwarding | `@forward()` on a node that is not a native element | Error |
 | D029 | Fragments | Fragment argument count/type mismatch | Error |
-| D030 | Fragments | Implicit fragment has no matching parent binding, or is delivered to a native element | Error |
+| D030 | Fragments | Fragment delivered to a component element has no matching parent binding | Error |
 | D031 | Fragments | Duplicate implicit fragment name under same parent | Error |
 | D032 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
 | D033 | Refs | `ref=` variable type incompatible with expose | Error |
@@ -917,6 +1077,7 @@ BindingKind<V> =
 | D040 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
 | D041 | Animate | `on:animate:` handler type mismatch | Error |
 | D042 | Expressions | Restricted TypeScript form used inside `{ ... }` | Error |
+| D043 | Derivation | `derivation(...)` declares a model, output or fragment binding | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1065,8 +1226,9 @@ const Panel = component.proxy<HTMLDivElement>()({
 // D030 — no matching parent fragment binding
 <Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D030
 
-// D030 — inline fragment delivered to a native element (no binding surface)
-<div>@fragment row(i: Item) { <span>{i.name}</span> }</div> // ❌ D030
+// Permitted: inside a native element there is nothing to deliver to, so the
+// same declaration is a local named template (§10.1) — not an error
+<div>@fragment row(i: Item) { <span>{i.desc}</span> }</div> // ✅
 
 // D031 — duplicate inline fragment
 <List>
@@ -1104,6 +1266,9 @@ const child = ref<HTMLDivElement>();
 
 // D041 — on:animate: handler type mismatch
 <div on:animate:enter={(x: string) => {}}>X</div> // ❌ D041
+
+// D043 — derivation declares a non-input binding
+derivation({ bindings: { changed: model<number>() }, /* ... */ }) // ❌ D043
 
 // D042 — restricted form inside { }
 <button on:click={count = 5}>X</button>              // ❌ D042: assignment
