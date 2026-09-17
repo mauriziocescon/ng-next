@@ -1065,7 +1065,7 @@ BindingKind<V> =
 | D028 | Forwarding | `@forward()` on a node that is not a native element | Error |
 | D029 | Fragments | Fragment argument count/type mismatch | Error |
 | D030 | Fragments | Fragment delivered to a component element has no matching parent binding | Error |
-| D031 | Fragments | Duplicate implicit fragment name under same parent | Error |
+| D031 | Fragments | Duplicate inline fragment name under same parent | Error |
 | D032 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
 | D033 | Refs | `ref=` variable type incompatible with expose | Error |
 | D034 | Derivation | Missing required derivation input | Error |
