@@ -11,7 +11,7 @@ Highlights:
   - `derivation`: a factory for template-scoped computed values that requires DI,
   - `fragment`: a way to capture some markup in the form of a function,
 2. TS expressions with `{}`: bindings + text interpolation
-3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `class:`, `style:`, `animate:`, `use:`,
+3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `once:`, `class:`, `style:`, `animate:`, `use:`,
 4. Hostless components + TS lexical scoping for templates,
 5. Component inputs: lifted up + immediately available in setup and providers,
 6. Expose and Template Refs,
@@ -207,7 +207,7 @@ export const tooltip = directive({
 
 `@derive` creates a template-scoped reactive computation, establishing an injection context before calling the derivation's `setup`. It follows the lifecycle of the enclosing view. Bindings are passed as named pairs `key={expr}`, not as a JS object literal.
 
-Only inputs are allowed (no outputs, no models — a derivation has no DOM surface). `setup` must return a `Signal<T>`.
+Only inputs are allowed (no outputs, no models, no fragments — a derivation has no DOM surface). `setup` must return a `Signal<T>`.
 
 ```ts
 import { component, derivation, computed, inject, input } from '@angular/core';
@@ -305,14 +305,15 @@ export const Consumer = component({
 Inputs hoisted to the component level for use in provider initialization (`providers` receives only inputs — not models or outputs). Provider factories run in an injection context — `inject()` works inside them:
 
 ```ts
-import { component, linkedSignal, input, WritableSignal, provide, inject } from '@angular/core';
+import { component, linkedSignal, input, WritableSignal, Signal, provide, inject } from '@angular/core';
 
 class CounterStore {
   private readonly counter: WritableSignal<number>;
-  readonly value = this.counter.asReadonly();
+  readonly value: Signal<number>;
 
   constructor(c = () => 0) {
     this.counter = linkedSignal(() => c());
+    this.value = this.counter.asReadonly();
   }
 
   decrease() {/** ... **/}
@@ -412,7 +413,11 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Forwarding has two component APIs and one marker: `component.proxy<T>()` exposes a directive-compatible native surface, `component.wrap(Target)` forwards a wrapped component's remaining API, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings/directive instructions.
+Forwarding has one declaration and one marker: `forward: surface<T>()` in the component config exposes a directive-compatible native surface, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary directive instructions.
+
+`surface<T>()` is a declaration, not a value — a phantom brand behind a `declare function`, with nothing to call and nothing to allocate. It sits in a value position for the same reason `fragment.required<void>()` does: so `T` can be written where TypeScript will infer it, leaving `bindings`, `expose`, and the template type inferred from the same `config` object. `setup` never receives it, and the compiler erases the key.
+
+Declaring the surface rather than reading it off the `@forward()` element is deliberate. Validation checks that the marked element is assignable *to* `T`, so a component can promise a wider surface (`HTMLElement`) than the element it actually forwards to — keeping the internal tag out of its public API. Inference would always make the tightest promise, turning `<button>` → `<a>` into a silent breaking change for every consumer.
 
 ### Implicit children fragment
 
@@ -515,9 +520,9 @@ export const Menu = component({
 });
 ```
 
-### Proxying directives to an internal element
+### Forwarding directives to an internal element
 
-`Button` exposes an `HTMLButtonElement` proxy surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the `@forward()` target. The same directive cannot be applied more than once to the same final element.
+`Button` declares an `HTMLButtonElement` forward surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the `@forward()` target. The same directive cannot be applied more than once to the same final element.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -548,9 +553,10 @@ export const Consumer = component({
 });
 
 // -- button in @mylib/button --------------------
-import { component, input, output, computed, fragment } from '@angular/core';
+import { component, input, output, computed, fragment, surface } from '@angular/core';
 
-export const Button = component.proxy<HTMLButtonElement>({
+export const Button = component({
+  forward: surface<HTMLButtonElement>(),
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -574,79 +580,6 @@ export const Button = component.proxy<HTMLButtonElement>({
         @render(children())
       </button>
     };
-  },
-});
-```
-
-### Wrapping components
-
-Wrappers forward the target's remaining bindings; directives pass through only if the target already exposes a proxy surface.
-
-```ts
-import { component, signal, input, computed } from '@angular/core';
-import { tooltip } from '@mylib/tooltip';
-import { Target, User } from './target.ng';
-
-export const Consumer = component({
-  setup: () => {
-    const user = signal<User>(/** ... **/);
-    const email = signal<string>(/** ... **/);
-
-    function makeAdmin() {/** ... **/}
-
-    return @{
-      <Wrapper
-        user={user()}
-        model:email={email}
-        on:makeAdmin={makeAdmin} />
-    };
-  },
-});
-
-// Select user locally; forward the remaining Target bindings.
-export const Wrapper = component.wrap(Target, {
-  bindings: {
-    user: input.required<User>(),
-  },
-  setup: ({ user }) => {
-    const other = computed(() => /** something depending on user() or a default value **/);
-
-    return @{
-      <Target
-        @forward()
-        use:tooltip(message={'Tooltip message'})
-        user={other()} />
-    };
-  },
-});
-
-// -- Target -----------------------------------
-import { component, input, model, output, fragment } from '@angular/core';
-
-export interface User {
-  name: string;
-  role: string;
-}
-
-export const Target = component.proxy<HTMLDivElement>({
-  bindings: {
-    user: input.required<User>(),
-    email: model.required<string>(),
-    makeAdmin: output<void>(),
-    children: fragment<void>(),
-  },
-  setup: ({ user, email, makeAdmin, children }) => @{
-    <div @forward()>
-      <h3>{user().name}</h3>
-      <p>Role: {user().role}</p>
-
-      <label>Email:</label>
-      <input type="email" model:value={email} />
-
-      <button on:click={() => makeAdmin.emit()}>Make Admin</button>
-
-      @render(children?.())
-    </div>
   },
 });
 ```
@@ -730,7 +663,7 @@ export const Counter = component({
     provide(multiToken),                    // shorthand
     provide(multiToken),                    // multiple contributions
     provide(multiToken, () => 10),          // explicit factory override
-    provide(multiToken, () => initialValue()),
+    provide(multiToken, () => initialValue() ?? 0),
     provide(otherCompToken, () => ''),      // no factory on token — explicit required
     provide(Store, () => new Store()),      // class
   ],
@@ -747,7 +680,7 @@ export const Counter = component({
 - `pipes`: can be modeled with derivations or components (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
-- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (proxy),
+- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (forwarding),
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
 - `template reference variables`: can be modeled with `ref`,
 - `queries`: can be modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
@@ -757,13 +690,13 @@ export const Counter = component({
 ### Scope and caveats
 
 - `interoperability layer`: the full incremental migration story (mixed projects, build boundaries) is not covered intentionally — the topic is important but requires many micro-decisions that depend on compiler architecture choices out of scope for this proposal;
-- other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
+- other decorator properties: in this proposal a component config carries only `bindings`, `forward`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings` and `setup` — notably no directive-level `providers`. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
 - programmatic view creation (dialogs, overlays): not covered here; likely requires a dedicated API — `createComponent` / `renderFragment` with an attachment target — rather than `ViewContainerRef`;
-- `formField` integration with Signal Forms: not considered here. On a `component.proxy` component, all `use:` directives forward to `@forward()` — but a form field directive needs the *component's* binding surface (its `value` model, `disabled`, `errors`, etc.), not the inner native element. This likely requires `formField` to be a reserved binding name (alongside `ref` and `children`) with dedicated compiler support, so the form system can target the component boundary directly:
+- `formField` integration with Signal Forms: not considered here. On a component with a forward surface, all `use:` directives forward to `@forward()` — but a form field directive needs the *component's* binding surface (its `value` model, `disabled`, `errors`, etc.), not the inner native element. This likely requires `formField` to be a reserved binding name (alongside `ref` and `children`) with dedicated compiler support, so the form system can target the component boundary directly:
   ```ts
   <TextInput
     formField={signupForm.username}
@@ -863,15 +796,15 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `bind:` | native elements, components | No (per property) | One-way property binding. Can be omitted (`prop={expr}` is shorthand for `bind:prop={expr}`). |
 | `model:` | native elements, components | No (per property) | Two-way binding. On native elements: `<input>`, `<select>`, `<textarea>`. On components: binds to a `model()` binding. |
 | `on:` | native elements, components | No (per event) | Event listener. On native elements: DOM events. On components: binds to an `output()` binding. |
-| `once:` | inputs only | No (per property) | Freezes the input value at creation time; never updated afterwards. `once:model:*` and `once:on:*` are compile-time errors. |
+| `once:` | inputs only — component, directive (`use:dir(once:x={...})`) and derivation (`@derive`) inputs alike | No (per property) | Freezes the input value at creation time; never updated afterwards. `once:model:*` and `once:on:*` are compile-time errors. |
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native elements, `component.proxy` components, wrapped proxy components | Yes (different directives) | Attaches a directive. On proxy / wrapped components, directives are placed at the `@forward()` target. Same directive cannot appear twice on the same final element. |
+| `use:` | native elements, components declaring a `forward` surface | Yes (different directives) | Attaches a directive. On forwarding components, directives are placed at the `@forward()` target. Same directive cannot appear twice on the same final element. |
 | `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. Reserved — cannot be declared as a component binding. |
-| `@forward()` | compatible native or wrapped component node | No (exactly one per component) | Places the forwarding payload declared by `component.proxy` or `component.wrap`. |
+| `@forward()` | compatible native element | No (exactly one per component) | Places the directive payload declared by `forward: surface<T>()`. |
 
 `ref` and `@forward()` are special attributes, not binding prefixes — included here for completeness. Both `ref` and `children` are reserved at component level only; directives and derivations may use them as binding names (though not recommended).
 
@@ -895,7 +828,12 @@ Invalid bindings on components:
 
 Avoid `on` prefix in input / model / output names:
 
-- `<UserDetail onInput={...} model:onModel={...} on:onEvent={...} />`
+```ts
+bindings: {
+  onSubmit: output<void>(),   // ⚠️ prefer `submit`
+  onValue: input<string>(),   // ⚠️ prefer `value`
+}
+```
 
 
 ---

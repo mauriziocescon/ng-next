@@ -9,8 +9,6 @@ import {
   type Signal,
 } from '@angular/core';
 
-import type { TemplateAST } from './ng-ast';
-
 // ────────────────────────────────────────────────────────────────
 // 1. TEMPLATE MARKUP
 //
@@ -19,10 +17,20 @@ import type { TemplateAST } from './ng-ast';
 // The AST payload is phantom type metadata: the compiler produces
 // TemplateMarkup<TAst> from the DSL, while public APIs can accept
 // the default TemplateMarkup alias when they do not inspect the tree.
+//
+// TemplateAST is nominal and opaque here. The shape of a parsed `@{ }`
+// literal is the compiler's concern; this layer only needs a distinct
+// token so a specific markup type cannot be mistaken for the generic
+// one. See ng-dsl-type-checking-spec.md §2.1 (MARKUP-LITERAL).
 // ────────────────────────────────────────────────────────────────
 
 declare const TEMPLATE: unique symbol;
 declare const TEMPLATE_AST: unique symbol;
+declare const TEMPLATE_AST_BRAND: unique symbol;
+
+export interface TemplateAST {
+  readonly [TEMPLATE_AST_BRAND]: true;
+}
 
 export type TemplateMarkup<TAst extends TemplateAST = TemplateAST> = {
   readonly [TEMPLATE]: true;
@@ -96,10 +104,17 @@ export interface Ref<T> extends Signal<T> {
 // ────────────────────────────────────────────────────────────────
 // 4. BINDING SURFACES
 //
-// Layered binding model:
-// - Derivation: inputs only
-// - Directive: derivation + model/output/fragment
-// - Component: directive
+// One union of every binding value, aliased per surface. The surfaces are
+// not structurally layered: each declares the same constraint and narrows it
+// with a mapped validator instead, because the narrowing has to name the
+// offending key (mapping it to `never`) rather than reject the whole record.
+// - Component: ValidateComponentBindings — reserves `children` / `ref` (§5)
+// - Directive: no validator — all four kinds allowed, no reserved names
+// - Derivation: ValidateDerivationBindings — inputs only (§9)
+//
+// The three aliases are exported so consumers can write the interface
+// conformance checks of `satisfies` against the right surface, e.g.
+// `satisfies Sortable & Record<string, ComponentBindingValue>`.
 // ────────────────────────────────────────────────────────────────
 
 type AnyBindingValue =
@@ -111,11 +126,14 @@ type AnyBindingValue =
 
 export type DirectiveBindingValue = AnyBindingValue;
 export type ComponentBindingValue = AnyBindingValue;
+// Pre-validation constraint: `derivation(...)` accepts this union and then
+// rejects everything but inputs via ValidateDerivationBindings (D043).
+export type DerivationBindingValue = AnyBindingValue;
 
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
 //
-// ComponentInstance has bindings + expose + template + proxy-surface
+// ComponentInstance has bindings + expose + template + forward-surface
 // metadata.
 // DirectiveInstance adds a host element type (H) — a directive
 // must be attached to a DOM element.
@@ -133,7 +151,7 @@ declare const BINDINGS: unique symbol;
 declare const EXPOSE: unique symbol;
 declare const COMPONENT_TEMPLATE: unique symbol;
 declare const HOST: unique symbol;
-declare const PROXY_SURFACE: unique symbol;
+declare const FORWARD_SURFACE: unique symbol;
 
 export type ComponentInstance<
   B,
@@ -143,7 +161,7 @@ export type ComponentInstance<
 > = {
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
-  readonly [PROXY_SURFACE]: S;
+  readonly [FORWARD_SURFACE]: S;
   readonly [COMPONENT_TEMPLATE]: TMarkup;
 };
 
@@ -157,12 +175,6 @@ type ExposeOf<T> = T extends { readonly [EXPOSE]: infer E } ? E : never;
 
 export type ComponentTemplateOf<T extends ComponentInstance<any, any, any>> =
   T extends { readonly [COMPONENT_TEMPLATE]: infer TMarkup } ? TMarkup : never;
-
-type TargetBindings<C extends ComponentInstance<unknown, unknown, any>> =
-  C extends { readonly [BINDINGS]: infer B } ? B : never;
-
-type ProxySurfaceOf<C extends ComponentInstance<any, any, any>> =
-  C extends { readonly [PROXY_SURFACE]: infer S } ? S : never;
 
 /**
  * Documentation-only shape for the Angular DSL intrinsic element map.
@@ -190,106 +202,6 @@ type InputKeys<B> = {
 
 type InputsOnly<B> = Pick<B, InputKeys<B>>;
 
-type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-
-type HasOwnKeys<T extends object> = keyof T extends never ? false : true;
-
-type BindingKind<V> =
-  V extends ModelSignal<any>
-    ? 'model'
-    : V extends InputSignal<any>
-      ? 'input'
-      : V extends OutputEmitterRef<any>
-        ? 'output'
-        : V extends FragmentBinding<any>
-          ? 'fragment'
-          : 'unknown';
-
-type ExtraKeys<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = Exclude<keyof Sel, keyof All>;
-
-type KindMismatchKeys<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = {
-  [K in Extract<keyof Sel, keyof All>]: IsExact<
-    BindingKind<Sel[K]>,
-    BindingKind<All[K]>
-  > extends true
-    ? never
-    : K;
-}[Extract<keyof Sel, keyof All>];
-
-type TypeMismatchKeys<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = {
-  [K in Extract<keyof Sel, keyof All>]: IsExact<
-    BindingKind<Sel[K]>,
-    BindingKind<All[K]>
-  > extends true
-    ? IsExact<Sel[K], All[K]> extends true
-      ? never
-      : K
-    : never;
-}[Extract<keyof Sel, keyof All>];
-
-type WrapUnknownKeysError<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  ExtraKeys<Sel, All> extends never
-    ? {}
-    : {
-        __wrap_unknown_keys__: {
-          message: 'wrapper bindings contain keys not present in target bindings';
-          keys: ExtraKeys<Sel, All>;
-        };
-      };
-
-type WrapKindMismatchError<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  KindMismatchKeys<Sel, All> extends never
-    ? {}
-    : {
-        __wrap_kind_mismatch__: {
-          message: 'wrapper binding kind must match target binding kind';
-          keys: KindMismatchKeys<Sel, All>;
-        };
-      };
-
-type WrapTypeMismatchError<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  TypeMismatchKeys<Sel, All> extends never
-    ? {}
-    : {
-        __wrap_type_mismatch__: {
-          message: 'wrapper binding type must exactly match target binding type';
-          keys: TypeMismatchKeys<Sel, All>;
-        };
-      };
-
-type WrapSelectionDiagnostics<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = WrapUnknownKeysError<Sel, All> &
-  WrapKindMismatchError<Sel, All> &
-  WrapTypeMismatchError<Sel, All>;
-
-type ValidateWrapSelection<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  HasOwnKeys<WrapSelectionDiagnostics<Sel, All>> extends true
-    ? Sel & WrapSelectionDiagnostics<Sel, All>
-    : Sel;
-
 type SetupBindingValue<V> =
   V extends OptionalFragmentBinding<infer T>
     ? OptionalFragmentBinding<T> | undefined
@@ -311,12 +223,7 @@ type ValidateComponentBindings<
       : B[K];
 };
 
-// Test-only exports for diagnostic contract checks in ng-types.spec.ts
-export type __WrapSelectionDiagnostics<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = WrapSelectionDiagnostics<Sel, All>;
-
+// Test-only export for diagnostic contract checks in ng-types.spec.ts
 export type __ValidateComponentBindings<
   B extends Record<string, ComponentBindingValue>,
 > = ValidateComponentBindings<B>;
@@ -378,23 +285,38 @@ export function refMany(): any {
 //
 // setup returns TemplateMarkup directly or { template, expose? }.
 //
-// component(...) declares a normal component. `bindings` is the public API;
+// component(...) declares every component. `bindings` is the public API;
 // setup receives those binding objects; providers receive inputs only.
 //
-// component.proxy<S>(...) declares a public directive-compatible surface.
-// S is explicit, must extend HTMLElement, and is realized by one or more
-// compatible native @forward() placements in the template.
+// `forward: surface<S>()` declares a public directive-compatible surface.
+// S must extend HTMLElement and is realized by exactly one compatible native
+// @forward() placement in the template (D027 on multiple). Omitting `forward`
+// leaves no inference site for S, so it falls back to its `never` default —
+// a plain component and a forwarding component share one signature.
 //
-// component.wrap(Target, ...) declares a wrapper around Target. Selected
-// bindings go to setup; the target remainder is placed on wrapped target
-// placement(s) by @forward(). If Target has a proxy surface, the wrapper
-// inherits that surface and can pass directives through the same @forward()
-// chain. A non-proxy target cannot receive forwarded directives.
+// surface<S>() is a declaration, not a value: a phantom brand behind a
+// `declare function`, with no implementation to call and nothing to allocate.
+// It sits in a value position for the same reason `fragment.required<void>()`
+// does — so the type can be written where TypeScript will infer it — and the
+// compiler erases the config key. setup never receives it.
+//
+// S is a promise, not a fact: @forward() validation checks H ⊑ S, so a
+// component may deliberately declare a wider surface (`HTMLElement`) than the
+// element it forwards to, keeping the internal tag out of its public API.
+// That is why the surface is declared rather than inferred from the template.
 //
 // @forward() is marker-only: no runtime forwarding object, no spread. The
-// enclosing component API defines the payload; marked nodes define where it
-// lands. Explicit bindings on a wrapped target override forwarded ones.
+// enclosing component's surface defines the payload — directives applied at
+// the call site — and the marked native element defines where they land.
 // ────────────────────────────────────────────────────────────────
+
+declare const SURFACE_DECL: unique symbol;
+
+export type Surface<H extends HTMLElement> = {
+  readonly [SURFACE_DECL]: H;
+};
+
+export declare function surface<H extends HTMLElement>(): Surface<H>;
 
 type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
   | { template: TMarkup; expose: E } // full form with expose
@@ -405,132 +327,36 @@ type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
 export function component<
   B extends Record<string, ComponentBindingValue>,
   E = void,
+  S extends HTMLElement = never,
   TMarkup extends TemplateMarkup = TemplateMarkup,
 >(
   config: {
     bindings: B & ValidateComponentBindings<B>;
+    forward?: Surface<S>;
     setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
     providers?: (inputs: InputsOnly<B>) => Provider[];
     style?: string;
     styleUrl?: string;
   },
-): ComponentInstance<B, E, never, TMarkup>;
+): ComponentInstance<B, E, S, TMarkup>;
 
 // No bindings
 export function component<
   E = void,
+  S extends HTMLElement = never,
   TMarkup extends TemplateMarkup = TemplateMarkup,
 >(config: {
   bindings?: never;
+  forward?: Surface<S>;
   setup: () => SetupReturn<E, TMarkup>;
   providers?: () => Provider[];
   style?: string;
   styleUrl?: string;
-}): ComponentInstance<{}, E, never, TMarkup>;
+}): ComponentInstance<{}, E, S, TMarkup>;
 
 export function component(config: any): any {
   return config;
 }
-
-// Component namespace helpers
-export namespace component {
-  export declare function proxy<
-    S extends HTMLElement = never,
-    B extends Record<string, ComponentBindingValue> = never,
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    config: [S] extends [never]
-      ? {
-          __proxy_surface_error__:
-            'component.proxy requires an explicit HTMLElement surface type';
-        }
-      : {
-          bindings: B & ValidateComponentBindings<B>;
-          setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
-          providers?: (inputs: InputsOnly<B>) => Provider[];
-          style?: string;
-          styleUrl?: string;
-        },
-  ): ComponentInstance<B, E, S, TMarkup>;
-
-  export declare function proxy<
-    S extends HTMLElement = never,
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    config: [S] extends [never]
-      ? {
-          __proxy_surface_error__:
-            'component.proxy requires an explicit HTMLElement surface type';
-        }
-      : {
-          bindings?: never;
-          setup: () => SetupReturn<E, TMarkup>;
-          providers?: () => Provider[];
-          style?: string;
-          styleUrl?: string;
-        },
-  ): ComponentInstance<{}, E, S, TMarkup>;
-
-  // With bindings (selected subset of target bindings)
-  export declare function wrap<
-    ExplicitWrapperGenericsAreNotAllowed extends never = never,
-    C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
-      unknown,
-      unknown,
-      any
-    >,
-    Sel extends Record<string, ComponentBindingValue> = {},
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    target: C,
-    config: TargetBindings<C> extends Record<string, ComponentBindingValue>
-      ? {
-          bindings: ValidateWrapSelection<Sel, TargetBindings<C>>;
-          setup: (bindings: SetupBindings<Sel>) => SetupReturn<E, TMarkup>;
-          providers?: (inputs: InputsOnly<Sel>) => Provider[];
-          style?: string;
-          styleUrl?: string;
-        }
-      : never,
-  ): ComponentInstance<
-    TargetBindings<C>,
-    E,
-    ProxySurfaceOf<C>,
-    TMarkup
-  >;
-
-  // No bindings (forward everything)
-  export declare function wrap<
-    ExplicitWrapperGenericsAreNotAllowed extends never = never,
-    C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
-      unknown,
-      unknown,
-      any
-    >,
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    target: C,
-    config: {
-      bindings?: never;
-      setup: () => SetupReturn<E, TMarkup>;
-      providers?: () => Provider[];
-      style?: string;
-      styleUrl?: string;
-    },
-  ): ComponentInstance<
-    TargetBindings<C>,
-    E,
-    ProxySurfaceOf<C>,
-    TMarkup
-  >;
-}
-
-(component as any).proxy = (config: any) => config;
-(component as any).wrap = (_target: any, config: any) => config;
 
 // ────────────────────────────────────────────────────────────────
 // 8. DIRECTIVE
@@ -592,7 +418,7 @@ export type DerivationInstance<B, T> = {
 };
 
 type ValidateDerivationBindings<
-  B extends Record<string, AnyBindingValue>,
+  B extends Record<string, DerivationBindingValue>,
 > = {
   [K in keyof B]: B[K] extends InputSignal<any>
     ? B[K] extends ModelSignal<any>
@@ -603,7 +429,7 @@ type ValidateDerivationBindings<
 
 // With bindings (input-only; rejects model, output, fragment via never)
 export function derivation<
-  B extends Record<string, AnyBindingValue>,
+  B extends Record<string, DerivationBindingValue>,
   T,
 >(config: {
   bindings: B & ValidateDerivationBindings<B>;

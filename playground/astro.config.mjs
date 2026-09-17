@@ -10,9 +10,8 @@ function llmsTxt() {
 
   const sections = [
     { file: 'readme.md', title: 'Proposal narrative, syntax, and examples — covers component/directive/derivation/fragment APIs, binding syntax, composition patterns, and DI enhancements.' },
-    { file: 'types/ng-ast.ts', title: 'Template AST type definitions — the structural representation of parsed `@{ }` markup (nodes, bindings, expressions, control flow).' },
     { file: 'types/ng-types.ts', title: 'Core runtime type contracts — `TemplateMarkup`, component/directive/derivation/fragment factories, `ref`, `expose`, `provide`, `injectionToken`.' },
-    { file: 'types/ng-types.spec.ts', title: 'Type-level test suite — usage examples showing how the type system enforces binding correctness, proxy forwarding, and DI wiring.' },
+    { file: 'types/ng-types.spec.ts', title: 'Type-level test suite — usage examples showing how the type system enforces binding correctness, directive forwarding, and DI wiring.' },
     { file: 'types/ng-dsl-type-checking-spec.md', title: 'DSL type-checking specification — formal judgments for what the template type checker must verify inside `@{ }` (element resolution, binding arity, directive host constraints, etc.).' },
   ];
 
@@ -24,7 +23,7 @@ function llmsTxt() {
     { anchor: 'one-time-bindings-once', desc: '`once:` freezes an input at creation time — never updated afterwards.' },
     { anchor: 'input-driven-providers', desc: 'Inputs hoisted for provider initialization; `providers` receives only inputs (not models or outputs); factories run in injection context.' },
     { anchor: 'expose-and-template-refs', desc: '`expose` defines a component/directive\'s public API through refs; `ref<T>()` and `refMany<T>()` for element/component/directive access.' },
-    { anchor: 'composition-with-fragments-directives-and-forwarding', desc: 'Fragments as functions (like Svelte snippets); `component.proxy<T>()` and `component.wrap(Target)` for forwarding; `@forward()` marks placement.' },
+    { anchor: 'composition-with-fragments-directives-and-forwarding', desc: 'Fragments as functions (like Svelte snippets); `forward: surface<T>()` declares a directive-compatible native surface; `@forward()` marks placement.' },
     { anchor: 'dependency-injection-enhancements', desc: '`injectionToken` with four flavours (with factory, auto-provided, without factory, multi); `provide()` shorthand.' },
     { anchor: 'final-considerations', desc: 'Concepts impacted (ng-content, ng-template, structural directives, pipes, queries, etc.); pros and cons of the approach.' },
     { anchor: 'appendix-co-located-templates-in-angular-via-ng-files', desc: 'Rationale for `*.ng` files; co-location benefits; boilerplate tax trade-off analysis.' },

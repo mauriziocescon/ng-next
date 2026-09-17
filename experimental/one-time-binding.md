@@ -2,7 +2,7 @@
 
 Two mechanisms for values that are read once and never updated.
 
-> Status: `once:` (consumer-side) is part of the current design — defined in `ng-dsl-type-checking-spec.md` §3.9 and represented in `ng-ast.ts`. Declaration-side `input.once(...)` is a proposal only — not implemented in `types/ng-types.ts`.
+> Status: `once:` (consumer-side) is part of the current design — defined in `ng-dsl-type-checking-spec.md` §3.9. Declaration-side `input.once(...)` is a proposal only — not implemented in `types/ng-types.ts`.
 
 ## Conventions
 
@@ -55,46 +55,33 @@ export const Consumer = component({
 ```
 ONCE-BINDING
 ─────────────────────────────────────────────────
-once: applies ONLY to inputs (InputSignal)
-once:model:*  → D018
-once:on:*     → D018
-once:prop + prop on same target → D019
+once: applies ONLY to inputs (InputSignal) — component, directive and
+derivation inputs. It is not a DOM feature.
+
+once:model:*                       → D018
+once:on:*                          → D018
+once: on a native element property → D018
+once: on a fragment prop (§10.2)   → D018
+once:prop + prop on same target    → D019
 ─────────────────────────────────────────────────
 ```
 
 The type checker validates the binding value against the target `InputSignal<T>` the same way as a normal input (§3.1 `CHECK-INPUT`). The `once:` modifier only affects codegen — it does not change type checking.
 
-### AST Representation (from `ng-ast.ts`)
+### Grammar and Representation
 
-The `once` flag is a boolean field on binding nodes:
+`once:` is a grammar-level prefix, legal only immediately before an input
+name. `once:model:x` and `once:on:x` are therefore syntax errors, not checks
+the type checker performs — see the D018 note in §3.9 of the spec.
 
-```ts
-// Component/native element inputs
-interface BoundAttributeNode extends BaseNode {
-  type: 'BoundAttribute';
-  name: string;
-  value: AST;
-  once: boolean;   // ← true when once: prefix is used
-  // ...
-}
-
-// Directive inputs inside use:dir(...)
-interface DirectiveInputNode extends BaseNode {
-  type: 'DirectiveInput';
-  name: string;
-  value: AST;
-  once: boolean;   // ← true when once: prefix is used
-  // ...
-}
-
-// Derivation inputs inside @derive
-interface DerivationInputNode extends BaseNode {
-  type: 'DerivationInput';
-  name: string;
-  value: AST;
-  once: boolean;   // ← true when once: prefix is used
-}
-```
+Where the prefix *is* legal, it carries through to the checker as a boolean
+`once` flag on the input binding entry, in all three positions that accept
+inputs: component element inputs, directive inputs inside `use:dir(...)`, and
+derivation inputs inside `@derive` (spec Notation, "Template node
+vocabulary"). Two of the four D018 cases are check-time rather than
+parse-time, because `once:prop` is well-formed syntax and only element
+resolution tells a component input apart from a native property or a fragment
+prop.
 
 ### Compiler Lowering
 
@@ -242,9 +229,10 @@ No new branded type or type-level changes are required. `input.once<T>()` produc
 | `once:` + `on:` on the same binding | D018 — `once:on:*` is invalid |
 | `once:prop` and `prop` on the same element | D019 — duplicate binding name |
 | `input.once` receives later parent changes | No error — updates are silently ignored by contract |
-| `once:prop` / `input.required.once` without an initial value | D013/D014/D038 — standard required-input diagnostic |
+| `once:prop` / `input.required.once` without an initial value | D013/D014/D034 — standard required-input diagnostic |
 | `input.once` in directive bindings | Valid |
 | `input.once` in `@derive` bindings | Valid |
 | `once:` on a `fragment` binding | D018 — fragments are not inputs |
+| `once:` on a native element property | D018 — `once:` is an input feature, not a DOM one |
 
 

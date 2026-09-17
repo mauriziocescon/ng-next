@@ -204,9 +204,9 @@ const variantDuplicateAnnotations = [
   },
 ];
 
-// Variant 4: Directive on a proxy component (valid)
-const variantProxy = `import { directive, ref, input } from '@angular/core';
-import { component, signal, fragment } from '@angular/core';
+// Variant 4: Directive on a component with a forward surface (valid)
+const variantForward = `import { directive, ref, input } from '@angular/core';
+import { component, signal, fragment, surface } from '@angular/core';
 
 export const tooltip = directive({
   host: ref<HTMLElement>(),
@@ -218,7 +218,8 @@ export const tooltip = directive({
   },
 });
 
-const Button = component.proxy<HTMLButtonElement>({
+const Button = component({
+  forward: surface<HTMLButtonElement>(),
   bindings: {
     disabled: input<boolean>(false),
     children: fragment.required<void>(),
@@ -238,20 +239,20 @@ export const Consumer = component({
   },
 });`;
 
-const variantProxyAnnotations = [
+const variantForwardAnnotations = [
   {
-    token: 'component.proxy<HTMLButtonElement>({',
-    explanation: 'Declares a proxy surface. Directives applied to <Button /> are forwarded to the @forward() target inside.',
+    token: 'forward: surface<HTMLButtonElement>(),',
+    explanation: 'Declares the forward surface. Directives applied to <Button /> are forwarded to the @forward() target inside. Declaration-only — nothing is allocated, and setup never receives it.',
     category: 'keyword',
   },
   {
     token: '@forward()',
-    explanation: 'Marks where forwarded directives land. The element type must be assignable to the proxy surface (HTMLButtonElement).',
+    explanation: 'Marks where forwarded directives land. The element type must be assignable to the declared surface (HTMLButtonElement).',
     category: 'keyword',
   },
   {
     token: "use:tooltip(message={'Save changes'})",
-    explanation: 'Valid — Button exposes an HTMLButtonElement proxy surface, which satisfies tooltip\'s host: ref<HTMLElement>(). The directive is placed on the internal <button>.',
+    explanation: 'Valid — Button declares an HTMLButtonElement forward surface, which satisfies tooltip\'s host: ref<HTMLElement>(). The directive is placed on the internal <button>.',
     category: 'directive',
   },
 ];
@@ -276,14 +277,14 @@ const variants = [
     label: 'Same directive twice',
     code: variantDuplicate,
     annotations: variantDuplicateAnnotations,
-    note: 'Compile error: the same directive cannot be applied more than once to the same resolved host element. This also applies across forwarding — if a proxy component already applies tooltip internally, adding it externally is rejected.',
+    note: 'Compile error: the same directive cannot be applied more than once to the same resolved host element. This also applies across forwarding — if a forwarding component already applies tooltip internally, adding it externally is rejected.',
     invalid: true,
   },
   {
-    label: 'With proxy',
-    code: variantProxy,
-    annotations: variantProxyAnnotations,
-    note: 'Valid. component.proxy<HTMLButtonElement> declares a directive-compatible surface. Directives applied to <Button /> are forwarded to the @forward() target — the internal <button> element.',
+    label: 'With forwarding',
+    code: variantForward,
+    annotations: variantForwardAnnotations,
+    note: 'Valid. forward: surface<HTMLButtonElement>() declares a directive-compatible surface. Directives applied to <Button /> are forwarded to the @forward() target — the internal <button> element.',
     invalid: false,
   },
 ];

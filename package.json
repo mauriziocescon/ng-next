@@ -21,7 +21,9 @@
     }
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit --strict --target es2022 --moduleResolution bundler types/ng-types.spec.ts"
+    "typecheck": "npm run typecheck:types && npm run typecheck:readme",
+    "typecheck:types": "tsc --noEmit --strict --target es2022 --moduleResolution bundler types/ng-types.spec.ts",
+    "typecheck:readme": "node scripts/check-readme-snippets.mjs"
   },
   "devDependencies": {
     "@angular/cli": "^22.1.0",

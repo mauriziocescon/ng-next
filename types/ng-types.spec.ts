@@ -12,12 +12,11 @@ import {
   signal,
 } from '@angular/core';
 
-import type { TemplateAST } from './ng-ast';
-
 import {
   type ComponentInstance,
   type ComponentBindingValue,
   type ComponentTemplateOf,
+  type DerivationBindingValue,
   type DerivationInstance,
   type DirectiveInstance,
   type IntrinsicElementDescriptor,
@@ -27,10 +26,11 @@ import {
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
+  type TemplateAST,
   type TemplateAstOf,
   type TemplateMarkup,
+  type Surface,
   type __ValidateComponentBindings,
-  type __WrapSelectionDiagnostics,
   component,
   derivation,
   directive,
@@ -40,6 +40,7 @@ import {
   provide,
   ref,
   refMany,
+  surface,
 } from './ng-types';
 
 declare const tmpl: TemplateMarkup;
@@ -69,7 +70,6 @@ type IsEqual<A, B> =
     ? true
     : false;
 type Assert<T extends true> = T;
-type MergeProps<Left, Right> = Omit<Left, keyof Right> & Right;
 
 // ────────────────────────────────────────────────────────────────
 // 1. TEMPLATE MARKUP
@@ -203,8 +203,9 @@ type UserDetailBindings = {
   children: OptionalFragmentBinding<void>;
 };
 
-// TS-only spec: spell out bindings after the explicit proxy surface generic.
-const UserDetail = component.proxy<HTMLElement, UserDetailBindings>({
+// A declared forward surface does not change how bindings are inferred.
+const UserDetail = component({
+  forward: surface<HTMLElement>(),
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -221,6 +222,18 @@ const UserDetail = component.proxy<HTMLElement, UserDetailBindings>({
     return tmpl;
   },
 });
+
+// The bindings record is inferred from the object, not hand-written: the
+// UserDetailBindings alias must stay in sync with what component(...)
+// actually infers.
+type _UserDetailBindingsInferred = Assert<
+  IsEqual<
+    typeof UserDetail extends ComponentInstance<infer B, any, any, any>
+      ? B
+      : never,
+    UserDetailBindings
+  >
+>;
 
 // fragment.required: children must be present in setup
 const RequiredChildren = component({
@@ -344,6 +357,54 @@ const RenderArrayPayloadFragment = component({
   },
 });
 
+// input<T>() vs input<T>(default): supplying a default removes undefined from
+// the signal type. This is the distinction that decides what a provider factory
+// closing over the input is allowed to return (see §7).
+const InputDefaults = component({
+  bindings: {
+    req: input.required<string>(),
+    optional: input<'info' | 'warn'>(),
+    defaulted: input<'info' | 'warn'>('info'),
+  },
+  setup: ({ req, optional, defaulted }) => {
+    const _r: string = req();
+    const _o: 'info' | 'warn' | undefined = optional();
+    const _d: 'info' | 'warn' = defaulted();
+    // @ts-expect-error an input without a default may be undefined
+    const _oNarrowed: 'info' | 'warn' = optional();
+    return tmpl;
+  },
+});
+
+// Optional *parameterized* fragment: undefined in setup, and still requires its
+// declared arguments once narrowed. Mirrors the readme's DataTable rowTemplate.
+interface Row {
+  id: string;
+}
+
+const DataTable = component({
+  bindings: {
+    rows: input.required<Row[]>(),
+    selected: model<Row | null>(),
+    sort: output<{ key: string }>(),
+    rowTemplate: fragment<[Row]>(),
+  },
+  setup: ({ rows, selected, sort, rowTemplate }) => {
+    const _rows: Row[] = rows();
+    const _sel: Row | null | undefined = selected();
+    sort.emit({ key: 'id' });
+
+    const _frag: OptionalFragmentBinding<[Row]> | undefined = rowTemplate;
+    const _args: Assert<
+      IsEqual<Parameters<NonNullable<typeof rowTemplate>>, [Row]>
+    > = true;
+    const _rendered: TemplateMarkup | undefined = rowTemplate?.(rows()[0]);
+    // @ts-expect-error optional parameterized fragment still requires its argument
+    rowTemplate?.();
+    return tmpl;
+  },
+});
+
 // ────────────────────────────────────────────────────────────────
 // 6. COMPONENT — bindings aliasing (TS destructuring in setup)
 //
@@ -417,6 +478,40 @@ const Counter = component({
     const _cInput: InputSignal<number> = c;
     return [provide(Store, () => new Store())];
   },
+});
+
+// A provider factory may close over an input and pass the InputSignal itself
+// as a () => T getter (the readme's input-driven CounterStore).
+class CounterStore {
+  readonly value: Signal<number>;
+
+  constructor(initial: () => number) {
+    this.value = computed(() => initial());
+  }
+}
+
+const CounterWithStore = component({
+  bindings: {
+    c: input.required<number>(),
+  },
+  setup: () => tmpl,
+  providers: ({ c }) => [provide(CounterStore, () => new CounterStore(c))],
+});
+
+// An input without a default reads as T | undefined, so it is not assignable
+// where the factory must return T. Documented examples have hit this.
+const seedToken = injectionToken.multi({ factory: () => 0 });
+
+const SeededFromInput = component({
+  bindings: {
+    initialValue: input<number>(),
+  },
+  setup: () => tmpl,
+  providers: ({ initialValue }) => [
+    // @ts-expect-error input<number>() reads as number | undefined; factory must return number
+    provide(seedToken, () => initialValue()),
+    provide(seedToken, () => initialValue() ?? 0),
+  ],
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -543,6 +638,17 @@ const highlight = directive({
 const highlightRef = ref<typeof highlight>();
 const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
 
+// Zero-parameter setup returning expose: neither bindings nor host are needed
+// in the body, and the expose still flows through ref (readme's tooltip sketch).
+const toggleOnly = directive({
+  host: ref<HTMLElement>(),
+  setup: () => ({ toggle: () => {} }),
+});
+
+const toggleOnlyRef = ref<typeof toggleOnly>();
+const _toggleOnlyRefType: Ref<{ toggle: () => void } | undefined> =
+  toggleOnlyRef;
+
 // Directive accepts fragment bindings (TemplateRef-style use cases)
 const directiveWithFragment = directive({
   host: ref<HTMLElement>(),
@@ -624,336 +730,202 @@ const Sibling = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// 11. COMPONENT — proxy, directive forwarding surface
+// 11. COMPONENT — forward surface
+//
+// `forward: surface<S>()` declares the surface in a value position, so one
+// component(...) signature covers plain and forwarding components: with the
+// key present S is inferred from it, with the key absent there is no
+// inference site and S falls back to its `never` default.
 // ────────────────────────────────────────────────────────────────
 
-const _NegProxyRequiresExplicitSurface = component.proxy({
-  // @ts-expect-error component.proxy requires an explicit proxy surface type
+const ForwardingButton = component({
+  forward: surface<HTMLButtonElement>(),
   setup: () => tmpl,
 });
-
-const ButtonProxy = component.proxy<HTMLButtonElement>({
-  setup: () => tmpl,
-});
-type _ButtonProxyType = Assert<
+type _ForwardingButtonType = Assert<
   IsEqual<
-    typeof ButtonProxy,
+    typeof ForwardingButton,
     ComponentInstance<{}, void, HTMLButtonElement>
   >
 >;
 
-// @ts-expect-error proxy surface must be an HTMLElement subtype
-const _NegInvalidProxySurface = component.proxy<string>({
-  setup: () => tmpl,
-});
-
-const _NegProxyMetadataInSetup = component.proxy<
-  HTMLElement,
-  { label: InputSignal<string | undefined> }
->({
+// WITH bindings: S, B, E and TMarkup are all inferred from one config object —
+// no type argument anywhere. Mirrors the readme's Button (forwarding directives
+// to an internal element), including class/style binding names aliased in setup.
+const ButtonWithBindings = component({
+  forward: surface<HTMLButtonElement>(),
   bindings: {
-    label: input<string>(),
-  },
-  setup: (bindings) => {
-    // @ts-expect-error proxy surface metadata is not visible in setup bindings
-    bindings.proxySurface;
-    return tmpl;
-  },
-});
-
-const _NegComponentAsProxySurface = (
-  // @ts-expect-error component instances are not valid proxy surface types
-  component.proxy<typeof UserDetail>({
-    setup: () => tmpl,
-  })
-);
-
-// @ts-expect-error directive instances are not valid proxy surface types
-const _NegDirectiveAsProxySurface = component.proxy<typeof tooltip>({
-  setup: () => tmpl,
-});
-
-// ────────────────────────────────────────────────────────────────
-// 12. COMPONENT — wrap with selected bindings + forwarding marker
-// ────────────────────────────────────────────────────────────────
-
-const UserDetailWrapper = component.wrap(UserDetail, {
-  bindings: {
-    user: input.required<User>(),
-  },
-  setup: ({ user }) => {
-    const _u: User = user();
-    return tmpl;
-  },
-});
-
-// setup sees selected keys only
-const _NegSelectedOnly = component.wrap(UserDetail, {
-  bindings: { user: input.required<User>() },
-  setup: ({
-    user,
-    // @ts-expect-error email is not selected in wrapper bindings
-    email,
-  }) => tmpl,
-});
-
-// selected keys must exist on target
-const _NegExtra = component.wrap(UserDetail, {
-  // @ts-expect-error nonsense is not in target bindings
-  bindings: {
-    user: input.required<User>(),
-    nonsense: input<string>(),
-  },
-  setup: () => tmpl,
-});
-
-// selected binding types must match exactly
-const _NegWrongType = component.wrap(UserDetail, {
-  // @ts-expect-error user input type should be User
-  bindings: {
-    user: input.required<string>(),
-  },
-  setup: () => tmpl,
-});
-
-// selected binding kinds must match
-const _NegWrongKind = component.wrap(UserDetail, {
-  // @ts-expect-error makeAdmin is an output on target, not an input
-  bindings: {
-    makeAdmin: input<void>(),
-  },
-  setup: () => tmpl,
-});
-
-// no narrowing
-const WideInput = component({
-  bindings: {
-    value: input.required<string | number>(),
-  },
-  setup: ({ value }) => tmpl,
-});
-
-const _NegNarrowedSubtype = component.wrap(WideInput, {
-  // @ts-expect-error wrapper bindings must exactly match target binding type
-  bindings: {
-    value: input.required<string>(),
-  },
-  setup: () => tmpl,
-});
-
-// no widening
-const NarrowInput = component({
-  bindings: {
-    value: input.required<string>(),
-  },
-  setup: ({ value }) => tmpl,
-});
-
-const _NegWidenedSupertype = component.wrap(NarrowInput, {
-  // @ts-expect-error wrapper bindings must exactly match target binding type
-  bindings: {
-    value: input.required<string | number>(),
-  },
-  setup: () => tmpl,
-});
-
-// empty selection means setup gets no target bindings
-interface Simple {
-  id: string;
-}
-
-const Base = component({
-  bindings: {
-    item: input.required<Simple>(),
-    selected: model<boolean>(),
+    type: input<'button' | 'submit' | 'reset'>('button'),
+    class: input<string>(''),
+    style: input<string>(''),
+    disabled: input<boolean>(false),
     click: output<void>(),
+    children: fragment.required<void>(),
   },
-  setup: ({ item, selected, click }) => tmpl,
-});
-
-const ForwardAll = component.wrap(Base, {
-  bindings: {},
-  setup: (bindings) => {
-    // @ts-expect-error empty selection should expose no setup keys
-    bindings.item;
-    return tmpl;
+  setup: ({ type, class: className, style, disabled, click, children }) => {
+    const _t: 'button' | 'submit' | 'reset' = type();
+    const _c: string = className();
+    const _s: string = style();
+    const _d: boolean = disabled();
+    const _rendered: TemplateMarkup = children();
+    click.emit();
+    return specificTmpl;
   },
-});
-
-// providers see selected inputs only
-const WrapperProviders = component.wrap(UserDetail, {
-  bindings: {
-    user: input.required<User>(),
-  },
-  setup: ({ user }) => tmpl,
   providers: (inputs) => {
-    const _user: InputSignal<User> = inputs.user;
-    // @ts-expect-error email is not selected, excluded from wrapper providers
-    inputs.email;
-    // @ts-expect-error makeAdmin is not selected, excluded from wrapper providers
-    inputs.makeAdmin;
-    // @ts-expect-error children is not selected, excluded from wrapper providers
+    const _type: InputSignal<'button' | 'submit' | 'reset'> = inputs.type;
+    // @ts-expect-error click is an output, excluded from providers
+    inputs.click;
+    // @ts-expect-error children is a fragment, excluded from providers
     inputs.children;
     return [];
   },
 });
 
-// providers still exclude selected models/outputs
-const WrapperProvidersSelectedKinds = component.wrap(Base, {
+// The bindings record is inferred from the object — never hand-written.
+type _ButtonWithBindingsInferred = Assert<
+  IsEqual<
+    typeof ButtonWithBindings extends ComponentInstance<infer B, any, any, any>
+      ? B
+      : never,
+    {
+      type: InputSignal<'button' | 'submit' | 'reset'>;
+      class: InputSignal<string>;
+      style: InputSignal<string>;
+      disabled: InputSignal<boolean>;
+      click: OutputEmitterRef<void>;
+      children: RequiredFragmentBinding<void>;
+    }
+  >
+>;
+
+// TemplateMarkup<TAst> survives a config carrying `forward`.
+// RESOLVED-FORWARD-HOSTS reads T(C) to locate the single @forward() placement,
+// so a forwarding component is precisely the case that must not lose its
+// template AST.
+type _ForwardingKeepsTemplateAst = Assert<
+  IsEqual<
+    TemplateAstOf<ComponentTemplateOf<typeof ButtonWithBindings>>,
+    SpecificTemplateAST
+  >
+>;
+
+const _NegInvalidSurface = component({
+  // @ts-expect-error forward surface must be an HTMLElement subtype
+  forward: surface<string>(),
+  setup: () => tmpl,
+});
+
+const _NegComponentAsSurface = component({
+  // @ts-expect-error component instances are not valid forward surface types
+  forward: surface<typeof UserDetail>(),
+  setup: () => tmpl,
+});
+
+const _NegDirectiveAsSurface = component({
+  // @ts-expect-error directive instances are not valid forward surface types
+  forward: surface<typeof tooltip>(),
+  setup: () => tmpl,
+});
+
+// The surface is a declaration, not a binding: it is never visible in setup
+// and cannot be smuggled into the bindings record.
+const _NegSurfaceInSetup = component({
+  forward: surface<HTMLElement>(),
   bindings: {
-    item: input.required<Simple>(),
-    selected: model<boolean>(),
-    click: output<void>(),
+    label: input<string>(),
   },
-  setup: ({ item, selected, click }) => tmpl,
-  providers: (inputs) => {
-    const _item: InputSignal<Simple> = inputs.item;
-    // @ts-expect-error selected is a model, excluded from providers
-    inputs.selected;
-    // @ts-expect-error click is an output, excluded from providers
-    inputs.click;
-    return [];
+  setup: (bindings) => {
+    // @ts-expect-error forward surface metadata is not visible in setup bindings
+    bindings.forward;
+    return tmpl;
   },
 });
-
-// Wrapper preserves proxy surface from target
-const ProxyWrapper = component.wrap(ButtonProxy, {
-  setup: () => tmpl,
-});
-type _ProxyWrapperPreservesHost = Assert<
-  IsEqual<
-    typeof ProxyWrapper,
-    ComponentInstance<{}, void, HTMLButtonElement>
-  >
+type _SurfaceIsNotABindingValue = Assert<
+  IsEqual<Surface<HTMLElement> extends ComponentBindingValue ? true : false, false>
 >;
 
-const InputProxy = component.proxy<HTMLInputElement>({
+// A second forward surface, used by §12's directive-compatibility checks.
+const ForwardingInput = component({
+  forward: surface<HTMLInputElement>(),
   setup: () => tmpl,
 });
-const InputProxyWrapper = component.wrap(InputProxy, {
-  setup: () => tmpl,
-});
-type _InputProxyWrapperPreservesHost = Assert<
-  IsEqual<
-    typeof InputProxyWrapper,
-    ComponentInstance<{}, void, HTMLInputElement>
-  >
+type _ForwardingInputType = Assert<
+  IsEqual<typeof ForwardingInput, ComponentInstance<{}, void, HTMLInputElement>>
 >;
 
+// `forward` omitted: no inference site, so F(C) = never.
 const NoForwardingTarget = component({
   setup: () => tmpl,
 });
-const NoProxyWrapper = component.wrap(NoForwardingTarget, {
-  setup: () => tmpl,
-});
-type _NoProxyWrapperKeepsNever = Assert<
-  IsEqual<typeof NoProxyWrapper, ComponentInstance<{}, void, never>>
+type _NoForwardSurface = Assert<
+  IsEqual<typeof NoForwardingTarget, ComponentInstance<{}, void, never>>
 >;
 
-// component.wrap is inference-only; explicit generics are invalid
-// @ts-expect-error component.wrap is inference-only; explicit generics are invalid
-const _NegWrapperExplicitGeneric = component.wrap<HTMLButtonElement>(
-  UserDetail,
-  {
-    setup: () => tmpl,
-  },
-);
-
 // ────────────────────────────────────────────────────────────────
-// 13. COMPONENT — forward collision precedence (compiler contract)
+// 12. DIRECTIVE — forwarding compatibility
 //
-// Explicit target bindings win over forwarded remainder, independent of
-// source order and binding kind. MergeProps models this: Right wins.
+// Directive host must accept the component's forward surface.
 // ────────────────────────────────────────────────────────────────
 
-type FromRemainder = {
-  user: 'remainder';
-  email: 'remainder-email';
-  click: 'remainder-click';
-};
-
-type FromExplicit = {
-  user: 'explicit';
-};
-
-type Merged = MergeProps<FromRemainder, FromExplicit>;
-type _MergedExplicitWins = Assert<IsEqual<Merged['user'], 'explicit'>>;
-type _MergedKeepsRemainder = Assert<IsEqual<Merged['email'], 'remainder-email'>>;
-
-// ────────────────────────────────────────────────────────────────
-// 14. DIRECTIVE — forwarding compatibility
-//
-// Directive host must accept the component's proxy surface.
-// ────────────────────────────────────────────────────────────────
-
-type ProxySurface<C extends ComponentInstance<any, any, any>> =
+type ForwardSurfaceOf<C extends ComponentInstance<any, any, any>> =
   C extends ComponentInstance<any, any, infer S> ? S : never;
 type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
   D extends DirectiveInstance<infer H, any, any> ? H : never;
-type DirectiveFitsProxySurface<
+type DirectiveFitsForwardSurface<
   C extends ComponentInstance<any, any, any>,
   D extends DirectiveInstance<any, any, any>,
 > =
-  ProxySurface<C> extends never
+  ForwardSurfaceOf<C> extends never
     ? false
-    : ProxySurface<C> extends DirectiveHost<D>
+    : ForwardSurfaceOf<C> extends DirectiveHost<D>
       ? true
       : false;
 
-type _ButtonProxyAcceptsButtonDirective = Assert<
+type _ButtonAcceptsButtonDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<typeof ButtonProxy, typeof buttonOnly>,
+    DirectiveFitsForwardSurface<typeof ForwardingButton, typeof buttonOnly>,
     true
   >
 >;
-type _ButtonProxyAcceptsGenericDirective = Assert<
+type _ButtonAcceptsGenericDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<typeof ButtonProxy, typeof tooltip>,
+    DirectiveFitsForwardSurface<typeof ForwardingButton, typeof tooltip>,
     true
   >
 >;
-// @ts-expect-error input-host directive cannot attach to a button proxy surface
-const _negButtonProxyRejectsInputDirective: DirectiveFitsProxySurface<
-  typeof ButtonProxy,
+// @ts-expect-error input-host directive cannot attach to a button forward surface
+const _negButtonRejectsInputDirective: DirectiveFitsForwardSurface<
+  typeof ForwardingButton,
   typeof inputOnly
 > = true;
 
-type _InputProxyWrapperAcceptsInputDirective = Assert<
+type _InputAcceptsInputDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<
-      typeof InputProxyWrapper,
-      typeof inputOnly
-    >,
+    DirectiveFitsForwardSurface<typeof ForwardingInput, typeof inputOnly>,
     true
   >
 >;
-type _InputProxyWrapperAcceptsGenericDirective = Assert<
+type _InputAcceptsGenericDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<typeof InputProxyWrapper, typeof tooltip>,
+    DirectiveFitsForwardSurface<typeof ForwardingInput, typeof tooltip>,
     true
   >
 >;
-// @ts-expect-error button-host directive cannot attach to an input proxy surface
-const _negInputProxyWrapperRejectsButtonDirective: DirectiveFitsProxySurface<
-  typeof InputProxyWrapper,
+// @ts-expect-error button-host directive cannot attach to an input forward surface
+const _negInputRejectsButtonDirective: DirectiveFitsForwardSurface<
+  typeof ForwardingInput,
   typeof buttonOnly
 > = true;
 
-type _NoProxyWrapperRejectsDirective = Assert<
-  IsEqual<
-    DirectiveFitsProxySurface<typeof NoProxyWrapper, typeof tooltip>,
-    false
-  >
->;
 type _PlainComponentRejectsDirective = Assert<
   IsEqual<
-    DirectiveFitsProxySurface<typeof NoForwardingTarget, typeof tooltip>,
+    DirectiveFitsForwardSurface<typeof NoForwardingTarget, typeof tooltip>,
     false
   >
 >;
 
 // ────────────────────────────────────────────────────────────────
-// 15. DERIVATION — only inputs, setup returns Signal<T>
+// 13. DERIVATION — only inputs, setup returns Signal<T>
 // ────────────────────────────────────────────────────────────────
 
 const simulation = derivation({
@@ -1002,7 +974,7 @@ const _NegDerivationFragment = derivation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// 16. INJECTION TOKEN
+// 14. INJECTION TOKEN
 // ────────────────────────────────────────────────────────────────
 
 // Token without factory — returns DiToken
@@ -1105,7 +1077,7 @@ const _negMultiAutoProvidedTrue = injectionToken.multi({
 });
 
 // ────────────────────────────────────────────────────────────────
-// 17. INJECT
+// 15. INJECT
 // ────────────────────────────────────────────────────────────────
 
 // inject(Component) → expose type
@@ -1179,7 +1151,7 @@ const _injectedLegacyOptional: number | null = inject(legacyToken, {
 });
 
 // ────────────────────────────────────────────────────────────────
-// 18. PROVIDE
+// 16. PROVIDE
 // ────────────────────────────────────────────────────────────────
 
 // provide shorthand — only works with DiToken (with factory)
@@ -1252,7 +1224,7 @@ provide(legacyToken);
 provide(legacyToken, () => 'wrong');
 
 // ────────────────────────────────────────────────────────────────
-// 19. INTERFACE CONFORMANCE — satisfies on bindings and expose
+// 17. INTERFACE CONFORMANCE — satisfies on bindings and expose
 //
 // Opt-in structural check, same as class implements:
 // the developer chooses to add satisfies, TS validates the shape.
@@ -1337,6 +1309,27 @@ const quantityDerivation = derivation({
   setup: ({ qty, item }) => computed(() => qty() * 2),
 });
 
+// Extra bindings: the Record intersection needs a surface-specific alias, same
+// as the component case above — hence DerivationBindingValue is exported.
+const quantityDerivationExtra = derivation({
+  bindings: {
+    qty: input.required<number>(),
+    item: input.required<Item>(),
+    discount: input<number>(),
+  } satisfies QuantityBound & Record<string, DerivationBindingValue>,
+  setup: ({ qty, discount }) => computed(() => qty() * (discount() ?? 1)),
+});
+
+// The alias is pre-validation: ValidateDerivationBindings still rejects
+// non-inputs, so widening with it cannot smuggle a model in.
+const _NegDerivationBindingValueStillValidated = derivation({
+  // @ts-expect-error derivations cannot declare model bindings
+  bindings: {
+    changed: model<number>(),
+  } satisfies Record<string, DerivationBindingValue>,
+  setup: () => computed(() => 1),
+});
+
 // -- Expose conformance: component ----------------
 
 interface Toggleable {
@@ -1413,59 +1406,11 @@ const _NegMissingExpose = component({
 });
 
 // ────────────────────────────────────────────────────────────────
-// 20. DIAGNOSTIC CONTRACTS — wrapper + reserved names
+// 18. DIAGNOSTIC CONTRACTS — reserved names
 //
 // Keep these checks at the end: they validate the shape of type-level
 // diagnostics, not core API behavior.
 // ────────────────────────────────────────────────────────────────
-
-type _NoWrapDiag = __WrapSelectionDiagnostics<
-  { user: InputSignal<User> },
-  UserDetailBindings
->;
-type _NoWrapDiagKeys = Assert<IsEqual<keyof _NoWrapDiag, never>>;
-
-type _WrapUnknownDiag = __WrapSelectionDiagnostics<
-  { user: InputSignal<User>; nonsense: InputSignal<string | undefined> },
-  UserDetailBindings
->;
-type _WrapUnknownKey = Assert<
-  IsEqual<_WrapUnknownDiag['__wrap_unknown_keys__']['keys'], 'nonsense'>
->;
-type _WrapUnknownMessage = Assert<
-  IsEqual<
-    _WrapUnknownDiag['__wrap_unknown_keys__']['message'],
-    'wrapper bindings contain keys not present in target bindings'
-  >
->;
-
-type _WrapKindDiag = __WrapSelectionDiagnostics<
-  { makeAdmin: InputSignal<void | undefined> },
-  UserDetailBindings
->;
-type _WrapKindKey = Assert<
-  IsEqual<_WrapKindDiag['__wrap_kind_mismatch__']['keys'], 'makeAdmin'>
->;
-type _WrapKindMessage = Assert<
-  IsEqual<
-    _WrapKindDiag['__wrap_kind_mismatch__']['message'],
-    'wrapper binding kind must match target binding kind'
-  >
->;
-
-type _WrapTypeDiag = __WrapSelectionDiagnostics<
-  { user: InputSignal<string> },
-  UserDetailBindings
->;
-type _WrapTypeKey = Assert<
-  IsEqual<_WrapTypeDiag['__wrap_type_mismatch__']['keys'], 'user'>
->;
-type _WrapTypeMessage = Assert<
-  IsEqual<
-    _WrapTypeDiag['__wrap_type_mismatch__']['message'],
-    'wrapper binding type must exactly match target binding type'
-  >
->;
 
 type _ReservedChildrenDiag = __ValidateComponentBindings<{
   children: InputSignal<string>;
