@@ -413,7 +413,7 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Forwarding has two component APIs and one marker: `component.proxy<T>()(config)` exposes a directive-compatible native surface, `component.wrap(Target, config)` forwards a wrapped component's remaining API, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary bindings/directive instructions.
+Forwarding has one component API and one marker: `component.proxy<T>()(config)` exposes a directive-compatible native surface, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary directive instructions.
 
 `component.proxy` applies its surface type in a separate call so that `T` stays explicit while `bindings`, `expose`, and the template type are inferred from `config` — TypeScript does not infer the remaining type arguments of a partially-specified list.
 
@@ -577,79 +577,6 @@ export const Button = component.proxy<HTMLButtonElement>()({
         @render(children())
       </button>
     };
-  },
-});
-```
-
-### Wrapping components
-
-Wrappers forward the target's remaining bindings; directives pass through only if the target already exposes a proxy surface.
-
-```ts
-import { component, signal, input, computed } from '@angular/core';
-import { tooltip } from '@mylib/tooltip';
-import { Target, User } from './target.ng';
-
-export const Consumer = component({
-  setup: () => {
-    const user = signal<User>(/** ... **/);
-    const email = signal<string>(/** ... **/);
-
-    function makeAdmin() {/** ... **/}
-
-    return @{
-      <Wrapper
-        user={user()}
-        model:email={email}
-        on:makeAdmin={makeAdmin} />
-    };
-  },
-});
-
-// Select user locally; forward the remaining Target bindings.
-export const Wrapper = component.wrap(Target, {
-  bindings: {
-    user: input.required<User>(),
-  },
-  setup: ({ user }) => {
-    const other = computed(() => /** something depending on user() or a default value **/);
-
-    return @{
-      <Target
-        @forward()
-        use:tooltip(message={'Tooltip message'})
-        user={other()} />
-    };
-  },
-});
-
-// -- Target -----------------------------------
-import { component, input, model, output, fragment } from '@angular/core';
-
-export interface User {
-  name: string;
-  role: string;
-}
-
-export const Target = component.proxy<HTMLDivElement>()({
-  bindings: {
-    user: input.required<User>(),
-    email: model.required<string>(),
-    makeAdmin: output<void>(),
-    children: fragment<void>(),
-  },
-  setup: ({ user, email, makeAdmin, children }) => @{
-    <div @forward()>
-      <h3>{user().name}</h3>
-      <p>Role: {user().role}</p>
-
-      <label>Email:</label>
-      <input type="email" model:value={email} />
-
-      <button on:click={() => makeAdmin.emit()}>Make Admin</button>
-
-      @render(children?.())
-    </div>
   },
 });
 ```
@@ -870,11 +797,11 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native elements, `component.proxy` components, wrapped proxy components | Yes (different directives) | Attaches a directive. On proxy / wrapped components, directives are placed at the `@forward()` target. Same directive cannot appear twice on the same final element. |
+| `use:` | native elements, `component.proxy` components | Yes (different directives) | Attaches a directive. On proxy components, directives are placed at the `@forward()` target. Same directive cannot appear twice on the same final element. |
 | `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. Reserved — cannot be declared as a component binding. |
-| `@forward()` | compatible native or wrapped component node | No (exactly one per component) | Places the forwarding payload declared by `component.proxy` or `component.wrap`. |
+| `@forward()` | compatible native element | No (exactly one per component) | Places the directive payload declared by `component.proxy`. |
 
 `ref` and `@forward()` are special attributes, not binding prefixes — included here for completeness. Both `ref` and `children` are reserved at component level only; directives and derivations may use them as binding names (though not recommended).
 

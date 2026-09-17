@@ -158,12 +158,6 @@ type ExposeOf<T> = T extends { readonly [EXPOSE]: infer E } ? E : never;
 export type ComponentTemplateOf<T extends ComponentInstance<any, any, any>> =
   T extends { readonly [COMPONENT_TEMPLATE]: infer TMarkup } ? TMarkup : never;
 
-type TargetBindings<C extends ComponentInstance<unknown, unknown, any>> =
-  C extends { readonly [BINDINGS]: infer B } ? B : never;
-
-type ProxySurfaceOf<C extends ComponentInstance<any, any, any>> =
-  C extends { readonly [PROXY_SURFACE]: infer S } ? S : never;
-
 /**
  * Documentation-only shape for the Angular DSL intrinsic element map.
  *
@@ -190,106 +184,6 @@ type InputKeys<B> = {
 
 type InputsOnly<B> = Pick<B, InputKeys<B>>;
 
-type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-
-type HasOwnKeys<T extends object> = keyof T extends never ? false : true;
-
-type BindingKind<V> =
-  V extends ModelSignal<any>
-    ? 'model'
-    : V extends InputSignal<any>
-      ? 'input'
-      : V extends OutputEmitterRef<any>
-        ? 'output'
-        : V extends FragmentBinding<any>
-          ? 'fragment'
-          : 'unknown';
-
-type ExtraKeys<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = Exclude<keyof Sel, keyof All>;
-
-type KindMismatchKeys<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = {
-  [K in Extract<keyof Sel, keyof All>]: IsExact<
-    BindingKind<Sel[K]>,
-    BindingKind<All[K]>
-  > extends true
-    ? never
-    : K;
-}[Extract<keyof Sel, keyof All>];
-
-type TypeMismatchKeys<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = {
-  [K in Extract<keyof Sel, keyof All>]: IsExact<
-    BindingKind<Sel[K]>,
-    BindingKind<All[K]>
-  > extends true
-    ? IsExact<Sel[K], All[K]> extends true
-      ? never
-      : K
-    : never;
-}[Extract<keyof Sel, keyof All>];
-
-type WrapUnknownKeysError<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  ExtraKeys<Sel, All> extends never
-    ? {}
-    : {
-        __wrap_unknown_keys__: {
-          message: 'wrapper bindings contain keys not present in target bindings';
-          keys: ExtraKeys<Sel, All>;
-        };
-      };
-
-type WrapKindMismatchError<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  KindMismatchKeys<Sel, All> extends never
-    ? {}
-    : {
-        __wrap_kind_mismatch__: {
-          message: 'wrapper binding kind must match target binding kind';
-          keys: KindMismatchKeys<Sel, All>;
-        };
-      };
-
-type WrapTypeMismatchError<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  TypeMismatchKeys<Sel, All> extends never
-    ? {}
-    : {
-        __wrap_type_mismatch__: {
-          message: 'wrapper binding type must exactly match target binding type';
-          keys: TypeMismatchKeys<Sel, All>;
-        };
-      };
-
-type WrapSelectionDiagnostics<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = WrapUnknownKeysError<Sel, All> &
-  WrapKindMismatchError<Sel, All> &
-  WrapTypeMismatchError<Sel, All>;
-
-type ValidateWrapSelection<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> =
-  HasOwnKeys<WrapSelectionDiagnostics<Sel, All>> extends true
-    ? Sel & WrapSelectionDiagnostics<Sel, All>
-    : Sel;
-
 type SetupBindingValue<V> =
   V extends OptionalFragmentBinding<infer T>
     ? OptionalFragmentBinding<T> | undefined
@@ -311,12 +205,7 @@ type ValidateComponentBindings<
       : B[K];
 };
 
-// Test-only exports for diagnostic contract checks in ng-types.spec.ts
-export type __WrapSelectionDiagnostics<
-  Sel extends Record<string, unknown>,
-  All extends Record<string, unknown>,
-> = WrapSelectionDiagnostics<Sel, All>;
-
+// Test-only export for diagnostic contract checks in ng-types.spec.ts
 export type __ValidateComponentBindings<
   B extends Record<string, ComponentBindingValue>,
 > = ValidateComponentBindings<B>;
@@ -391,15 +280,9 @@ export function refMany(): any {
 // rejecting `bindings` and typing setup's parameters as `any`. Applying S
 // first keeps it explicit while everything else is inferred from config.
 //
-// component.wrap(Target, ...) declares a wrapper around Target. Selected
-// bindings go to setup; the target remainder is placed on the single wrapped
-// target placement marked by @forward(). If Target has a proxy surface, the
-// wrapper inherits that surface and can pass directives through the same
-// @forward() chain. A non-proxy target cannot receive forwarded directives.
-//
 // @forward() is marker-only: no runtime forwarding object, no spread. The
-// enclosing component API defines the payload; the marked node defines where
-// it lands. Explicit bindings on a wrapped target override forwarded ones.
+// enclosing component's proxy surface defines the payload — directives applied
+// at the call site — and the marked native element defines where they land.
 // ────────────────────────────────────────────────────────────────
 
 type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
@@ -478,64 +361,9 @@ export namespace component {
         ): ComponentInstance<{}, E, S, TMarkup>;
       };
 
-  // With bindings (selected subset of target bindings)
-  export declare function wrap<
-    ExplicitWrapperGenericsAreNotAllowed extends never = never,
-    C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
-      unknown,
-      unknown,
-      any
-    >,
-    Sel extends Record<string, ComponentBindingValue> = {},
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    target: C,
-    config: TargetBindings<C> extends Record<string, ComponentBindingValue>
-      ? {
-          bindings: ValidateWrapSelection<Sel, TargetBindings<C>>;
-          setup: (bindings: SetupBindings<Sel>) => SetupReturn<E, TMarkup>;
-          providers?: (inputs: InputsOnly<Sel>) => Provider[];
-          style?: string;
-          styleUrl?: string;
-        }
-      : never,
-  ): ComponentInstance<
-    TargetBindings<C>,
-    E,
-    ProxySurfaceOf<C>,
-    TMarkup
-  >;
-
-  // No bindings (forward everything)
-  export declare function wrap<
-    ExplicitWrapperGenericsAreNotAllowed extends never = never,
-    C extends ComponentInstance<unknown, unknown, any> = ComponentInstance<
-      unknown,
-      unknown,
-      any
-    >,
-    E = void,
-    TMarkup extends TemplateMarkup = TemplateMarkup,
-  >(
-    target: C,
-    config: {
-      bindings?: never;
-      setup: () => SetupReturn<E, TMarkup>;
-      providers?: () => Provider[];
-      style?: string;
-      styleUrl?: string;
-    },
-  ): ComponentInstance<
-    TargetBindings<C>,
-    E,
-    ProxySurfaceOf<C>,
-    TMarkup
-  >;
 }
 
 (component as any).proxy = () => (config: any) => config;
-(component as any).wrap = (_target: any, config: any) => config;
 
 // ────────────────────────────────────────────────────────────────
 // 8. DIRECTIVE

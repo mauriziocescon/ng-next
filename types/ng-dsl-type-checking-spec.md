@@ -258,9 +258,6 @@ Violation → D013 (component), D014 (directive), D038 (derivation)
 
 `provided_fragments` includes all delivery mechanisms defined in §10.2.
 
-For components, `provided_*` includes both explicit bindings and
-`forwarded_*` bindings delivered by `WrapBindingPayload`.
-
 ### 3.6 Unknown Bindings Check
 
 ```
@@ -484,7 +481,7 @@ node.animations ≠ []     → D040
 ∀ dir ∈ node.directives:
   P(C) = never → D024
   else: CHECK-DIRECTIVE-USE(Γ, P(C), RESOLVED-FORWARD-HOSTS(C), dir)
-CHECK-REQUIRED(B, provided ∪ forwarded, "component")
+CHECK-REQUIRED(B, provided, "component")
 NO-DUPLICATE-BINDINGS(node)
 NO-STATIC-DYNAMIC-CLASH(node)
 NO-UNKNOWN-BINDINGS(B, node)
@@ -540,9 +537,8 @@ BINDING-PRIMITIVE-PLACEMENT
 ─────────────────────────────────────────────────────────────────
 input(), input.required(), model(), output(), fragment() and
 fragment.required() may appear only as values of the `bindings` record of
-component(...), component.proxy<S>()(...), component.wrap(...), directive(...)
-or derivation(...). Calling one anywhere else — in setup, providers, or module
-scope — is → D003.
+component(...), component.proxy<S>()(...), directive(...) or derivation(...).
+Calling one anywhere else — in setup, providers, or module scope — is → D003.
 
 
 RESERVED-COMPONENT-BINDINGS
@@ -566,25 +562,6 @@ B, E and M are inferred by the inner call. A single-call component.proxy<S>(conf
 is not viable — TypeScript does not infer the remaining type arguments of a
 partially-specified list, so B, E and M would fall back to their defaults,
 rejecting `bindings` and typing setup's parameters as `any`.
-
-
-WRAPPER-SELECTION
-─────────────────────────────────────────────────────────────────
-component.wrap(Target, config)
-Target : ComponentInstance<B_Target, E_Target, S_Target, M_Target>
-Selected = B(config)    (defaults to {} when bindings is omitted)
-
-keys(Selected) ⊆ keys(B_Target)                                    → D027
-∀ k ∈ keys(Selected):
-  BindingKind(Selected[k]) ≡ BindingKind(B_Target[k])              → D028
-  Selected[k] ≡ B_Target[k]                                        → D029
-
-setup receives SetupBindings<Selected>
-providers receives Pick<Selected, input keys only>
-result : ComponentInstance<B_Target, E, S_Target, M>
-Wrapper inherits Target's proxy surface: P(result) = P(Target).
-Inference-only form — explicit generics must not be accepted.
-─────────────────────────────────────────────────────────────────
 ```
 
 ---
@@ -599,19 +576,8 @@ PAYLOAD-DEFS
 ProxyDirectivePayload(C) =
   directives on a <C ...> call site where P(C) ≠ never
 
-WrapBindingPayload(W, Target, Selected) =
-  bindings in B(Target) not selected by component.wrap(Target, ...)
-
-WrapDirectivePayload(W) =
-  ProxyDirectivePayload(W) if P(W) = P(Target) ≠ never, otherwise ∅
-
-WrapPayload(W, Target, Selected) = {
-  bindings: WrapBindingPayload(W, Target, Selected),
-  directives: WrapDirectivePayload(W),
-}
-
-Directive payloads pass through every wrapper hop and resolve to
-native hosts via RESOLVED-FORWARD-HOSTS.
+Directives are the only forwarded payload. They resolve to native
+hosts via RESOLVED-FORWARD-HOSTS.
 ─────────────────────────────────────────────────────────────────
 ```
 
@@ -629,27 +595,10 @@ ProxyDirectivePayload delivered to that single target
 ─────────────────────────────────────────────────────────────────
 
 
-FORWARD-WRAP
-─────────────────────────────────────────────────────────────────
-Enclosing wrapper W declared by component.wrap(Target, ...)
-P(W) = P(Target)
-Exactly one component element with @forward() must exist → D031 on multiple
-That element must be Target
-Explicit bindings override WrapBindingPayload for same key
-if (WrapPayload.bindings ≠ ∅ ∨ P(W) ≠ never) ∧ no @forward() → D025
-WrapPayload delivered to that single target
-─────────────────────────────────────────────────────────────────
-
-
 FORWARD-INVALID
 ─────────────────────────────────────────────────────────────────
-Marked node cannot consume enclosing component's payload → D032
-
-
-COLLISION-PRECEDENCE
-─────────────────────────────────────────────────────────────────
-∀ key ∈ (ExplicitBindings ∩ WrapBindingPayload):
-  Explicit wins regardless of source order.
+@forward() on a node that is not a native element → D032
+Only a native element can consume a proxy directive payload.
 ─────────────────────────────────────────────────────────────────
 
 
@@ -662,10 +611,6 @@ component.proxy<S>()(...) C:
   target = the single @forward() placement in T(C)
   I(tag(target)) ⊑ S
   RESOLVED-FORWARD-HOSTS(C) = {target}
-
-component.wrap(Target, ...) W:
-  P(W) = P(Target)
-  RESOLVED-FORWARD-HOSTS(W) = RESOLVED-FORWARD-HOSTS(Target)
 
 Exactly one placement per component (D031).
 Directive host checks use RESOLVED-FORWARD-HOSTS.
@@ -931,14 +876,10 @@ BindingKind<V> =
 | D022 | Directives | Directive host incompatible with element/proxy surface | Error |
 | D023 | Directives | Same directive applied twice to same resolved host element | Error |
 | D024 | Directives | Directive on non-proxy component | Error |
-| D025 | Forwarding | No `@forward()` when wrapper has payload | Error |
 | D026 | Forwarding | `@forward()` element type not assignable to proxy surface S | Error |
-| D027 | Forwarding | Wrapper selects binding key not in target | Error |
-| D028 | Forwarding | Wrapper selected binding kind differs from target | Error |
-| D029 | Forwarding | Wrapper selected binding type not exactly target type | Error |
 | D030 | Forwarding | No `@forward()` in proxy component | Error |
 | D031 | Forwarding | Multiple `@forward()` placements in one component | Error |
-| D032 | Forwarding | `@forward()` placement cannot consume enclosing payload | Error |
+| D032 | Forwarding | `@forward()` on a node that is not a native element | Error |
 | D033 | Fragments | Fragment argument count/type mismatch | Error |
 | D034 | Fragments | Implicit fragment has no matching parent binding or conflicts with explicit | Error |
 | D035 | Fragments | Duplicate implicit fragment name under same parent | Error |
@@ -1064,21 +1005,10 @@ const Button = component.proxy<HTMLButtonElement>()({
 // D024 — directive on non-proxy component
 <Plain label={'hi'} use:tooltip(message={'tip'}) /> // ❌ D024
 
-// D025 — no @forward() when payload exists
-const Broken = component.wrap(UserDetail, {
-  bindings: { user: input.required<User>() },
-  setup: ({ user }) => @{ <UserDetail user={user()} /> }, // ❌ D025: missing @forward()
-});
-
 // D026 — @forward() type mismatch
 const Button = component.proxy<HTMLButtonElement>()({
   setup: () => @{ <span @forward()>X</span> }, // ❌ D026: HTMLSpanElement ⊄ HTMLButtonElement
 });
-
-// D027–D029 — wrapper selection errors
-component.wrap(Target, { bindings: { role: input<string>() } })   // ❌ D027
-component.wrap(Target, { bindings: { save: input<void>() } })     // ❌ D028
-component.wrap(Target, { bindings: { user: input.required<string>() } }) // ❌ D029
 
 // D030 — proxy component missing @forward()
 const Button = component.proxy<HTMLButtonElement>()({
@@ -1093,14 +1023,13 @@ const SplitPanel = component.proxy<HTMLDivElement>()({
   },
 });
 
-// D032 — @forward() placement cannot consume the enclosing payload.
-// A wrapper's payload targets Target; a native element cannot receive it.
-const Wrapper = component.wrap(Target, {
-  bindings: { user: input.required<User>() },
-  setup: ({ user }) => @{
-    <div @forward()>            // ❌ D032: expected @forward() on <Target />
-      <Target user={user()} />
-    </div>
+// D032 — @forward() on a node that is not a native element.
+// A proxy directive payload can only land on a native element.
+const Panel = component.proxy<HTMLDivElement>()({
+  setup: () => @{
+    <Card @forward()>           // ❌ D032: component element cannot consume the payload
+      <p>Body</p>
+    </Card>
   },
 });
 

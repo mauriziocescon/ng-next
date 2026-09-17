@@ -24,7 +24,7 @@ function llmsTxt() {
     { anchor: 'one-time-bindings-once', desc: '`once:` freezes an input at creation time — never updated afterwards.' },
     { anchor: 'input-driven-providers', desc: 'Inputs hoisted for provider initialization; `providers` receives only inputs (not models or outputs); factories run in injection context.' },
     { anchor: 'expose-and-template-refs', desc: '`expose` defines a component/directive\'s public API through refs; `ref<T>()` and `refMany<T>()` for element/component/directive access.' },
-    { anchor: 'composition-with-fragments-directives-and-forwarding', desc: 'Fragments as functions (like Svelte snippets); `component.proxy<T>()` and `component.wrap(Target)` for forwarding; `@forward()` marks placement.' },
+    { anchor: 'composition-with-fragments-directives-and-forwarding', desc: 'Fragments as functions (like Svelte snippets); `component.proxy<T>()` exposes a directive-compatible native surface; `@forward()` marks placement.' },
     { anchor: 'dependency-injection-enhancements', desc: '`injectionToken` with four flavours (with factory, auto-provided, without factory, multi); `provide()` shorthand.' },
     { anchor: 'final-considerations', desc: 'Concepts impacted (ng-content, ng-template, structural directives, pipes, queries, etc.); pros and cons of the approach.' },
     { anchor: 'appendix-co-located-templates-in-angular-via-ng-files', desc: 'Rationale for `*.ng` files; co-location benefits; boilerplate tax trade-off analysis.' },
