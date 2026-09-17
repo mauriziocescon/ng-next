@@ -1,0 +1,87 @@
+---
+layout: ../layouts/Base.astro
+title: "Directive Forwarding — Interactive Tour"
+description: "Directive forwarding with forward: surface<T>() — declare a native element surface so directives applied to a component land on an internal @forward() target."
+---
+
+## Directive Forwarding
+
+<p class="subtitle"><code>forward: surface&lt;T&gt;()</code> declares a native element surface — directives forward at compile time through <code>@forward()</code>.</p>
+
+Directives applied to the component are type-checked against the declared surface, then placed on the `@forward()` target inside the template.
+
+```typescript
+import { component, input, output, computed, fragment, signal, surface } from '@angular/core';
+import { ripple } from '@mylib/ripple';
+import { tooltip } from '@mylib/tooltip';
+
+// -- Definition: declared forward surface --
+export const Button = component({
+  forward: surface<HTMLButtonElement>(),
+  bindings: {
+    type: input<'button' | 'submit' | 'reset'>('button'),
+    disabled: input<boolean>(false),
+    click: output<void>(),
+    children: fragment.required<void>(),
+  },
+  setup: ({ type, disabled, click, children }) => @{
+    <button
+      @forward()
+      type={type()}
+      disabled={disabled()}
+      on:click={() => click.emit()}>
+      @render(children())
+    </button>
+  },
+});
+
+// -- Usage: directives pass through --
+export const Consumer = component({
+  setup: () => {
+    const tooltipMsg = signal('Hover me');
+    const valid = signal(false);
+
+    return @{
+      <Button
+        type="button"
+        use:ripple()
+        use:tooltip(message={tooltipMsg()})
+        disabled={!valid()}
+        on:click={() => {}}>
+          Click me
+      </Button>
+    };
+  },
+});
+```
+
+<div class="annotation" role="note">
+  <strong>No runtime spread:</strong> the compiler expands <code>@forward()</code> into concrete bindings and directive instructions. <code>use:ripple()</code> and <code>use:tooltip(...)</code> are accepted because their <code>host</code> types are compatible with <code>HTMLButtonElement</code>. The same directive cannot appear twice on the same final element.
+</div>
+
+<div class="annotation" role="note">
+  <strong>Declaration, not a value:</strong> <code>surface&lt;T&gt;()</code> is a phantom brand — nothing to call, nothing to allocate, and never passed to <code>setup</code>. It sits in a value position for the same reason <code>fragment.required&lt;void&gt;()</code> does: so <code>T</code> can be written where TypeScript will infer it, leaving <code>bindings</code>, <code>expose</code>, and the template type inferred from the same config object.
+</div>
+
+### The surface is a promise, not a fact
+
+Validation checks that the `@forward()` element is assignable **to** the declared surface — not the other way round. So a component may promise less than it implements:
+
+```typescript
+export const Button = component({
+  // Promises only "some HTML element", even though it forwards to a <button>
+  forward: surface<HTMLElement>(),
+  bindings: {
+    children: fragment.required<void>(),
+  },
+  setup: ({ children }) => @{
+    <button @forward()>@render(children())</button>
+  },
+});
+```
+
+That keeps the internal tag out of the public API: swapping `<button>` for `<a>` stays a private change. The cost is paid at the call site — a directive declaring `host: ref<HTMLButtonElement>()` is rejected on `<Button />`, because the component never promised a button.
+
+<div class="annotation" role="note">
+  <strong>Why declared and not inferred:</strong> reading the surface off the <code>@forward()</code> element would always make the tightest promise. The internal tag would become public API, and changing it would break every consumer applying a tag-specific directive — reported in their code, with no declaration in the library to point at.
+</div>

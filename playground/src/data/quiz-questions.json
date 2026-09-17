@@ -147,25 +147,25 @@
     "explanation": "Correct. Named fragment with typed parameter, rendered inside @for with the item passed as argument."
   },
   {
-    "category": "Proxy Forwarding",
-    "description": "Applying a use: directive to a component without a proxy surface.",
-    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button is a plain component (no proxy surface)\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
+    "category": "Directive Forwarding",
+    "description": "Applying a use: directive to a component that declares no forward surface.",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button has no `forward` key, so it declares no surface\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
     "valid": false,
-    "explanation": "Invalid. use: directives on components only work if the component uses component.proxy<T>. Button is a plain component() — it doesn't expose a native element surface for directives."
+    "explanation": "Invalid. use: directives on components only work if the component declares `forward: surface<T>()` in its config. Button has no `forward` key, so it exposes no native element surface for directives to land on."
   },
   {
-    "category": "Proxy Forwarding",
-    "description": "component.proxy exposing an HTMLButtonElement surface with @forward().",
-    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const IconButton = component.proxy<HTMLButtonElement>({\n  bindings: {\n    icon: input.required<string>(),\n    click: output<void>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, click, children }) => @{\n    <button @forward() on:click={() => click.emit()}>\n      <i class={icon()} />\n      @render(children())\n    </button>\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = signal('Save changes');\n\n    return @{\n      <IconButton\n        icon={'icon-save'}\n        use:tooltip(message={tip()})\n        on:click={() => {}}>\n        Save\n      </IconButton>\n    };\n  },\n});",
+    "category": "Directive Forwarding",
+    "description": "forward: surface<HTMLButtonElement>() with a matching @forward() placement.",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const IconButton = component({\n  forward: surface<HTMLButtonElement>(),\n  bindings: {\n    icon: input.required<string>(),\n    click: output<void>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, click, children }) => @{\n    <button @forward() on:click={() => click.emit()}>\n      <i class={icon()} />\n      @render(children())\n    </button>\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = signal('Save changes');\n\n    return @{\n      <IconButton\n        icon={'icon-save'}\n        use:tooltip(message={tip()})\n        on:click={() => {}}>\n        Save\n      </IconButton>\n    };\n  },\n});",
     "valid": true,
-    "explanation": "Correct. component.proxy<HTMLButtonElement> exposes a native button surface. The tooltip directive's host (HTMLElement) is compatible with HTMLButtonElement, so use:tooltip on <IconButton /> is forwarded to the inner <button> via @forward()."
+    "explanation": "Correct. forward: surface<HTMLButtonElement>() declares a native button surface. The tooltip directive's host (HTMLElement) accepts HTMLButtonElement, so use:tooltip on <IconButton /> is forwarded to the inner <button> via @forward()."
   },
   {
-    "category": "Wrap Forwarding",
-    "description": "component.wrap forwarding remaining bindings to an inner proxy component.",
-    "code": "const Target = component.proxy<HTMLDivElement>({\n  bindings: {\n    title: input.required<string>(),\n    extra: input<string>(''),\n    select: output<void>(),\n    children: fragment<void>(),\n  },\n  setup: ({ title, extra, select, children }) => @{\n    <div @forward() class={extra()}>\n      <h2 on:click={() => select.emit()}>{title()}</h2>\n      @render(children?.())\n    </div>\n  },\n});\n\nconst Wrapper = component.wrap(Target, {\n  bindings: {\n    extra: input<string>(''),\n  },\n  setup: ({ extra }) => {\n    const cls = computed(() => `wrapped ${extra()}`);\n\n    return @{\n      <Target @forward() extra={cls()} />\n    };\n  },\n});\n\nexport const Consumer = component({\n  setup: () => {\n    function onSelect() { /* ... */ }\n\n    return @{\n      <Wrapper title={'Hello'} extra={'highlighted'} on:select={onSelect}>\n        <p>Forwarded children</p>\n      </Wrapper>\n    };\n  },\n});",
-    "valid": true,
-    "explanation": "Correct. Wrapper selects 'extra' for its own logic; 'title' and 'children' flow through @forward() to Target. Consumer uses Wrapper as if it were Target — providing title, extra, and children content. Since Target is a proxy, the wrapper inherits its surface."
+    "category": "Directive Forwarding",
+    "description": "A directive requiring HTMLButtonElement applied to a component that promises only HTMLElement.",
+    "code": "const focusRing = directive({\n  host: ref<HTMLButtonElement>(),\n  bindings: {\n    color: input<string>('blue'),\n  },\n  setup: ({ color }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Promises only \"some HTML element\", even though it forwards to a <button>\nexport const Button = component({\n  forward: surface<HTMLElement>(),\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button @forward()>@render(children())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:focusRing(color={'teal'})>\n      Save\n    </Button>\n  },\n});",
+    "valid": false,
+    "explanation": "Invalid. The declared surface is a promise, not a fact: Button says only HTMLElement, and HTMLElement is not assignable to focusRing's host: ref<HTMLButtonElement>() — the check uses the declaration, never the internal <button>. Widening the promise is deliberate (it keeps the inner tag a private detail); the cost is that tag-specific directives are refused. forward: surface<HTMLButtonElement>() would accept this call and lock the tag into the public API."
   },
   {
     "category": "DI: Tokens",
