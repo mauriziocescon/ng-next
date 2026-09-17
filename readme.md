@@ -413,11 +413,9 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Forwarding has one declaration and one marker: `forward: surface<T>()` in the component config exposes a directive-compatible native surface, and `@forward()` marks the placement site. There is no runtime props object or spread; the compiler expands forwarding into ordinary directive instructions.
+Forwarding lets a component take directives from its user and pass them to an element inside it: declare the entry point with `forward: surface<T>()`, mark the receiving element with `@forward()`. Write `use:tooltip(...)` on the component and it lands on that inner element — no props object, the compiler just rewrites it into normal directive instructions.
 
-`surface<T>()` is a declaration, not a value — a phantom brand behind a `declare function`, with nothing to call and nothing to allocate. It sits in a value position for the same reason `fragment.required<void>()` does: so `T` can be written where TypeScript will infer it, leaving `bindings`, `expose`, and the template type inferred from the same `config` object. `setup` never receives it, and the compiler erases the key.
-
-Declaring the surface rather than reading it off the `@forward()` element is deliberate. Validation checks that the marked element is assignable *to* `T`, so a component can promise a wider surface (`HTMLElement`) than the element it actually forwards to — keeping the internal tag out of its public API. Inference would always make the tightest promise, turning `<button>` → `<a>` into a silent breaking change for every consumer.
+`surface<T>()` never runs; it only declares what a component accepts — the kind of element the incoming directives must be compatible with.
 
 ### Implicit children fragment
 
