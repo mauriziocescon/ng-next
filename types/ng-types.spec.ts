@@ -16,6 +16,7 @@ import {
   type ComponentInstance,
   type ComponentBindingValue,
   type ComponentTemplateOf,
+  type DerivationBindingValue,
   type DerivationInstance,
   type DirectiveInstance,
   type IntrinsicElementDescriptor,
@@ -1294,6 +1295,27 @@ const quantityDerivation = derivation({
     item: input.required<Item>(),
   } satisfies QuantityBound,
   setup: ({ qty, item }) => computed(() => qty() * 2),
+});
+
+// Extra bindings: the Record intersection needs a surface-specific alias, same
+// as the component case above — hence DerivationBindingValue is exported.
+const quantityDerivationExtra = derivation({
+  bindings: {
+    qty: input.required<number>(),
+    item: input.required<Item>(),
+    discount: input<number>(),
+  } satisfies QuantityBound & Record<string, DerivationBindingValue>,
+  setup: ({ qty, discount }) => computed(() => qty() * (discount() ?? 1)),
+});
+
+// The alias is pre-validation: ValidateDerivationBindings still rejects
+// non-inputs, so widening with it cannot smuggle a model in.
+const _NegDerivationBindingValueStillValidated = derivation({
+  // @ts-expect-error derivations cannot declare model bindings
+  bindings: {
+    changed: model<number>(),
+  } satisfies Record<string, DerivationBindingValue>,
+  setup: () => computed(() => 1),
 });
 
 // -- Expose conformance: component ----------------

@@ -75,9 +75,11 @@ them however it likes.
 | ref | `target` (a single identifier) |
 
 `attributes` are static `name="literal"` pairs. `inputs` are `name={expr}`
-bindings — which, per §10.2, may target either an input or a fragment binding.
-A component element's `fragments` are the fragments *delivered* to it; a
-`@fragment` declaration anywhere else is an ordinary child node (§10.1).
+bindings, equivalently written `bind:name={expr}` — the prefix is optional
+syntax and carries no separate judgment. Per §10.2 an input entry may target
+either an input or a fragment binding. A component element's `fragments` are
+the fragments *delivered* to it; a `@fragment` declaration anywhere else is an
+ordinary child node (§10.1).
 
 ---
 
@@ -101,6 +103,12 @@ First match wins.
 Derivation, component, and directive references must be simple identifiers (single
 lexical name resolved through the scope chain). Dot-notation, conditional
 expressions, or any non-identifier forms are parse errors.
+
+Such an identifier is not inside a `{ ... }` region, so §2's diagnostic mapping
+does not apply to it and D001 is not the code. A name that resolves to nothing
+is D002; a name that resolves to the wrong kind — a `use:` target that is not a
+directive, a `@derive` target that is not a derivation, a tag that is neither
+intrinsic nor a component — is D044.
 
 ---
 
@@ -331,12 +339,17 @@ NO-UNKNOWN-BINDINGS(B, node)
 ─────────────────────────────────────────────────
 ∀ b ∈ binding lists carried by node:  b.name ∈ keys(B)   → D010
 
-  component element: attributes, inputs, models, outputs, fragments
+  component element: attributes, inputs, models, outputs
   directive:         inputs, models, outputs, fragments
   derive:            inputs
 
 Native elements do not use this rule — they resolve against the DOM type
 system through the CHECK-NATIVE-* rules in §4 (→ D009).
+
+A component element's delivered `fragments` are excluded: an unmatched
+fragment there is D030 (§3.4, §10.2), the more specific code. Fragments
+delivered to a directive arrive by reference and have no such rule, so they
+stay under D010.
 ─────────────────────────────────────────────────
 ```
 
@@ -369,7 +382,28 @@ on the same element — is D019, not D011, for the same reason.
 classes: repeatable (multiple class:name allowed per element)
 styles: repeatable (multiple style:prop allowed per element)
 animate: uses ANIMATE-CONSTRAINTS (§4.2)
-use: uniqueness per DIRECTIVE-SET-UNIQUENESS (§7.1)
+use: at most one application of a given directive per resolved host
+     element — the UNIQUE premise of §7, → D023 (see §7.1)
+─────────────────────────────────────────────────
+
+
+NO-DUPLICATE-DIRECTIVE-BINDINGS(dir)
+─────────────────────────────────────────────────
+The bindings carried by a single `use:D(...)` application have their own
+identity slots, independent of the element's:
+
+∀ name: |{b ∈ dir.inputs ∪ dir.models | b.name = name}| ≤ 1
+∀ name: |{b ∈ dir.outputs | b.name = name}| ≤ 1
+∀ name: |{b ∈ dir.fragments | b.name = name}| ≤ 1
+|dir.when| ≤ 1
+|dir.ref| ≤ 1
+Violation → D011
+
+The once: exception of NO-DUPLICATE-BINDINGS applies here too: once:prop
+and prop on the same application is D019.
+
+Two applications of the *same* directive to one element are D023, not D011 —
+that is the UNIQUE premise of §7, not a binding-identity question.
 ─────────────────────────────────────────────────
 
 
@@ -425,15 +459,6 @@ never reach the checker. The other two are check-time — `once:prop` is
 well-formed syntax, and only element resolution (§4) and the binding record
 (§10.2) tell a component input apart from a native property or a fragment
 prop.
-
-### 3.10 on-Prefix Warning
-
-```
-ON-PREFIX-WARNING
-─────────────────────────────────────────────────
-∀ binding name starting with "on" in B → D020 (warning)
-─────────────────────────────────────────────────
-```
 
 ---
 
@@ -566,7 +591,8 @@ ANIMATE-CONSTRAINTS
 ```
 COMPONENT-ELEMENT
 ─────────────────────────────────────────────────────────────────
-C = resolve(tag, Γ)     C : ComponentInstance<B, E, S, M>
+C = resolve(tag, Γ)
+C : ComponentInstance<B, E, S, M>                          → D044 otherwise
 
 node.classes ≠ []        → D021
 node.styles ≠ []         → D021
@@ -575,9 +601,12 @@ node.forwardMarker ≠ ∅   → D028   (FORWARD-INVALID, §6.2)
 
 ∀ attr ∈ node.attributes:  CHECK-COMP-TEXT-INPUT(Γ, B, attr)
 ∀ b ∈ node.inputs:         dispatch on BindingKind<B[b.name]> (§12):
+                             b.name ∉ keys(B) → D010
                              input    → CHECK-INPUT(Γ, B, b)
+                             model    → CHECK-INPUT(Γ, B, b)   (see note)
                              fragment → CHECK-FRAGMENT-PROP(Γ, B, b)
-                             absent   → D010
+                             output   → D046
+                             unknown  → D046
 ∀ model ∈ node.models:     CHECK-MODEL(Γ, B, model)
 ∀ output ∈ node.outputs:   CHECK-OUTPUT(Γ, B, output)
 ∀ frag ∈ node.fragments where frag.origin = "inline":
@@ -599,15 +628,27 @@ NO-UNKNOWN-BINDINGS(B, node)
 Γ ⊢ <C ...> ✓
 ```
 
+The dispatch is total: every input entry lands on exactly one row, so a
+binding that exists under the wrong kind is distinguishable from one that does
+not exist at all (D046 vs D010).
+
+**On binding a `model()` one-way.** `model` dispatches to CHECK-INPUT rather
+than to D046 because `ModelSignal<T> ⊑ InputSignal<T>` in Angular's type
+hierarchy (§3.5), so the premise `B[name] : InputSignal<T>` already holds. The
+effect is that `<C value={expr} />` against `value: model<T>()` is a legal
+one-way binding — the writeback half is simply not requested — matching how
+`[value]` on a model input behaves today. Requesting writeback needs `model:`,
+which CHECK-MODEL additionally constrains to a `WritableSignal` (D016).
+
 Component-specific rule:
 
 ```
 CHECK-COMP-TEXT-INPUT
 ─────────────────────────────────────────────────
-attr.name ∈ keys(B)
-B[attr.name] : InputSignal<T>
+attr.name ∈ keys(B)                                    → D010 if absent
+B[attr.name] : InputSignal<T>                          → D046 on wrong kind
 attr.value is string literal V    V : literal type
-V ⊑ T
+V ⊑ T                                                  → D015 on mismatch
 ─────────────────────────────────────────────────
 ```
 
@@ -660,6 +701,16 @@ if "ref" ∈ keys(B) (component only):  → D005
 ─────────────────────────────────────────────────────────────────
 
 
+ON-PREFIX-WARNING
+─────────────────────────────────────────────────────────────────
+∀ k ∈ keys(B) of component(...), component.proxy<S>()(...),
+directive(...) or derivation(...):
+  k starts with "on" → D020 (warning)
+
+Reported once at the declaration site, not at each call site.
+─────────────────────────────────────────────────────────────────
+
+
 PROXY-SURFACE
 ─────────────────────────────────────────────────────────────────
 component.proxy<S>()(config)
@@ -697,12 +748,18 @@ hosts via RESOLVED-FORWARD-HOSTS.
 FORWARD-PROXY
 ─────────────────────────────────────────────────────────────────
 Enclosing component declared by component.proxy<S>()(...)
+  i.e. P(C) ≠ never                                → D045 otherwise
 Exactly one native element with @forward() must exist → D027 on multiple
 H = I(tag of that element)
 H ⊑ S → D025 on failure
 If no @forward() placement exists → D026
 ProxyDirectivePayload delivered to that single target
 ─────────────────────────────────────────────────────────────────
+
+D045 is the converse of D026: D026 is a proxy component that never places its
+payload, D045 is a placement in a component that has no payload to place.
+Without it the premise would fall through to `H ⊑ never`, reporting D025 — an
+assignability message for a component that has no surface to be assignable to.
 
 
 FORWARD-INVALID
@@ -734,8 +791,8 @@ Directive host checks use RESOLVED-FORWARD-HOSTS.
 ```
 CHECK-DIRECTIVE-USE(Γ, H_host, R_host, dir)
 ─────────────────────────────────────────────────────────────────
-D = resolve(dir.directiveName, Γ)
-D : DirectiveInstance<H_D, B_D, E_D>
+D = resolve(dir.directiveName, Γ)                  → D002 if unresolved
+D : DirectiveInstance<H_D, B_D, E_D>               → D044 otherwise
 
 HOST-COMPAT:  H_host ⊑ H_D                         → D022
 UNIQUE:       D at most once per element in R_host  → D023
@@ -746,6 +803,7 @@ UNIQUE:       D at most once per element in R_host  → D023
 ∀ frag ∈ dir.fragments:     CHECK-DIRECTIVE-FRAGMENT(Γ, B_D, frag)
 CHECK-REQUIRED(B_D, provided, "directive")
 NO-UNKNOWN-BINDINGS(B_D, dir)
+NO-DUPLICATE-DIRECTIVE-BINDINGS(dir)
 
 if dir.when:  Γ ⊢ dir.when.condition : T    (any type — truthiness)
 if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
@@ -769,6 +827,12 @@ Inline `@fragment` delivery is supported only on component elements. Directives 
 Note: D032 is a parse-time diagnostic. The grammar admits only `name={expr}`
 inside `use:dir(...)`, so an inline `@fragment` declaration there never reaches
 the checker.
+
+That single `name={expr}` syntax is also why `dir.inputs` and `dir.fragments`
+cannot be told apart at parse time — the same ambiguity §10.2 describes for
+component elements. The split is made after `D` resolves, by `BindingKind<B_D[name]>`
+(§12); a checker may equally keep one list and dispatch on the kind, as
+COMPONENT-ELEMENT does.
 
 ### 7.1 Uniqueness Note
 
@@ -847,8 +911,8 @@ expression narrows nothing.
 ```
 DERIVE
 ─────────────────────────────────────────────────────────────────
-D = resolve(derivation_name, Γ)
-D : DerivationInstance<B_D, T>
+D = resolve(derivation_name, Γ)                    → D002 if unresolved
+D : DerivationInstance<B_D, T>                     → D044 otherwise
 
 ∀ input ∈ node.inputs:  CHECK-INPUT(Γ, B_D, input)
 CHECK-REQUIRED(B_D, provided, "derivation")
@@ -863,9 +927,9 @@ Any non-input binding form → D035
 Block-scoped to enclosing control-flow block. Each `@for` iteration owns an
 independent instance.
 
-Note: D035 is a parse-time diagnostic. The grammar admits only `name={expr}`
-input bindings inside `@derive name = D(...)`, so `model:`, `on:` and inline
-fragment forms never reach the checker.
+Note: D035 is a parse-time diagnostic. The grammar admits only input bindings
+inside `@derive name = D(...)` — `name={expr}` and its `bind:`/`once:` forms —
+so `model:`, `on:` and inline fragment forms never reach the checker.
 
 ### 9.1 Derivation Declaration Contract
 
@@ -978,6 +1042,10 @@ RENDER
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ expr : TemplateMarkup | undefined
 
+if expr is a fragment invocation f(a₁, ..., aₙ)  (incl. f?.(...)):
+  Γ ⊢ f : FragmentBinding<T> | undefined
+  (a₁, ..., aₙ) match FragmentArgs<T> positionally         → D029
+
 Optional: if options.injector present:
   Γ ⊢ options.injector : Injector | null | undefined
 ─────────────────────────────────────────────────────────────────
@@ -986,6 +1054,19 @@ Optional: if options.injector present:
 
 When `expr` is `undefined`, nothing is rendered (no-op).
 This supports `@render(optionalFragment?.())` directly.
+
+**Why D029 rather than a mapped TypeScript diagnostic.** A fragment binding is
+a callable (`ng-types.ts`), so TypeScript would catch a bad argument list on
+its own and §2 would surface it in the D015/D001 family. The DSL claims the
+code instead, because at a `@render` site the arity is the fragment contract
+rather than an incidental call signature, and D029 can name the binding the
+arguments failed to match. The same call written in `setup` — `children?.()` —
+stays ordinary TypeScript; D029 is a template-side code only.
+
+This is the invocation half of D029. §3.4 is the declaration half: an inline
+`@fragment`'s *parameter* list against the parent binding's `FragmentArgs<T>`.
+Both compare a positional list to the same `FragmentArgs<T>`, from the two
+sides of the contract.
 
 **Injector resolution.** `@render` is an inline outlet: providers inside the rendered
 fragment resolve against the **render site's** injector, not the definition site's.
@@ -1036,7 +1117,7 @@ BindingKind<V> =
 | Code | Category | Condition | Severity |
 |------|----------|-----------|----------|
 | D001 | Resolution | Unresolved identifier in template expression (mapped TS diagnostic, §2) | Error |
-| D002 | Resolution | Unresolved element (neither intrinsic nor in scope) | Error |
+| D002 | Resolution | Unresolved reference: element tag (neither intrinsic nor in scope), `use:` directive name, or `@derive` derivation name | Error |
 | D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
 | D004 | Declaration | Reserved `children` binding is not a `FragmentBinding<void>` | Error |
 | D005 | Declaration | Reserved `ref` binding declared on a component | Error |
@@ -1052,7 +1133,7 @@ BindingKind<V> =
 | D015 | Binding: Types | Type mismatch (expression not assignable to binding type; mapped TS diagnostic, §2) | Error |
 | D016 | Binding: Types | `model:` bound to non-writable signal | Error |
 | D017 | Binding: Types | `model:` on non-modelable native element | Error |
-| D018 | Binding: Modifiers | `once:` on a non-input target (`model:`, `on:`, native element property) | Error |
+| D018 | Binding: Modifiers | `once:` on a non-input target (`model:`, `on:`, native element property, fragment prop) | Error |
 | D019 | Binding: Modifiers | `once:prop` + `prop` duplicate on same element | Error |
 | D020 | Binding: Modifiers | `on`-prefixed binding name | Warning |
 | D021 | Binding: Scope | `class:` or `style:` on component element | Error |
@@ -1063,7 +1144,7 @@ BindingKind<V> =
 | D026 | Forwarding | No `@forward()` in proxy component | Error |
 | D027 | Forwarding | Multiple `@forward()` placements in one component | Error |
 | D028 | Forwarding | `@forward()` on a node that is not a native element | Error |
-| D029 | Fragments | Fragment argument count/type mismatch | Error |
+| D029 | Fragments | Fragment argument/parameter list does not match `FragmentArgs<T>` — at a `@render` invocation (§10.3) or an inline `@fragment` declaration (§3.4) | Error |
 | D030 | Fragments | Fragment delivered to a component element has no matching parent binding | Error |
 | D031 | Fragments | Duplicate inline fragment name under same parent | Error |
 | D032 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
@@ -1078,6 +1159,9 @@ BindingKind<V> =
 | D041 | Animate | `on:animate:` handler type mismatch | Error |
 | D042 | Expressions | Restricted TypeScript form used inside `{ ... }` | Error |
 | D043 | Derivation | `derivation(...)` declares a model, output or fragment binding | Error |
+| D044 | Resolution | Reference resolves to the wrong kind (tag that is not a component, `use:` target that is not a directive, `@derive` target that is not a derivation) | Error |
+| D045 | Forwarding | `@forward()` in a component that has no proxy surface | Error |
+| D046 | Binding: Existence | Binding bound with the syntax of a different kind (e.g. an `output()` bound as an input) | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1220,8 +1304,17 @@ const Panel = component.proxy<HTMLDivElement>()({
   },
 });
 
-// D029 — fragment arg mismatch
-// fragment.required<[string, number]>() but @render(row(item)) passes 1 arg → D029
+// D029 — fragment arg mismatch at the invocation (§10.3).
+// A fragment is a callable, so this is an arity error against FragmentArgs<T>:
+// row : fragment.required<[string, number]>() declares (string, number)
+@render(row(item))          // ❌ D029: 1 argument, expected 2
+@render(row(label, 0))      // ✅
+
+// D029 — the same code on the declaration side (§3.4): an inline @fragment's
+// parameter list must match the parent binding it is delivered to
+<List>
+  @fragment row(i: Item) { <span>{i.name}</span> }  // ❌ D029 if List declares
+</List>                                             //    row: fragment.required<[Item, number]>()
 
 // D030 — no matching parent fragment binding
 <Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D030
@@ -1267,13 +1360,34 @@ const child = ref<HTMLDivElement>();
 // D041 — on:animate: handler type mismatch
 <div on:animate:enter={(x: string) => {}}>X</div> // ❌ D041
 
-// D043 — derivation declares a non-input binding
-derivation({ bindings: { changed: model<number>() }, /* ... */ }) // ❌ D043
-
 // D042 — restricted form inside { }
 <button on:click={count = 5}>X</button>              // ❌ D042: assignment
 <span>{value as string}</span>                        // ❌ D042: type assertion
 <span>{new Date().getFullYear()}</span>               // ❌ D042: new
 // Permitted: an arrow body is ordinary TypeScript, statements included
 <button on:click={() => { count.set(0); log(); }}>X</button> // ✅
+
+// D043 — derivation declares a non-input binding
+derivation({ bindings: { changed: model<number>() }, /* ... */ }) // ❌ D043
+
+// D044 — reference resolves, but to the wrong kind
+const helper = (x: number) => x * 2;
+<helper />                              // ❌ D044: not a component
+<div use:helper()>X</div>               // ❌ D044: not a directive
+@derive total = helper(x={1});          // ❌ D044: not a derivation
+// Contrast D002, where nothing resolves at all:
+<div use:noSuchDirective()>X</div>      // ❌ D002
+
+// D045 — @forward() in a component with no proxy surface.
+// Plain component(...) declares no payload, so there is nothing to place.
+const Plain = component({
+  setup: () => @{ <button @forward()>X</button> }, // ❌ D045
+});
+
+// D046 — binding bound with the syntax of a different kind
+<UserDetail user={u()} makeAdmin={handler} />  // ❌ D046: makeAdmin is an
+                                               //    output(); use on:makeAdmin
+// Permitted: a model() may be bound one-way — ModelSignal ⊑ InputSignal, and
+// the writeback half is simply not requested (§5)
+<UserDetail user={u()} email={'a@b.c'} />      // ✅
 ```

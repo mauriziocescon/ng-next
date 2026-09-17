@@ -104,10 +104,17 @@ export interface Ref<T> extends Signal<T> {
 // ────────────────────────────────────────────────────────────────
 // 4. BINDING SURFACES
 //
-// Layered binding model:
-// - Derivation: inputs only
-// - Directive: derivation + model/output/fragment
-// - Component: directive
+// One union of every binding value, aliased per surface. The surfaces are
+// not structurally layered: each declares the same constraint and narrows it
+// with a mapped validator instead, because the narrowing has to name the
+// offending key (mapping it to `never`) rather than reject the whole record.
+// - Component: ValidateComponentBindings — reserves `children` / `ref` (§5)
+// - Directive: no validator — all four kinds allowed, no reserved names
+// - Derivation: ValidateDerivationBindings — inputs only (§9)
+//
+// The three aliases are exported so consumers can write the interface
+// conformance checks of `satisfies` against the right surface, e.g.
+// `satisfies Sortable & Record<string, ComponentBindingValue>`.
 // ────────────────────────────────────────────────────────────────
 
 type AnyBindingValue =
@@ -119,6 +126,9 @@ type AnyBindingValue =
 
 export type DirectiveBindingValue = AnyBindingValue;
 export type ComponentBindingValue = AnyBindingValue;
+// Pre-validation constraint: `derivation(...)` accepts this union and then
+// rejects everything but inputs via ValidateDerivationBindings (D043).
+export type DerivationBindingValue = AnyBindingValue;
 
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
@@ -433,7 +443,7 @@ export type DerivationInstance<B, T> = {
 };
 
 type ValidateDerivationBindings<
-  B extends Record<string, AnyBindingValue>,
+  B extends Record<string, DerivationBindingValue>,
 > = {
   [K in keyof B]: B[K] extends InputSignal<any>
     ? B[K] extends ModelSignal<any>
@@ -444,7 +454,7 @@ type ValidateDerivationBindings<
 
 // With bindings (input-only; rejects model, output, fragment via never)
 export function derivation<
-  B extends Record<string, AnyBindingValue>,
+  B extends Record<string, DerivationBindingValue>,
   T,
 >(config: {
   bindings: B & ValidateDerivationBindings<B>;

@@ -11,7 +11,7 @@ Highlights:
   - `derivation`: a factory for template-scoped computed values that requires DI,
   - `fragment`: a way to capture some markup in the form of a function,
 2. TS expressions with `{}`: bindings + text interpolation
-3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `class:`, `style:`, `animate:`, `use:`,
+3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `once:`, `class:`, `style:`, `animate:`, `use:`,
 4. Hostless components + TS lexical scoping for templates,
 5. Component inputs: lifted up + immediately available in setup and providers,
 6. Expose and Template Refs,
@@ -207,7 +207,7 @@ export const tooltip = directive({
 
 `@derive` creates a template-scoped reactive computation, establishing an injection context before calling the derivation's `setup`. It follows the lifecycle of the enclosing view. Bindings are passed as named pairs `key={expr}`, not as a JS object literal.
 
-Only inputs are allowed (no outputs, no models — a derivation has no DOM surface). `setup` must return a `Signal<T>`.
+Only inputs are allowed (no outputs, no models, no fragments — a derivation has no DOM surface). `setup` must return a `Signal<T>`.
 
 ```ts
 import { component, derivation, computed, inject, input } from '@angular/core';
@@ -687,7 +687,7 @@ export const Counter = component({
 ### Scope and caveats
 
 - `interoperability layer`: the full incremental migration story (mixed projects, build boundaries) is not covered intentionally — the topic is important but requires many micro-decisions that depend on compiler architecture choices out of scope for this proposal;
-- other decorator properties: in this proposal, components and directives expose only `providers` and `setup` entries. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
+- other decorator properties: in this proposal a component config carries only `bindings`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings` and `setup` — notably no directive-level `providers`. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
