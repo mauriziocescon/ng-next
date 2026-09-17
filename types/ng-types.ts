@@ -272,7 +272,7 @@ export function refMany(): any {
 //
 // component.proxy<S>()(...) declares a public directive-compatible surface.
 // S is explicit, must extend HTMLElement, and is realized by exactly one
-// compatible native @forward() placement in the template (D031 on multiple).
+// compatible native @forward() placement in the template (D027 on multiple).
 //
 // The call is deliberately split in two. TypeScript does not infer the
 // remaining type arguments of a partially-specified list, so a single-call

@@ -55,10 +55,13 @@ export const Consumer = component({
 ```
 ONCE-BINDING
 ─────────────────────────────────────────────────
-once: applies ONLY to inputs (InputSignal)
-once:model:*  → D018
-once:on:*     → D018
-once:prop + prop on same target → D019
+once: applies ONLY to inputs (InputSignal) — component, directive and
+derivation inputs. It is not a DOM feature.
+
+once:model:*                       → D018
+once:on:*                          → D018
+once: on a native element property → D018
+once:prop + prop on same target    → D019
 ─────────────────────────────────────────────────
 ```
 
@@ -69,7 +72,8 @@ The type checker validates the binding value against the target `InputSignal<T>`
 The `once` flag is a boolean field on binding nodes:
 
 ```ts
-// Component/native element inputs
+// Component inputs (the node is shared with native element property
+// bindings, where once: true is D018 — see ONCE-BINDING above)
 interface BoundAttributeNode extends BaseNode {
   type: 'BoundAttribute';
   name: string;
@@ -242,9 +246,10 @@ No new branded type or type-level changes are required. `input.once<T>()` produc
 | `once:` + `on:` on the same binding | D018 — `once:on:*` is invalid |
 | `once:prop` and `prop` on the same element | D019 — duplicate binding name |
 | `input.once` receives later parent changes | No error — updates are silently ignored by contract |
-| `once:prop` / `input.required.once` without an initial value | D013/D014/D038 — standard required-input diagnostic |
+| `once:prop` / `input.required.once` without an initial value | D013/D014/D034 — standard required-input diagnostic |
 | `input.once` in directive bindings | Valid |
 | `input.once` in `@derive` bindings | Valid |
 | `once:` on a `fragment` binding | D018 — fragments are not inputs |
+| `once:` on a native element property | D018 — `once:` is an input feature, not a DOM one |
 
 
