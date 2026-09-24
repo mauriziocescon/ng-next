@@ -127,7 +127,7 @@ type AnyBindingValue =
 export type DirectiveBindingValue = AnyBindingValue;
 export type ComponentBindingValue = AnyBindingValue;
 // Pre-validation constraint: `derivation(...)` accepts this union and then
-// rejects everything but inputs via ValidateDerivationBindings (D043).
+// rejects everything but inputs via ValidateDerivationBindings (D045).
 export type DerivationBindingValue = AnyBindingValue;
 
 // ────────────────────────────────────────────────────────────────
