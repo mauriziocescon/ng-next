@@ -204,9 +204,9 @@ const variantDuplicateAnnotations = [
   },
 ];
 
-// Variant 4: Directive on a component with a forward surface (valid)
-const variantForward = `import { directive, ref, input } from '@angular/core';
-import { component, signal, fragment, surface } from '@angular/core';
+// Variant 4: Directive on a component with a native-element rootNode (valid)
+const variantRootNode = `import { directive, ref, input } from '@angular/core';
+import { component, element, fragment } from '@angular/core';
 
 export const tooltip = directive({
   host: ref<HTMLElement>(),
@@ -219,13 +219,13 @@ export const tooltip = directive({
 });
 
 const Button = component({
-  forward: surface<HTMLButtonElement>(),
+  rootNode: element<HTMLButtonElement>(),
   bindings: {
     disabled: input<boolean>(false),
     children: fragment.required<void>(),
   },
   setup: ({ disabled, children }) => @{
-    <button @forward() disabled={disabled()}>
+    <button disabled={disabled()}>
       @render(children())
     </button>
   },
@@ -239,20 +239,20 @@ export const Consumer = component({
   },
 });`;
 
-const variantForwardAnnotations = [
+const variantRootNodeAnnotations = [
   {
-    token: 'forward: surface<HTMLButtonElement>(),',
-    explanation: 'Declares the forward surface. Directives applied to <Button /> are forwarded to the @forward() target inside. Declaration-only — nothing is allocated, and setup never receives it.',
+    token: 'rootNode: element<HTMLButtonElement>(),',
+    explanation: 'Declares the native-element root. The template must have a single <button> root (not wrapped in @if/@for/@switch), and directives applied to <Button /> attach to it. Declaration-only — element<T>() is a phantom brand, never passed to setup.',
     category: 'keyword',
   },
   {
-    token: '@forward()',
-    explanation: 'Marks where forwarded directives land. The element type must be assignable to the declared surface (HTMLButtonElement).',
+    token: '<button disabled={disabled()}>',
+    explanation: 'The single native-element root. Its declared type (HTMLButtonElement) decides which call-site directives are compatible.',
     category: 'keyword',
   },
   {
     token: "use:tooltip(message={'Save changes'})",
-    explanation: 'Valid — Button declares an HTMLButtonElement forward surface, which satisfies tooltip\'s host: ref<HTMLElement>(). The directive is placed on the internal <button>.',
+    explanation: 'Valid — the directive lands on Button\'s <button> root. tooltip\'s host: ref<HTMLElement>() accepts HTMLButtonElement by ordinary assignability, so the check passes.',
     category: 'directive',
   },
 ];
@@ -277,14 +277,14 @@ const variants = [
     label: 'Same directive twice',
     code: variantDuplicate,
     annotations: variantDuplicateAnnotations,
-    note: 'Compile error: the same directive cannot be applied more than once to the same resolved host element. This also applies across forwarding — if a forwarding component already applies tooltip internally, adding it externally is rejected.',
+    note: 'Compile error: the same directive cannot be applied more than once to the same resolved host element. This also applies to a component\'s root — if the component already writes tooltip on its native-element root, adding it again at the call site is rejected.',
     invalid: true,
   },
   {
-    label: 'With forwarding',
-    code: variantForward,
-    annotations: variantForwardAnnotations,
-    note: 'Valid. forward: surface<HTMLButtonElement>() declares a directive-compatible surface. Directives applied to <Button /> are forwarded to the @forward() target — the internal <button> element.',
+    label: 'Root element directive',
+    code: variantRootNode,
+    annotations: variantRootNodeAnnotations,
+    note: 'Valid. rootNode: element<HTMLButtonElement>() declares Button\'s native-element root. Directives applied to <Button /> attach to that single <button> root, and are accepted when the root type is assignable to the directive\'s host.',
     invalid: false,
   },
 ];
@@ -311,6 +311,13 @@ const variants = [
     <strong>No magic selectors:</strong> directives are applied where you see them (<code>use:</code>),
     type-checked against the host element, and conditionally toggled with <code>:when</code> —
     e.g. <code>use:tooltip(message=&#123;tip()&#125;):when=&#123;showTip()&#125;</code>.
+  </div>
+
+  <div class="annotation" role="note">
+    <strong>Host is <code>HTMLElement | RootNode</code>:</strong> a directive's <code>host</code> type is
+    the <code>DirectiveHostType</code> union — a native element (the common case, e.g. <code>host: ref&lt;HTMLElement&gt;()</code>)
+    or a component's default <code>RootNode</code>. Use <code>isRootNode(host)</code> to narrow the union;
+    it's preferred over <code>instanceof</code>, which is unreliable under SSR.
   </div>
 
 </Base>

@@ -21,7 +21,7 @@ import {
 // TemplateAST is nominal and opaque here. The shape of a parsed `@{ }`
 // literal is the compiler's concern; this layer only needs a distinct
 // token so a specific markup type cannot be mistaken for the generic
-// one. See ng-dsl-type-checking-spec.md §2.1 (MARKUP-LITERAL).
+// one.
 // ────────────────────────────────────────────────────────────────
 
 declare const TEMPLATE: unique symbol;
@@ -85,6 +85,14 @@ export declare namespace fragment {
   export function required<T>(): RequiredFragmentBinding<T>;
 }
 
+declare const ELEMENT: unique symbol;
+
+export type ElementBinding<T> = {
+  readonly [ELEMENT]: T;
+};
+
+export declare function element<T>(): ElementBinding<T>;
+
 // ────────────────────────────────────────────────────────────────
 // 3. REF
 //
@@ -108,9 +116,9 @@ export interface Ref<T> extends Signal<T> {
 // not structurally layered: each declares the same constraint and narrows it
 // with a mapped validator instead, because the narrowing has to name the
 // offending key (mapping it to `never`) rather than reject the whole record.
-// - Component: ValidateComponentBindings — reserves `children` / `ref` (§5)
+// - Component: ValidateComponentBindings — reserves `children` / `ref`
 // - Directive: no validator — all four kinds allowed, no reserved names
-// - Derivation: ValidateDerivationBindings — inputs only (§9)
+// - Derivation: ValidateDerivationBindings — inputs only
 //
 // The three aliases are exported so consumers can write the interface
 // conformance checks of `satisfies` against the right surface, e.g.
@@ -126,46 +134,62 @@ type AnyBindingValue =
 
 export type DirectiveBindingValue = AnyBindingValue;
 export type ComponentBindingValue = AnyBindingValue;
-// Pre-validation constraint: `derivation(...)` accepts this union and then
-// rejects everything but inputs via ValidateDerivationBindings (D043).
 export type DerivationBindingValue = AnyBindingValue;
 
 // ────────────────────────────────────────────────────────────────
 // 5. INSTANCE TYPES & SHARED HELPERS
 //
-// ComponentInstance has bindings + expose + template + forward-surface
-// metadata.
-// DirectiveInstance adds a host element type (H) — a directive
-// must be attached to a DOM element.
+// ComponentInstance carries bindings + expose + template markup + the declared
+// root type R. DirectiveInstance mirrors this: it carries a host type H, which
+// is a DirectiveHostType, i.e. `HTMLElement | RootNode`.
+//
+// Every component has a root type R. Omit `rootNode` and R defaults to
+// RootNode; set it to element<HTMLElement>() (or a subtype) and R becomes that
+// native element type. Directive-host compatibility is ordinary TypeScript
+// assignability: a directive with host H fits a component when the component's
+// root R is assignable to H (equivalently, `R extends DirectiveHost`).
 //
 // ExposeOf<T> works for components and directives thanks to structural match
-// on EXPOSE. ComponentTemplateOf<T> exposes the template markup metadata that
-// component(...) inferred from setup's return value.
+// on EXPOSE. ComponentTemplateOf<T> exposes the template markup metadata and
+// ComponentRootOf<C> exposes the declared root type that component(...)
+// inferred from setup's return value / rootNode.
 //
 // InputsOnly<B> filters a bindings record to InputSignal keys
 // only (excluding ModelSignal, which extends InputSignal in
 // Angular's type hierarchy). Used by `providers`.
 // ────────────────────────────────────────────────────────────────
 
+declare const ROOT_NODE: unique symbol;
+
+export interface RootNode {
+  readonly [ROOT_NODE]: true;
+}
+
+export type DirectiveHostType = HTMLElement | RootNode;
+
+export declare function isRootNode(
+  host: DirectiveHostType,
+): host is RootNode;
+
 declare const BINDINGS: unique symbol;
 declare const EXPOSE: unique symbol;
 declare const COMPONENT_TEMPLATE: unique symbol;
+declare const COMPONENT_ROOT: unique symbol;
 declare const HOST: unique symbol;
-declare const FORWARD_SURFACE: unique symbol;
 
 export type ComponentInstance<
   B,
   E = void,
-  S extends HTMLElement = never,
   TMarkup extends TemplateMarkup = TemplateMarkup,
+  R extends DirectiveHostType = RootNode,
 > = {
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
-  readonly [FORWARD_SURFACE]: S;
   readonly [COMPONENT_TEMPLATE]: TMarkup;
+  readonly [COMPONENT_ROOT]: R;
 };
 
-export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
+export type DirectiveInstance<H extends DirectiveHostType, B, E = void> = {
   readonly [HOST]: H;
   readonly [BINDINGS]: B;
   readonly [EXPOSE]: E;
@@ -173,8 +197,13 @@ export type DirectiveInstance<H extends HTMLElement, B, E = void> = {
 
 type ExposeOf<T> = T extends { readonly [EXPOSE]: infer E } ? E : never;
 
-export type ComponentTemplateOf<T extends ComponentInstance<any, any, any>> =
+export type ComponentTemplateOf<T extends ComponentInstance<any, any, any, any>> =
   T extends { readonly [COMPONENT_TEMPLATE]: infer TMarkup } ? TMarkup : never;
+
+export type ComponentRootOf<C extends ComponentInstance<any, any, any, any>> =
+  C extends { readonly [COMPONENT_ROOT]: infer R } ? R : never;
+
+type StoredRoot<R> = [R] extends [never] ? RootNode : R;
 
 /**
  * Documentation-only shape for the Angular DSL intrinsic element map.
@@ -183,7 +212,8 @@ export type ComponentTemplateOf<T extends ComponentInstance<any, any, any>> =
  * helper types describe the contract used by template type checking:
  * a native tag resolves to a concrete HTMLElement subtype, and that host
  * type is then used for native bindings, directive compatibility,
- * @forward() validation, and native refs.
+ * root-type resolution for components whose `rootNode` declares a native
+ * element (via `element<HTMLElement>()` or a subtype), and native refs.
  */
 export interface IntrinsicElementDescriptor<H extends HTMLElement> {
   readonly element: H;
@@ -254,26 +284,26 @@ export type __ValidateComponentBindings<
 //     into Signal<H[]>.
 // ────────────────────────────────────────────────────────────────
 
-// Native element
-export function ref<H extends HTMLElement>(): Ref<H | undefined>;
+// Native element, or the root of a component whose rootNode is element<RootNode>() (the default)
+export function ref<H extends DirectiveHostType>(): Ref<H | undefined>;
 // Component or Directive (expose inferred from type parameter)
 export function ref<
   T extends
-    | ComponentInstance<unknown, unknown, any>
-    | DirectiveInstance<HTMLElement, unknown, unknown>,
+    | ComponentInstance<unknown, unknown, any, any>
+    | DirectiveInstance<DirectiveHostType, unknown, unknown>,
 >(): Ref<ExposeOf<T> extends void ? undefined : ExposeOf<T> | undefined>;
 
 export function ref(): any {
   return {} as any;
 }
 
-// Native element
-export function refMany<H extends HTMLElement>(): Ref<H[]>;
+// Native element, or the root of a component whose rootNode is element<RootNode>() (the default)
+export function refMany<H extends DirectiveHostType>(): Ref<H[]>;
 // Component or Directive (expose inferred from type parameter)
 export function refMany<
   T extends
-    | ComponentInstance<unknown, unknown, any>
-    | DirectiveInstance<HTMLElement, unknown, unknown>,
+    | ComponentInstance<unknown, unknown, any, any>
+    | DirectiveInstance<DirectiveHostType, unknown, unknown>,
 >(): Ref<ExposeOf<T> extends void ? [] : ExposeOf<T>[]>;
 
 export function refMany(): any {
@@ -288,35 +318,17 @@ export function refMany(): any {
 // component(...) declares every component. `bindings` is the public API;
 // setup receives those binding objects; providers receive inputs only.
 //
-// `forward: surface<S>()` declares a public directive-compatible surface.
-// S must extend HTMLElement and is realized by exactly one compatible native
-// @forward() placement in the template (D027 on multiple). Omitting `forward`
-// leaves no inference site for S, so it falls back to its `never` default —
-// a plain component and a forwarding component share one signature.
+// `rootNode` declares the component's root node, typed via element<...>(). Its
+// value is an ElementBinding<R> where R is a native element type, e.g.
+// element<HTMLElement>() or any HTMLElement subtype.
+// RootNode is not a declarable root: element<RootNode>() and
+// element<HTMLElement | RootNode>() are rejected. Omitting the key defaults the
+// component root to RootNode; declaring element<HTMLElement>() (or a subtype)
+// gives the component a native element root.
 //
-// surface<S>() is a declaration, not a value: a phantom brand behind a
-// `declare function`, with no implementation to call and nothing to allocate.
-// It sits in a value position for the same reason `fragment.required<void>()`
-// does — so the type can be written where TypeScript will infer it — and the
-// compiler erases the config key. setup never receives it.
-//
-// S is a promise, not a fact: @forward() validation checks H ⊑ S, so a
-// component may deliberately declare a wider surface (`HTMLElement`) than the
-// element it forwards to, keeping the internal tag out of its public API.
-// That is why the surface is declared rather than inferred from the template.
-//
-// @forward() is marker-only: no runtime forwarding object, no spread. The
-// enclosing component's surface defines the payload — directives applied at
-// the call site — and the marked native element defines where they land.
+// The declaration is never visible to setup, but the declared root type R
+// is inferred and carried in ComponentInstance so consumers can read it via ComponentRootOf.
 // ────────────────────────────────────────────────────────────────
-
-declare const SURFACE_DECL: unique symbol;
-
-export type Surface<H extends HTMLElement> = {
-  readonly [SURFACE_DECL]: H;
-};
-
-export declare function surface<H extends HTMLElement>(): Surface<H>;
 
 type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
   | { template: TMarkup; expose: E } // full form with expose
@@ -327,32 +339,32 @@ type SetupReturn<E, TMarkup extends TemplateMarkup = TemplateMarkup> =
 export function component<
   B extends Record<string, ComponentBindingValue>,
   E = void,
-  S extends HTMLElement = never,
   TMarkup extends TemplateMarkup = TemplateMarkup,
+  R extends HTMLElement = never,
 >(
   config: {
     bindings: B & ValidateComponentBindings<B>;
-    forward?: Surface<S>;
+    rootNode?: ElementBinding<R>;
     setup: (bindings: SetupBindings<B>) => SetupReturn<E, TMarkup>;
     providers?: (inputs: InputsOnly<B>) => Provider[];
     style?: string;
     styleUrl?: string;
   },
-): ComponentInstance<B, E, S, TMarkup>;
+): ComponentInstance<B, E, TMarkup, StoredRoot<R>>;
 
 // No bindings
 export function component<
   E = void,
-  S extends HTMLElement = never,
   TMarkup extends TemplateMarkup = TemplateMarkup,
+  R extends HTMLElement = never,
 >(config: {
   bindings?: never;
-  forward?: Surface<S>;
+  rootNode?: ElementBinding<R>;
   setup: () => SetupReturn<E, TMarkup>;
   providers?: () => Provider[];
   style?: string;
   styleUrl?: string;
-}): ComponentInstance<{}, E, S, TMarkup>;
+}): ComponentInstance<{}, E, TMarkup, StoredRoot<R>>;
 
 export function component(config: any): any {
   return config;
@@ -372,7 +384,7 @@ export function component(config: any): any {
 
 // With bindings
 export function directive<
-  H extends HTMLElement,
+  H extends DirectiveHostType,
   B extends Record<string, DirectiveBindingValue>,
   E = void,
 >(config: {
@@ -385,7 +397,7 @@ export function directive<
 }): DirectiveInstance<H, B, E>;
 
 // No bindings
-export function directive<H extends HTMLElement, E = void>(config: {
+export function directive<H extends DirectiveHostType, E = void>(config: {
   host: Ref<H | undefined>;
   bindings?: never;
   setup: (bindings: {}, context: { host: Ref<H | undefined> }) => E;
@@ -567,14 +579,14 @@ export namespace injectionToken {
 type AbstractCtor<T = any> = abstract new (...args: any[]) => T;
 
 type StrictInjectionToken =
-  | ComponentInstance<any, any, any>
+  | ComponentInstance<any, any, any, any>
   | DirectiveInstance<any, any, any>
   | DiTokenContract<any, any>
   | InjectionToken<any>
   | AbstractCtor<any>;
 
 type InjectResult<T> =
-  T extends ComponentInstance<any, infer E, any>
+  T extends ComponentInstance<any, infer E, any, any>
     ? E
     : T extends DirectiveInstance<any, any, infer E>
       ? E
