@@ -284,7 +284,6 @@ export type __ValidateComponentBindings<
 //     into Signal<H[]>.
 // ────────────────────────────────────────────────────────────────
 
-// Native element, or the root of a component whose root defaults to RootNode when the rootNode key is omitted
 export function ref<H extends DirectiveHostType>(): Ref<H | undefined>;
 // Component or Directive (expose inferred from type parameter)
 export function ref<
@@ -297,7 +296,6 @@ export function ref(): any {
   return {} as any;
 }
 
-// Native element, or the root of a component whose root defaults to RootNode when the rootNode key is omitted
 export function refMany<H extends DirectiveHostType>(): Ref<H[]>;
 // Component or Directive (expose inferred from type parameter)
 export function refMany<
