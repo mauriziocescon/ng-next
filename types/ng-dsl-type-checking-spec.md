@@ -110,7 +110,7 @@ Such an identifier is not inside a `{ ... }` region, so §2's diagnostic mapping
 does not apply to it and D001 is not the code. A name that resolves to nothing
 is D002; a name that resolves to the wrong kind — a `use:` target that is not a
 directive, a `@derive` target that is not a derivation, a tag that is neither
-intrinsic nor a component — is D046.
+intrinsic nor a component — is D003.
 
 ---
 
@@ -145,7 +145,7 @@ The following TypeScript forms must be rejected inside `{ ... }`:
   new                                   satisfies
   type assertions (as, <T>)
 
-Rejection must name the offending form           → D044
+Rejection must name the offending form           → D040
 
 Scope of the ban: it applies to the binding expression and to every
 expression nested within it, but NOT to the body of an arrow function
@@ -159,7 +159,7 @@ DIAGNOSTIC-MAPPING
 ─────────────────────────────────────────────────────────────────
 TypeScript diagnostics for e are reported at sourceSpan(e) in the `.ng` file.
 
-D001 (unresolved identifier) and D015 (expression not assignable to a
+D001 (unresolved identifier) and D017 (expression not assignable to a
 binding type) are TypeScript diagnostics surfaced through this mapping, not
 independent judgments of this specification.
 ─────────────────────────────────────────────────────────────────
@@ -246,8 +246,8 @@ directives (§7), and derivations (§9).
 CHECK-INPUT(Γ, B, input)
 ─────────────────────────────────────────────────
 input.name ∈ keys(B)
-B[input.name] : InputSignal<T>                        → D010 if absent
-Γ ⊢ input.value : U    U ⊑ T                          → D015 on mismatch
+B[input.name] : InputSignal<T>                        → D011 if absent
+Γ ⊢ input.value : U    U ⊑ T                          → D017 on mismatch
 ─────────────────────────────────────────────────
 ```
 
@@ -257,8 +257,8 @@ B[input.name] : InputSignal<T>                        → D010 if absent
 CHECK-MODEL(Γ, B, model)
 ─────────────────────────────────────────────────
 model.name ∈ keys(B)
-B[model.name] : ModelSignal<T>                        → D010 if absent
-Γ ⊢ model.value : WritableSignal<T>                   → D016 if not writable
+B[model.name] : ModelSignal<T>                        → D011 if absent
+Γ ⊢ model.value : WritableSignal<T>                   → D018 if not writable
 ─────────────────────────────────────────────────
 ```
 
@@ -268,9 +268,9 @@ B[model.name] : ModelSignal<T>                        → D010 if absent
 CHECK-OUTPUT(Γ, B, output)
 ─────────────────────────────────────────────────
 output.name ∈ keys(B)
-B[output.name] : OutputEmitterRef<T>                  → D010 if absent
+B[output.name] : OutputEmitterRef<T>                  → D011 if absent
 Γ ⊢ output.handler : U
-U ⊑ ((e: T) → void)                                   → D015 on mismatch
+U ⊑ ((e: T) → void)                                   → D017 on mismatch
        (arity-safe: () → void is assignable)
 ─────────────────────────────────────────────────
 ```
@@ -281,8 +281,8 @@ U ⊑ ((e: T) → void)                                   → D015 on mismatch
 CHECK-FRAGMENT(Γ, B, frag)
 ─────────────────────────────────────────────────
 frag.name ∈ keys(B)
-B[frag.name] : FragmentBinding<T>                          → D032 if absent
-frag.parameters match FragmentArgs<T> positionally         → D031
+B[frag.name] : FragmentBinding<T>                          → D027 if absent
+frag.parameters match FragmentArgs<T> positionally         → D026
 Γ' = Γ ∪ { paramᵢ.name : Tᵢ }
 CHECK-NODES(Γ', frag.children)
 ─────────────────────────────────────────────────
@@ -293,7 +293,7 @@ child of a component element (§10.2). A `@fragment` anywhere else declares a
 name without delivering it and is checked by FRAGMENT-DEF (§10.1) instead.
 The by-value form `name={expr}` is CHECK-FRAGMENT-PROP (§10.2).
 
-The `children` binding name is reserved at **declaration** time (D004): if
+The `children` binding name is reserved at **declaration** time (D005): if
 present in a component's `bindings`, it must be a `FragmentBinding<void>`.
 Call-site delivery rules for all fragments (including `children`) are in §10.2.
 
@@ -313,7 +313,7 @@ required(k) is a property of how k was declared, not of its type:
   BindingKind<B[k]> = model     → k ∈ provided_models
   BindingKind<B[k]> = fragment  → k ∈ provided_fragments
 
-Violation → D013 (component), D014 (directive), D036 (derivation)
+Violation → D015 (component), D016 (directive), D031 (derivation)
 ─────────────────────────────────────────────────
 ```
 
@@ -331,19 +331,19 @@ so a checker must read `required(k)` from the declaration site. There is no
 ```
 NO-UNKNOWN-BINDINGS(B, node)
 ─────────────────────────────────────────────────
-∀ b ∈ binding lists carried by node:  b.name ∈ keys(B)   → D010
+∀ b ∈ binding lists carried by node:  b.name ∈ keys(B)   → D011
 
   component element: attributes, inputs, models, outputs
   directive:         inputs, models, outputs, fragments
   derive:            inputs
 
 Native elements do not use this rule — they resolve against the DOM type
-system through the CHECK-NATIVE-* rules in §4 (→ D009).
+system through the CHECK-NATIVE-* rules in §4 (→ D010).
 
 A component element's delivered `fragments` are excluded: an unmatched
-fragment there is D032 (§3.4, §10.2), the more specific code. Fragments
+fragment there is D027 (§3.4, §10.2), the more specific code. Fragments
 delivered to a directive arrive by reference and have no such rule, so they
-stay under D010.
+stay under D011.
 ─────────────────────────────────────────────────
 ```
 
@@ -356,7 +356,7 @@ NO-DUPLICATE-BINDINGS(node)
 ∀ name: |{b ∈ inputs ∪ models | b.name = name}| ≤ 1
 ∀ name: |{b ∈ outputs | b.name = name}| ≤ 1
 |references| ≤ 1
-Violation → D011
+Violation → D012
 
 A fragment must be delivered once, by one mechanism (§10.2). Let
 delivered(name) = the fragment props in inputs, the inline fragments, and
@@ -364,20 +364,20 @@ the implicit children fragment, taken together:
 
 ∀ name: |delivered(name)| ≤ 1
 
-  both occurrences are inline fragments  → D033
-  otherwise (mechanisms differ)          → D011
+  both occurrences are inline fragments  → D028
+  otherwise (mechanisms differ)          → D012
 
 Two occurrences of the same name in the same list get the more specific
 code; a name arriving by two different mechanisms is an ordinary duplicate.
 
 Exception: a pair differing only in the once: modifier — once:prop and prop
-on the same element — is D019, not D011, for the same reason.
+on the same element — is D021, not D012, for the same reason.
 
 classes: repeatable (multiple class:name allowed per element)
 styles: repeatable (multiple style:prop allowed per element)
 animate: uses ANIMATE-CONSTRAINTS (§4.2)
 use: at most one application of a given directive per resolved host
-     element — the UNIQUE premise of §7, → D023 (see §7.1)
+     element — the UNIQUE premise of §7, → D025 (see §7.1)
 ─────────────────────────────────────────────────
 
 
@@ -391,19 +391,19 @@ identity slots, independent of the element's:
 ∀ name: |{b ∈ dir.fragments | b.name = name}| ≤ 1
 |dir.when| ≤ 1
 |dir.ref| ≤ 1
-Violation → D011
+Violation → D012
 
 The once: exception of NO-DUPLICATE-BINDINGS applies here too: once:prop
-and prop on the same application is D019.
+and prop on the same application is D021.
 
-Two applications of the *same* directive to one element are D023, not D011 —
+Two applications of the *same* directive to one element are D025, not D012 —
 that is the UNIQUE premise of §7, not a binding-identity question.
 ─────────────────────────────────────────────────
 
 
 NO-STATIC-DYNAMIC-CLASH(node)
 ─────────────────────────────────────────────────
-∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}     → D012
+∀ name ∈ attributes:  name ∉ {b.name | b ∈ inputs}     → D013
 
 classes and styles may coexist with a static attribute or
 dynamic binding for the same base name on native elements.
@@ -418,7 +418,7 @@ CHECK-REF(Γ, E, ref)
 ref.target.name = x
 if E = void:  x : Ref<undefined> ∈ Γ  ∨  x : Ref<[]> ∈ Γ
 else:         x : Ref<E | undefined> ∈ Γ  ∨  x : Ref<E[]> ∈ Γ
-Violation → D035
+Violation → D030
 ─────────────────────────────────────────────────
 ```
 
@@ -439,11 +439,11 @@ ONCE-BINDING
 once: applies ONLY to inputs (InputSignal) — component, directive and
 derivation inputs. It is not a DOM feature.
 
-once:model:*                       → D018
-once:on:*                          → D018
-once: on a native element property → D018
-once: on a fragment prop (§10.2)   → D018
-once:prop + prop on same target    → D019
+once:model:*                       → D020
+once:on:*                          → D020
+once: on a native element property → D020
+once: on a fragment prop (§10.2)   → D020
+once:prop + prop on same target    → D021
 ─────────────────────────────────────────────────
 ```
 
@@ -497,14 +497,14 @@ CHECK-NATIVE-TEXT-ATTR
 ─────────────────────────────────────────────────
 attr.name ∈ Attrs(H)
   ∨ (attr.name ∈ Props(H) ∧ string ⊑ Props(H)[attr.name])
-                                                       → D009 on failure
+                                                       → D010 on failure
 
 
 CHECK-NATIVE-INPUT
 ─────────────────────────────────────────────────
-input.name ∈ Props(H)    Props(H)[input.name] = T      → D009 if absent
-input.once = false                                     → D018 otherwise
-Γ ⊢ input.value : U     U ⊑ T                          → D015 on mismatch
+input.name ∈ Props(H)    Props(H)[input.name] = T      → D010 if absent
+input.once = false                                     → D020 otherwise
+Γ ⊢ input.value : U     U ⊑ T                          → D017 on mismatch
 
 
 CHECK-NATIVE-OUTPUT
@@ -516,8 +516,8 @@ U ⊑ ((e: T) → void)    (same arity-safe rule as §3.3)
 
 CHECK-NATIVE-MODEL
 ─────────────────────────────────────────────────
-tag ∈ {"input", "select", "textarea"}                  → D017 otherwise
-model.name ∈ ModelableProps(H)                         → D009 if absent
+tag ∈ {"input", "select", "textarea"}                  → D019 otherwise
+model.name ∈ ModelableProps(H)                         → D010 if absent
 ModelableProps(H)[model.name] = T
 Γ ⊢ model.value : WritableSignal<T>
 ```
@@ -525,7 +525,7 @@ ModelableProps(H)[model.name] = T
 ### 4.1 class: and style: Typing
 
 `class:` and `style:` apply **only** to native elements. Using them on component
-elements is a compile-time error (D021).
+elements is a compile-time error (D023).
 
 ```
 CLASS-BINDING
@@ -552,24 +552,24 @@ Both forms are subject to ANIMATE-CONSTRAINTS.
 ANIMATE-CLASS-BINDING
 ─────────────────────────────────────────────────
 animate:phase={expr}   where phase ∈ {"enter", "leave"}
-Γ ⊢ expr : string | string[]                           → D042 on mismatch
+Γ ⊢ expr : string | string[]                           → D038 on mismatch
 
 
 ANIMATE-EVENT-BINDING
 ─────────────────────────────────────────────────
 on:animate:phase={handler}   where phase ∈ {"enter", "leave"}
-Γ ⊢ handler : (event: AnimationCallbackEvent) => void   → D043 on mismatch
+Γ ⊢ handler : (event: AnimationCallbackEvent) => void   → D039 on mismatch
 
 AnimationCallbackEvent = { target: Element; animationComplete: VoidFunction; }
 
 
 ANIMATE-CONSTRAINTS
 ─────────────────────────────────────────────────
-- applies ONLY to native elements (not components → D038)
-- phase must be "enter" or "leave" → D039 (parse-time: the grammar admits only
+- applies ONLY to native elements (not components → D034)
+- phase must be "enter" or "leave" → D035 (parse-time: the grammar admits only
   those two phase names)
-- at most one animate:enter and one animate:leave (class form) per element → D040
-- at most one on:animate:enter and one on:animate:leave per element        → D041
+- at most one animate:enter and one animate:leave (class form) per element → D036
+- at most one on:animate:enter and one on:animate:leave per element        → D037
 - both phases and both forms (class + event) can coexist on the same element
 ─────────────────────────────────────────────────
 ```
@@ -582,26 +582,26 @@ ANIMATE-CONSTRAINTS
 COMPONENT-ELEMENT
 ─────────────────────────────────────────────────────────────────
 C = resolve(tag, Γ)
-C : ComponentInstance<B, E, M, R>                          → D046 otherwise
+C : ComponentInstance<B, E, M, R>                          → D003 otherwise
 
-node.classes ≠ []        → D021
-node.styles ≠ []         → D021
-node.animations ≠ []     → D038
+node.classes ≠ []        → D023
+node.styles ≠ []         → D023
+node.animations ≠ []     → D034
 
 ∀ attr ∈ node.attributes:  CHECK-COMP-TEXT-INPUT(Γ, B, attr)
 ∀ b ∈ node.inputs:         dispatch on BindingKind<B[b.name]> (§12):
-                             b.name ∉ keys(B) → D010
+                             b.name ∉ keys(B) → D011
                              input    → CHECK-INPUT(Γ, B, b)
                              model    → CHECK-INPUT(Γ, B, b)   (see note)
                              fragment → CHECK-FRAGMENT-PROP(Γ, B, b)
-                             output   → D030
-                             unknown  → D030
+                             output   → D014
+                             unknown  → D014
 ∀ model ∈ node.models:     CHECK-MODEL(Γ, B, model)
 ∀ output ∈ node.outputs:   CHECK-OUTPUT(Γ, B, output)
 ∀ frag ∈ node.fragments where frag.origin = "inline":
   CHECK-FRAGMENT(Γ, B, frag)
 ∀ frag ∈ node.fragments where frag.origin = "implicitChildren":
-  B["children"] : FragmentBinding<void>                    → D032
+  B["children"] : FragmentBinding<void>                    → D027
   CHECK-NODES(Γ, frag.children)
 ∀ ref ∈ node.references:   CHECK-REF(Γ, E, ref)
 node.children = []         (nested content is lowered to the
@@ -620,21 +620,21 @@ NO-UNKNOWN-BINDINGS(B, node)
 ```
 
 Every component accepts directives syntactically; incompatibility is reported by
-HOST-COMPAT (§7) as D022.
+HOST-COMPAT (§7) as D024.
 
 **On binding a `model()` one-way.** `model` dispatches to CHECK-INPUT because
 `ModelSignal<T> ⊑ InputSignal<T>` (§3.5), so one-way binding is legal and
-writeback needs `model:` (D016).
+writeback needs `model:` (D018).
 
 Component-specific rule:
 
 ```
 CHECK-COMP-TEXT-INPUT
 ─────────────────────────────────────────────────
-attr.name ∈ keys(B)                                    → D010 if absent
-B[attr.name] : InputSignal<T>                          → D030 on wrong kind
+attr.name ∈ keys(B)                                    → D011 if absent
+B[attr.name] : InputSignal<T>                          → D014 on wrong kind
 attr.value is string literal V    V : literal type
-V ⊑ T                                                  → D015 on mismatch
+V ⊑ T                                                  → D017 on mismatch
 ─────────────────────────────────────────────────
 ```
 
@@ -647,7 +647,7 @@ SETUP-RETURN
 ─────────────────────────────────────────────────────────────────
 setup returns: M | { template: M } | { template: M, expose: E }
 where M : TemplateMarkup<TAst>
-Any other return shape → D007
+Any other return shape → D008
 → component(...) : ComponentInstance<B, E, M, R>
 
 
@@ -659,15 +659,15 @@ That literal must appear only at the tail position:
   - Block return:  setup: () => { ...; return @{ ... }; }
   - Object return: setup: () => { ...; return { template: @{ ... }, expose }; }
 
-Multiple @{ } literals in setup → D008
-@{ } inside branches, loops, or non-tail position → D008
+Multiple @{ } literals in setup → D009
+@{ } inside branches, loops, or non-tail position → D009
 ─────────────────────────────────────────────────────────────────
 
 
 PROVIDERS-INPUTS-ONLY
 ─────────────────────────────────────────────────────────────────
 providers receives Pick<B, input keys only>.
-Models, outputs, and fragments are excluded → D006.
+Models, outputs, and fragments are excluded → D007.
 
 
 BINDING-PRIMITIVE-PLACEMENT
@@ -675,22 +675,21 @@ BINDING-PRIMITIVE-PLACEMENT
 input(), input.required(), model(), output(), fragment() and
 fragment.required() may appear only as values of the `bindings` record of
 component(...), directive(...) or derivation(...).
-Calling one anywhere else — in setup, providers, or module scope — is → D003.
+Calling one anywhere else — in setup, providers, or module scope — is → D004.
 
 
 RESERVED-COMPONENT-BINDINGS
 ─────────────────────────────────────────────────────────────────
-if "children" ∈ keys(B):  B["children"] : FragmentBinding<void>
-otherwise → D004
+if "children" ∈ keys(B):  B["children"] : FragmentBinding<void>   → D005 otherwise
 
-if "ref" ∈ keys(B) (component only):  → D005
+if "ref" ∈ keys(B) (component only):  → D006
 ─────────────────────────────────────────────────────────────────
 
 
 ON-PREFIX-WARNING
 ─────────────────────────────────────────────────────────────────
 ∀ k ∈ keys(B) of component(...), directive(...) or derivation(...):
-  k starts with "on" → D020 (warning)
+  k starts with "on" → D022 (warning)
 
 Reported once at the declaration site, not at each call site.
 ─────────────────────────────────────────────────────────────────
@@ -712,15 +711,20 @@ A top-level @let or @fragment declaration beside the root element is therefore
 not a second root.
 
 When C declares a native-element rootNode (rootNode: element<T>() where T ⊑ HTMLElement):
-  |RR(C)| = 1                                    → D047 otherwise
+  |RR(C)| = 1                                    → D041 otherwise
   RN(C) = the single member of RR(C)
-  RN(C) is not a control-flow block (@if/@for/@switch)   → D048
-  RN(C) is a native element                             → D049
+  RN(C) is not a block construct (@if/@for/@switch/@defer/@boundary)  → D042
+  RN(C) is a native element                                          → D043
   Root(C) = I(tag(RN(C)))
 
-  Diagnostic precedence: D047 is checked first, then D048, then D049. D048 is
-  the specific case of D049 that has a better message, so a control-flow root
-  reports D048 and never D049.
+  A block construct is any control-flow block (@if/@for/@switch), a @defer
+  block (or its companion @placeholder/@loading/@error blocks), or a @boundary
+  block. RN(C) must be a statically/unconditionally present node, not nested in
+  any of these.
+
+  Diagnostic precedence: D041 is checked first, then D042, then D043. D042 is
+  the specific case of D043 that has a better message, so a block-wrapped root
+  reports D042 and never D043.
 
 Otherwise C has the default rootNode:
   RN(C) is undefined     Root(C) = RootNode     no root diagnostic applies
@@ -747,7 +751,7 @@ Native element N:
 
 Component C declaring a native-element rootNode:
   RN(C) = the single renderable root node of T(C)
-                (§5.1 ELEMENT-ROOT; D047/D048/D049)
+                (§5.1 ELEMENT-ROOT; D041/D042/D043)
   RN(C) is a native element by rule, so resolution terminates here.
   Root(C) = I(tag(RN(C)))    host set = {RN(C)}
 
@@ -760,7 +764,7 @@ CHECK-DIRECTIVE-USE (§7).
 ─────────────────────────────────────────────────────────────────
 ```
 
-RN(C) and Root(C) follow §5.1 ELEMENT-ROOT (D047/D048/D049).
+RN(C) and Root(C) follow §5.1 ELEMENT-ROOT (D041/D042/D043).
 
 ---
 
@@ -770,10 +774,10 @@ RN(C) and Root(C) follow §5.1 ELEMENT-ROOT (D047/D048/D049).
 CHECK-DIRECTIVE-USE(Γ, H_host, R_host, dir)
 ─────────────────────────────────────────────────────────────────
 D = resolve(dir.directiveName, Γ)                  → D002 if unresolved
-D : DirectiveInstance<H_D, B_D, E_D>               → D046 otherwise
+D : DirectiveInstance<H_D, B_D, E_D>               → D003 otherwise
 
-HOST-COMPAT:  H_host ⊑ H_D                         → D022
-UNIQUE:       D at most once per element in R_host  → D023
+HOST-COMPAT:  H_host ⊑ H_D                         → D024
+UNIQUE:       D at most once per element in R_host  → D025
 
 ∀ input ∈ dir.inputs:       CHECK-INPUT(Γ, B_D, input)
 ∀ output ∈ dir.outputs:     CHECK-OUTPUT(Γ, B_D, output)
@@ -789,9 +793,9 @@ if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 Γ ⊢ use:D(...) ✓
 ```
 
-HOST-COMPAT (`H_host ⊑ H_D`) is ordinary TypeScript assignability, D022 on
+HOST-COMPAT (`H_host ⊑ H_D`) is ordinary TypeScript assignability, D024 on
 failure, with `H_host = Root(C)` (§5.1 ELEMENT-ROOT). So a default RootNode root
-(§6) rejects a DOM-only `host: ref<HTMLElement>()` as D022 and accepts hosts that
+(§6) rejects a DOM-only `host: ref<HTMLElement>()` as D024 and accepts hosts that
 admit RootNode (`host: ref<RootNode>()`, `host: ref<HTMLElement | RootNode>()`),
 while `host: ref<RootNode>()` fails against native elements and native-element-rootNode
 components. A RootNode host is inert: it attaches, runs setup, injects, and reads
@@ -813,13 +817,13 @@ B_D[frag.name] : FragmentBinding<T>
 
 Inline `@fragment` is component-only; directives receive fragments only by
 reference via `name={expr}`, and an inline `@fragment` in a directive use is
-rejected as D034 (parse-time). Since `name={expr}` cannot distinguish
+rejected as D029 (parse-time). Since `name={expr}` cannot distinguish
 `dir.inputs` from `dir.fragments` at parse time (the §10.2 ambiguity), the split
 is made after `D` resolves by `BindingKind<B_D[name]>` (§12), as COMPONENT-ELEMENT does.
 
 ### 7.1 Uniqueness Note
 
-Uniqueness (D023) is per resolved host element per instantiation, not per
+Uniqueness (D025) is per resolved host element per instantiation, not per
 syntactic position and not per component declaration. For a component C with a
 native-element `rootNode`, instantiated at call site S:
 
@@ -899,12 +903,12 @@ expression narrows nothing.
 DERIVE
 ─────────────────────────────────────────────────────────────────
 D = resolve(derivation_name, Γ)                    → D002 if unresolved
-D : DerivationInstance<B_D, T>                     → D046 otherwise
+D : DerivationInstance<B_D, T>                     → D003 otherwise
 
 ∀ input ∈ node.inputs:  CHECK-INPUT(Γ, B_D, input)
 CHECK-REQUIRED(B_D, provided, "derivation")
 NO-UNKNOWN-BINDINGS(B_D, node)
-Any non-input binding form → D037
+Any non-input binding form → D032
 
 Γ' = Γ ∪ { node.name : Signal<T> }
 ─────────────────────────────────────────────────────────────────
@@ -922,7 +926,7 @@ A TypeScript API well-formedness rule (not a template-node judgment):
 DERIVATION-BINDINGS-INPUTS-ONLY
 ─────────────────────────────────────────────────────────────────
 ∀ k ∈ keys(B) of derivation(...):  BindingKind<B[k]> = input
-Model, output or fragment binding → D045
+Model, output or fragment binding → D033
 
 A derivation has no DOM surface — no host, no events, no content — so the
 only binding kind that means anything is an input.
@@ -930,8 +934,8 @@ only binding kind that means anything is an input.
 ```
 
 Enforced at the type level by `ValidateDerivationBindings` (`ng-types.ts`),
-which maps a non-input binding to `never`. D037 is the template-side
-counterpart: D045 rejects the *declaration*, D037 the *call site*.
+which maps a non-input binding to `never`. D032 is the template-side
+counterpart: D033 rejects the *declaration*, D032 the *call site*.
 
 ---
 
@@ -981,31 +985,31 @@ Three mechanisms deliver a fragment to a component binding.
 ```
 CHECK-FRAGMENT-PROP(Γ, B, prop)
 ─────────────────────────────────────────────────
-prop.name ∈ keys(B)                                        → D010 if absent
-prop.once = false                                          → D018 otherwise
+prop.name ∈ keys(B)                                        → D011 if absent
+prop.once = false                                          → D020 otherwise
 
 B[prop.name] : RequiredFragmentBinding<T>
-  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T>              → D015 on mismatch
+  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T>              → D017 on mismatch
 
 B[prop.name] : OptionalFragmentBinding<T>
-  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T> | undefined  → D015 on mismatch
+  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T> | undefined  → D017 on mismatch
 ─────────────────────────────────────────────────
 ```
 
 **Inline:** `@fragment name(...) { ... }` as a direct child of a component
 element, delivered to the matching binding and checked by CHECK-FRAGMENT
 (§3.4).
-- Parent must have binding `name: FragmentBinding<T>` → D032
-- The same name must not also arrive as a fragment prop → D011
-- No duplicate inline fragment with the same name → D033
+- Parent must have binding `name: FragmentBinding<T>` → D027
+- The same name must not also arrive as a fragment prop → D012
+- No duplicate inline fragment with the same name → D028
 
 **Implicit children:** non-fragment direct child content inside
 `<Component>...</Component>`, lowered to a fragment named `children` with
 origin `implicitChildren`. Parent must have `children: FragmentBinding<void>`
-→ D032.
+→ D027.
 
 All three work for `children`. Providing the same fragment name through more
-than one mechanism is a duplicate (D011 / D033).
+than one mechanism is a duplicate (D012 / D028).
 
 A fragment prop and an input binding share `name={expr}` syntax and are
 disambiguated by the component's binding record `B` through `BindingKind` (§12).
@@ -1019,7 +1023,7 @@ RENDER
 
 if expr is a fragment invocation f(a₁, ..., aₙ)  (incl. f?.(...)):
   Γ ⊢ f : FragmentBinding<T> | undefined
-  (a₁, ..., aₙ) match FragmentArgs<T> positionally         → D031
+  (a₁, ..., aₙ) match FragmentArgs<T> positionally         → D026
 
 Optional: if options.injector present:
   Γ ⊢ options.injector : Injector | null | undefined
@@ -1030,7 +1034,7 @@ Optional: if options.injector present:
 When `expr` is `undefined`, nothing is rendered (no-op).
 This supports `@render(optionalFragment?.())` directly.
 
-D031 is a template-side code only. It is the invocation half of the fragment
+D026 is a template-side code only. It is the invocation half of the fragment
 contract; §3.4 is the declaration half (an inline `@fragment`'s parameter list),
 both comparing a positional list to the same `FragmentArgs<T>`.
 
@@ -1084,47 +1088,47 @@ BindingKind<V> =
 |------|----------|-----------|----------|
 | D001 | Resolution | Unresolved identifier in template expression (mapped TS diagnostic, §2) | Error |
 | D002 | Resolution | Unresolved reference: element tag (neither intrinsic nor in scope), `use:` directive name, or `@derive` derivation name | Error |
-| D003 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
-| D004 | Declaration | Reserved `children` binding is not a `FragmentBinding<void>` | Error |
-| D005 | Declaration | Reserved `ref` binding declared on a component | Error |
-| D006 | Declaration | `providers` reads model/output/fragment bindings | Error |
-| D007 | Declaration | Setup does not return `TemplateMarkup` or `{ template }` | Error |
-| D008 | Declaration | Multiple `@{ }` literals in setup or `@{ }` not in tail position | Error |
-| D009 | Binding: Existence | Unknown attribute/property on native element | Error |
-| D010 | Binding: Existence | Unknown binding on component, directive, or derivation | Error |
-| D011 | Binding: Existence | Duplicate binding identity (including duplicate refs or fragments) | Error |
-| D012 | Binding: Existence | Static attribute + dynamic binding clash (same name) | Error |
-| D013 | Binding: Required | Missing required component input/model/fragment | Error |
-| D014 | Binding: Required | Missing required directive input/model/fragment | Error |
-| D015 | Binding: Types | Type mismatch (expression not assignable to binding type; mapped TS diagnostic, §2) | Error |
-| D016 | Binding: Types | `model:` bound to non-writable signal | Error |
-| D017 | Binding: Types | `model:` on non-modelable native element | Error |
-| D018 | Binding: Modifiers | `once:` on a non-input target (`model:`, `on:`, native element property, fragment prop) | Error |
-| D019 | Binding: Modifiers | `once:prop` + `prop` duplicate on same element | Error |
-| D020 | Binding: Modifiers | `on`-prefixed binding name | Warning |
-| D021 | Binding: Scope | `class:` or `style:` on component element | Error |
-| D022 | Directives | Directive host incompatible with the element or the component's root type, including a DOM-element directive on a component with the default (RootNode) root | Error |
-| D023 | Directives | Same directive applied twice to same resolved host element | Error |
-| D030 | Binding: Existence | Binding bound with the syntax of a different kind (e.g. an `output()` bound as an input) | Error |
-| D031 | Fragments | Fragment argument/parameter list does not match `FragmentArgs<T>` — at a `@render` invocation (§10.3) or an inline `@fragment` declaration (§3.4) | Error |
-| D032 | Fragments | Fragment delivered to a component element has no matching parent binding | Error |
-| D033 | Fragments | Duplicate inline fragment name under same parent | Error |
-| D034 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
-| D035 | Refs | `ref=` variable type incompatible with expose | Error |
-| D036 | Derivation | Missing required derivation input | Error |
-| D037 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
-| D038 | Animate | `animate:` on component element | Error |
-| D039 | Animate | Invalid animate phase (not `enter`/`leave`) | Error |
-| D040 | Animate | Duplicate `animate:enter` or `animate:leave` class binding | Error |
-| D041 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
-| D042 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
-| D043 | Animate | `on:animate:` handler type mismatch | Error |
-| D044 | Expressions | Restricted TypeScript form used inside `{ ... }` | Error |
-| D045 | Derivation | `derivation(...)` declares a model, output or fragment binding | Error |
-| D046 | Resolution | Reference resolves to the wrong kind (tag that is not a component, `use:` target that is not a directive, `@derive` target that is not a derivation) | Error |
-| D047 | Root node | a native-element `rootNode` is declared but the template does not have exactly one renderable root node | Error |
-| D048 | Root node | a native-element `rootNode` is declared but the root node is a control-flow block (`@if`/`@for`/`@switch`) | Error |
-| D049 | Root node | a native-element `rootNode` is declared but the root node is not a native element | Error |
+| D003 | Resolution | Reference resolves to the wrong kind (tag that is not a component, `use:` target that is not a directive, `@derive` target that is not a derivation) | Error |
+| D004 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
+| D005 | Declaration | Reserved `children` binding is not a `FragmentBinding<void>` | Error |
+| D006 | Declaration | Reserved `ref` binding declared on a component | Error |
+| D007 | Declaration | `providers` reads model/output/fragment bindings | Error |
+| D008 | Declaration | Setup does not return `TemplateMarkup` or `{ template }` | Error |
+| D009 | Declaration | Multiple `@{ }` literals in setup or `@{ }` not in tail position | Error |
+| D010 | Binding: Existence | Unknown attribute/property on native element | Error |
+| D011 | Binding: Existence | Unknown binding on component, directive, or derivation | Error |
+| D012 | Binding: Existence | Duplicate binding identity (including duplicate refs or fragments) | Error |
+| D013 | Binding: Existence | Static attribute + dynamic binding clash (same name) | Error |
+| D014 | Binding: Existence | Binding bound with the syntax of a different kind (e.g. an `output()` bound as an input) | Error |
+| D015 | Binding: Required | Missing required component input/model/fragment | Error |
+| D016 | Binding: Required | Missing required directive input/model/fragment | Error |
+| D017 | Binding: Types | Type mismatch (expression not assignable to binding type; mapped TS diagnostic, §2) | Error |
+| D018 | Binding: Types | `model:` bound to non-writable signal | Error |
+| D019 | Binding: Types | `model:` on non-modelable native element | Error |
+| D020 | Binding: Modifiers | `once:` on a non-input target (`model:`, `on:`, native element property, fragment prop) | Error |
+| D021 | Binding: Modifiers | `once:prop` + `prop` duplicate on same element | Error |
+| D022 | Binding: Modifiers | `on`-prefixed binding name | Warning |
+| D023 | Binding: Scope | `class:` or `style:` on component element | Error |
+| D024 | Directives | Directive host incompatible with the element or the component's root type, including a DOM-element directive on a component with the default (RootNode) root | Error |
+| D025 | Directives | Same directive applied twice to same resolved host element | Error |
+| D026 | Fragments | Fragment argument/parameter list does not match `FragmentArgs<T>` — at a `@render` invocation (§10.3) or an inline `@fragment` declaration (§3.4) | Error |
+| D027 | Fragments | Fragment delivered to a component element has no matching parent binding | Error |
+| D028 | Fragments | Duplicate inline fragment name under same parent | Error |
+| D029 | Fragments | Inline `@fragment` declaration inside directive `use:` binding | Error |
+| D030 | Refs | `ref=` variable type incompatible with expose | Error |
+| D031 | Derivation | Missing required derivation input | Error |
+| D032 | Derivation | Derivation uses non-input binding form (parse-time) | Error |
+| D033 | Derivation | `derivation(...)` declares a model, output or fragment binding | Error |
+| D034 | Animate | `animate:` on component element | Error |
+| D035 | Animate | Invalid animate phase (not `enter`/`leave`) | Error |
+| D036 | Animate | Duplicate `animate:enter` or `animate:leave` class binding | Error |
+| D037 | Animate | Duplicate `on:animate:enter` or `on:animate:leave` event binding | Error |
+| D038 | Animate | `animate:` expression type mismatch (not `string \| string[]`) | Error |
+| D039 | Animate | `on:animate:` handler type mismatch | Error |
+| D040 | Expressions | Restricted TypeScript form used inside `{ ... }` | Error |
+| D041 | Root node | a native-element `rootNode` is declared but the template does not have exactly one renderable root node | Error |
+| D042 | Root node | a native-element `rootNode` is declared but the root node is a block construct: a control-flow block (`@if`/`@for`/`@switch`), a `@defer` block, or a `@boundary` block | Error |
+| D043 | Root node | a native-element `rootNode` is declared but the root node is not a native element | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1137,107 +1141,112 @@ One example per diagnostic — just enough to show the violation.
 // D002 — unresolved element
 <FancyCard title={'hello'} /> // ❌ D002
 
-// D003 — binding primitive outside bindings
+// D003 — reference resolves, but to the wrong kind
+const helper = (x: number) => x * 2;
+<helper />                              // ❌ D003: not a component
+<div use:helper()>X</div>               // ❌ D003: not a directive
+@derive total = helper(x={1});          // ❌ D003: not a derivation
+// Contrast D002, where nothing resolves at all:
+<div use:noSuchDirective()>X</div>      // ❌ D002
+
+// D004 — binding primitive outside bindings
 const Broken = component({
   setup: () => {
-    const name = input<string>(); // ❌ D003
+    const name = input<string>(); // ❌ D004
     return @{ <span>{name()}</span> };
   },
 });
 
-// D004 — children is not a fragment
-bindings: { children: input<string>() } // ❌ D004
+// D005 — children is not a fragment
+bindings: { children: input<string>() } // ❌ D005
 
-// D005 — reserved `ref` binding declared on a component
-bindings: { ref: input<string>() } // ❌ D005
+// D006 — reserved `ref` binding declared on a component
+bindings: { ref: input<string>() } // ❌ D006
 
-// D006 — providers reads non-input
-providers: (inputs) => { inputs.selected; return []; } // ❌ D006
+// D007 — providers reads non-input
+providers: (inputs) => { inputs.selected; return []; } // ❌ D007
 
-// D007 — invalid setup return
-component({ setup: () => ({ expose: {} }) }) // ❌ D007
+// D008 — invalid setup return
+component({ setup: () => ({ expose: {} }) }) // ❌ D008
 
-// D008 — multiple @{ } literals / early return with markup
+// D009 — multiple @{ } literals / early return with markup
 const Bad = component({
   setup: ({ flag }) => {
     if (flag()) {
-      return @{ <span>A</span> }; // ❌ D008: @{ } not in tail position
+      return @{ <span>A</span> }; // ❌ D009: @{ } not in tail position
     }
     return @{ <span>B</span> };
   },
 });
 
-// D008 — @{ } inside a branch (even without early return)
+// D009 — @{ } inside a branch (even without early return)
 const AlsoBad = component({
   setup: () => {
-    const tmpl = condition ? @{ <span>A</span> } : @{ <span>B</span> }; // ❌ D008
+    const tmpl = condition ? @{ <span>A</span> } : @{ <span>B</span> }; // ❌ D009
     return tmpl;
   },
 });
 
-// D009 — unknown native property
-<div colour="red">Hello</div> // ❌ D009
+// D010 — unknown native property
+<div colour="red">Hello</div> // ❌ D010
 
-// D010 — unknown component binding
-<UserDetail user={u()} role="admin" /> // ❌ D010: 'role' not in bindings
+// D011 — unknown component binding
+<UserDetail user={u()} role="admin" /> // ❌ D011: 'role' not in bindings
 
-// D011 — duplicate binding
-<button disabled={true} disabled={false}>Click</button> // ❌ D011
+// D012 — duplicate binding
+<button disabled={true} disabled={false}>Click</button> // ❌ D012
 
-// D011 — duplicate static attribute
-<div id="a" id="b">Content</div> // ❌ D011
+// D012 — duplicate static attribute
+<div id="a" id="b">Content</div> // ❌ D012
 
-// D011 — duplicate children (explicit prop + implicit nested content)
-<Card children={body}><p>Also children</p></Card> // ❌ D011
+// D012 — duplicate children (explicit prop + implicit nested content)
+<Card children={body}><p>Also children</p></Card> // ❌ D012
 
-// D012 — static + dynamic clash
-<div id="static" id={dynamicId()}>Content</div> // ❌ D012
+// D013 — static + dynamic clash
+<div id="static" id={dynamicId()}>Content</div> // ❌ D013
 
-// D013 — missing required component binding
-<Card><p>Body</p></Card> // ❌ D013: required 'title' missing
+// D014 — binding bound with the syntax of a different kind
+<UserDetail user={u()} makeAdmin={handler} />  // ❌ D014: makeAdmin is an
+                                               //    output(); use on:makeAdmin
+// Permitted: a model() may be bound one-way — ModelSignal ⊑ InputSignal, and
+// the writeback half is simply not requested (§5)
+<UserDetail user={u()} email={'a@b.c'} />      // ✅
 
-// D014 — missing required directive input
-<button use:tooltip()>Save</button> // ❌ D014: 'message' required
+// D015 — missing required component binding
+<Card><p>Body</p></Card> // ❌ D015: required 'title' missing
 
-// D015 — type mismatch
-<Counter count={'five'} /> // ❌ D015: string not assignable to number
+// D016 — missing required directive input
+<button use:tooltip()>Save</button> // ❌ D016: 'message' required
 
-// D016 — model bound to non-writable
-<input model:value={computed(() => 'x')} /> // ❌ D016
+// D017 — type mismatch
+<Counter count={'five'} /> // ❌ D017: string not assignable to number
 
-// D017 — model: on non-modelable element
-<div model:value={text}>X</div> // ❌ D017
+// D018 — model bound to non-writable
+<input model:value={computed(() => 'x')} /> // ❌ D018
 
-// D018 — once: on model/output
-<UserDetail once:model:email={email} user={u()} /> // ❌ D018
+// D019 — model: on non-modelable element
+<div model:value={text}>X</div> // ❌ D019
 
-// D018 — once: on a native element property (once: is an input feature)
-<div once:id={staticId()}>X</div> // ❌ D018
+// D020 — once: on model/output
+<UserDetail once:model:email={email} user={u()} /> // ❌ D020
 
-// D019 — once:prop + prop duplicate
-<Counter once:count={5} count={n()} /> // ❌ D019
+// D020 — once: on a native element property (once: is an input feature)
+<div once:id={staticId()}>X</div> // ❌ D020
 
-// D020 — on-prefix warning
-bindings: { onSubmit: output<void>() } // ⚠️ D020
+// D021 — once:prop + prop duplicate
+<Counter once:count={5} count={n()} /> // ❌ D021
 
-// D021 — class:/style: on component element
-<UserDetail class:active={true} user={u()} /> // ❌ D021
-<UserDetail style:color={'red'} user={u()} /> // ❌ D021
+// D022 — on-prefix warning
+bindings: { onSubmit: output<void>() } // ⚠️ D022
 
-// D022 — directive host incompatible
-<div use:inputMask(mask={'###'})>X</div> // ❌ D022: HTMLDivElement ⊄ HTMLInputElement
+// D023 — class:/style: on component element
+<UserDetail class:active={true} user={u()} /> // ❌ D023
+<UserDetail style:color={'red'} user={u()} /> // ❌ D023
 
-// D023 — same directive twice
-<button use:tooltip(message={'A'}) use:tooltip(message={'B'})>X</button> // ❌ D023
+// D024 — directive host incompatible
+<div use:inputMask(mask={'###'})>X</div> // ❌ D024: HTMLDivElement ⊄ HTMLInputElement
 
-// D023 — a call-site directive colliding with one on the native-element root
-const Button = component({
-  rootNode: element<HTMLButtonElement>(),
-  setup: () => @{ <button use:tooltip(message={'Internal'})>X</button> },
-});
-<Button use:tooltip(message={'External'}) /> // ❌ D023: collides on Button's root
-
-// D022 — a DOM-element directive on a component with no element root.
+// D024 — a DOM-element directive on a component with no element root.
 // tooltip declares host: ref<HTMLElement>(); MultiTags has the default rootNode,
 // so Root(MultiTags) = RootNode, which is not an HTMLElement.
 const MultiTags = component({
@@ -1246,24 +1255,100 @@ const MultiTags = component({
     <p>two</p>
   },
 });
-<MultiTags use:tooltip(message={'x'}) />     // ❌ D022
+<MultiTags use:tooltip(message={'x'}) />     // ❌ D024
 <MultiTags use:logDirective() />             // ✅ host: ref<HTMLElement | RootNode>()
 
-// D047 — a native-element rootNode with more than one renderable root node
+// D025 — same directive twice
+<button use:tooltip(message={'A'}) use:tooltip(message={'B'})>X</button> // ❌ D025
+
+// D025 — a call-site directive colliding with one on the native-element root
+const Button = component({
+  rootNode: element<HTMLButtonElement>(),
+  setup: () => @{ <button use:tooltip(message={'Internal'})>X</button> },
+});
+<Button use:tooltip(message={'External'}) /> // ❌ D025: collides on Button's root
+
+// D026 — fragment arg mismatch at the invocation (§10.3).
+// A fragment is a callable, so this is an arity error against FragmentArgs<T>:
+// row : fragment.required<[string, number]>() declares (string, number)
+@render(row(item))          // ❌ D026: 1 argument, expected 2
+@render(row(label, 0))      // ✅
+
+// D026 — the same code on the declaration side (§3.4): an inline @fragment's
+// parameter list must match the parent binding it is delivered to
+<List>
+  @fragment row(i: Item) { <span>{i.name}</span> }  // ❌ D026 if List declares
+</List>                                             //    row: fragment.required<[Item, number]>()
+
+// D027 — no matching parent fragment binding
+<Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D027
+
+// Permitted: inside a native element there is nothing to deliver to, so the
+// same declaration is a local named template (§10.1) — not an error
+<div>@fragment row(i: Item) { <span>{i.desc}</span> }</div> // ✅
+
+// D028 — duplicate inline fragment
+<List>
+  @fragment row(i: Item) { <span>{i.name}</span> }
+  @fragment row(i: Item) { <b>{i.name}</b> }  // ❌ D028
+</List>
+
+// D029 — inline fragment inside use:
+<button use:popover(@fragment content() { <div>Body</div> })>X</button> // ❌ D029
+
+// D030 — ref type incompatible
+const child = ref<HTMLDivElement>();
+<Child ref={child} /> // ❌ D030: expects Ref<{ value: Signal<number> } | undefined>
+
+// D031 — missing required derivation input
+@derive total = price(); // ❌ D031: 'item' required
+
+// D032 — derivation non-input binding
+@derive total = price(model:item={x}); // ❌ D032
+
+// D033 — derivation declares a non-input binding
+derivation({ bindings: { changed: model<number>() }, /* ... */ }) // ❌ D033
+
+// D034 — animate: on component element
+<Card animate:enter={'fade'} /> // ❌ D034
+
+// D035 — invalid animate phase
+<div animate:show={'fade'}>X</div> // ❌ D035
+
+// D036 — duplicate animate:enter class binding
+<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D036
+
+// D037 — duplicate on:animate:leave event binding
+<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D037
+
+// D038 — animate: expression type mismatch
+<div animate:enter={42}>X</div> // ❌ D038: number not assignable
+
+// D039 — on:animate: handler type mismatch
+<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D039
+
+// D040 — restricted form inside { }
+<button on:click={count = 5}>X</button>              // ❌ D040: assignment
+<span>{value as string}</span>                        // ❌ D040: type assertion
+<span>{new Date().getFullYear()}</span>               // ❌ D040: new
+// Permitted: an arrow body is ordinary TypeScript, statements included
+<button on:click={() => { count.set(0); log(); }}>X</button> // ✅
+
+// D041 — a native-element rootNode with more than one renderable root node
 const TwoRoots = component({
   rootNode: element<HTMLButtonElement>(),
   setup: () => @{
     <button>A</button>
-    <button>B</button>                       // ❌ D047
+    <button>B</button>                       // ❌ D041
   },
 });
 
-// D047 — a native-element rootNode with no renderable root node.
+// D041 — a native-element rootNode with no renderable root node.
 // @let is declaration-only, so it does not count as the root.
 const NoRoot = component({
   rootNode: element<HTMLElement>(),
   setup: () => @{
-    @let n = 1;                              // ❌ D047: zero renderable roots
+    @let n = 1;                              // ❌ D041: zero renderable roots
   },
 });
 
@@ -1276,21 +1361,21 @@ const WithLet = component({
   },
 });
 
-// D048 — a native-element rootNode with a control-flow root
+// D042 — a native-element rootNode with a control-flow root
 const CondRoot = component({
   rootNode: element<HTMLButtonElement>(),
   setup: () => @{
-    @if (cond()) {                           // ❌ D048
+    @if (cond()) {                           // ❌ D042
       <button>X</button>
     }
   },
 });
 
-// D049 — a native-element rootNode with a root that is not a native element
+// D043 — a native-element rootNode with a root that is not a native element
 const Inner = component({ setup: () => @{ <button>x</button> } });
 const CompRoot = component({
   rootNode: element<HTMLElement>(),
-  setup: () => @{ <Inner /> },               // ❌ D049
+  setup: () => @{ <Inner /> },               // ❌ D043
 });
 
 // OK — the same template with the default rootNode. Root = RootNode, and the
@@ -1299,85 +1384,4 @@ const CompRoot = component({
 const NoFlag = component({
   setup: () => @{ <Inner /> },               // ✅
 });
-
-// D030 — binding bound with the syntax of a different kind
-<UserDetail user={u()} makeAdmin={handler} />  // ❌ D030: makeAdmin is an
-                                               //    output(); use on:makeAdmin
-// Permitted: a model() may be bound one-way — ModelSignal ⊑ InputSignal, and
-// the writeback half is simply not requested (§5)
-<UserDetail user={u()} email={'a@b.c'} />      // ✅
-
-// D031 — fragment arg mismatch at the invocation (§10.3).
-// A fragment is a callable, so this is an arity error against FragmentArgs<T>:
-// row : fragment.required<[string, number]>() declares (string, number)
-@render(row(item))          // ❌ D031: 1 argument, expected 2
-@render(row(label, 0))      // ✅
-
-// D031 — the same code on the declaration side (§3.4): an inline @fragment's
-// parameter list must match the parent binding it is delivered to
-<List>
-  @fragment row(i: Item) { <span>{i.name}</span> }  // ❌ D031 if List declares
-</List>                                             //    row: fragment.required<[Item, number]>()
-
-// D032 — no matching parent fragment binding
-<Card title={'X'}>@fragment footer() { <p>X</p> }</Card> // ❌ D032
-
-// Permitted: inside a native element there is nothing to deliver to, so the
-// same declaration is a local named template (§10.1) — not an error
-<div>@fragment row(i: Item) { <span>{i.desc}</span> }</div> // ✅
-
-// D033 — duplicate inline fragment
-<List>
-  @fragment row(i: Item) { <span>{i.name}</span> }
-  @fragment row(i: Item) { <b>{i.name}</b> }  // ❌ D033
-</List>
-
-// D034 — inline fragment inside use:
-<button use:popover(@fragment content() { <div>Body</div> })>X</button> // ❌ D034
-
-// D035 — ref type incompatible
-const child = ref<HTMLDivElement>();
-<Child ref={child} /> // ❌ D035: expects Ref<{ value: Signal<number> } | undefined>
-
-// D036 — missing required derivation input
-@derive total = price(); // ❌ D036: 'item' required
-
-// D037 — derivation non-input binding
-@derive total = price(model:item={x}); // ❌ D037
-
-// D038 — animate: on component element
-<Card animate:enter={'fade'} /> // ❌ D038
-
-// D039 — invalid animate phase
-<div animate:show={'fade'}>X</div> // ❌ D039
-
-// D040 — duplicate animate:enter class binding
-<div animate:enter={'a'} animate:enter={'b'}>X</div> // ❌ D040
-
-// D041 — duplicate on:animate:leave event binding
-<div on:animate:leave={f1} on:animate:leave={f2}>X</div> // ❌ D041
-
-// D042 — animate: expression type mismatch
-<div animate:enter={42}>X</div> // ❌ D042: number not assignable
-
-// D043 — on:animate: handler type mismatch
-<div on:animate:enter={(x: string) => {}}>X</div> // ❌ D043
-
-// D044 — restricted form inside { }
-<button on:click={count = 5}>X</button>              // ❌ D044: assignment
-<span>{value as string}</span>                        // ❌ D044: type assertion
-<span>{new Date().getFullYear()}</span>               // ❌ D044: new
-// Permitted: an arrow body is ordinary TypeScript, statements included
-<button on:click={() => { count.set(0); log(); }}>X</button> // ✅
-
-// D045 — derivation declares a non-input binding
-derivation({ bindings: { changed: model<number>() }, /* ... */ }) // ❌ D045
-
-// D046 — reference resolves, but to the wrong kind
-const helper = (x: number) => x * 2;
-<helper />                              // ❌ D046: not a component
-<div use:helper()>X</div>               // ❌ D046: not a directive
-@derive total = helper(x={1});          // ❌ D046: not a derivation
-// Contrast D002, where nothing resolves at all:
-<div use:noSuchDirective()>X</div>      // ❌ D002
 ```

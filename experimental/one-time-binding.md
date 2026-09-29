@@ -58,11 +58,11 @@ ONCE-BINDING
 once: applies ONLY to inputs (InputSignal) — component, directive and
 derivation inputs. It is not a DOM feature.
 
-once:model:*                       → D018
-once:on:*                          → D018
-once: on a native element property → D018
-once: on a fragment prop (§10.2)   → D018
-once:prop + prop on same target    → D019
+once:model:*                       → D020
+once:on:*                          → D020
+once: on a native element property → D020
+once: on a fragment prop (§10.2)   → D020
+once:prop + prop on same target    → D021
 ─────────────────────────────────────────────────
 ```
 
@@ -72,13 +72,13 @@ The type checker validates the binding value against the target `InputSignal<T>`
 
 `once:` is a grammar-level prefix, legal only immediately before an input
 name. `once:model:x` and `once:on:x` are therefore syntax errors, not checks
-the type checker performs — see the D018 note in §3.9 of the spec.
+the type checker performs — see the D020 note in §3.9 of the spec.
 
 Where the prefix *is* legal, it carries through to the checker as a boolean
 `once` flag on the input binding entry, in all three positions that accept
 inputs: component element inputs, directive inputs inside `use:dir(...)`, and
 derivation inputs inside `@derive` (spec Notation, "Template node
-vocabulary"). Two of the four D018 cases are check-time rather than
+vocabulary"). Two of the four D020 cases are check-time rather than
 parse-time, because `once:prop` is well-formed syntax and only element
 resolution tells a component input apart from a native property or a fragment
 prop.
@@ -216,8 +216,8 @@ No new branded type or type-level changes are required. `input.once<T>()` produc
 | `input<T>()` | `once:prop={expr}` | One-time (consumer freezes it) |
 | `input.once<T>()` | `prop={expr}` | One-time (declaration enforces it) |
 | `input.once<T>()` | `once:prop={expr}` | One-time (redundant but valid — no error) |
-| `model<T>()` | `once:model:prop={sig}` | ‼️ Compile error (D018) |
-| `output<T>()` | `once:on:event={fn}` | ‼️ Compile error (D018) |
+| `model<T>()` | `once:model:prop={sig}` | ‼️ Compile error (D020) |
+| `output<T>()` | `once:on:event={fn}` | ‼️ Compile error (D020) |
 
 ---
 
@@ -225,14 +225,14 @@ No new branded type or type-level changes are required. `input.once<T>()` produc
 
 | Rule | Diagnostic |
 |:---|:---|
-| `once:` + `model:` on the same binding | D018 — `once:model:*` is invalid |
-| `once:` + `on:` on the same binding | D018 — `once:on:*` is invalid |
-| `once:prop` and `prop` on the same element | D019 — duplicate binding name |
+| `once:` + `model:` on the same binding | D020 — `once:model:*` is invalid |
+| `once:` + `on:` on the same binding | D020 — `once:on:*` is invalid |
+| `once:prop` and `prop` on the same element | D021 — duplicate binding name |
 | `input.once` receives later parent changes | No error — updates are silently ignored by contract |
-| `once:prop` / `input.required.once` without an initial value | D013/D014/D036 — standard required-input diagnostic |
+| `once:prop` / `input.required.once` without an initial value | D015/D016/D031 — standard required-input diagnostic |
 | `input.once` in directive bindings | Valid |
 | `input.once` in `@derive` bindings | Valid |
-| `once:` on a `fragment` binding | D018 — fragments are not inputs |
-| `once:` on a native element property | D018 — `once:` is an input feature, not a DOM one |
+| `once:` on a `fragment` binding | D020 — fragments are not inputs |
+| `once:` on a native element property | D020 — `once:` is an input feature, not a DOM one |
 
 

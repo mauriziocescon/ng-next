@@ -127,7 +127,6 @@ const variantExposeAnnotations = [
   },
 ];
 
-// Variant 2: Host type mismatch (invalid — D022)
 const variantHostMismatch = `import { directive, ref, input } from '@angular/core';
 import { component } from '@angular/core';
 
@@ -162,7 +161,6 @@ const variantHostMismatchAnnotations = [
   },
 ];
 
-// Variant 3: Same directive applied twice (invalid — D023)
 const variantDuplicate = `import { directive, ref, input } from '@angular/core';
 import { component, signal } from '@angular/core';
 
