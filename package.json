@@ -26,10 +26,10 @@
     "typecheck:readme": "node scripts/check-readme-snippets.mjs"
   },
   "devDependencies": {
-    "@angular/cli": "^22.1.0",
-    "@angular/common": "^22.1.0",
-    "@angular/core": "^22.1.0",
-    "@angular/forms": "^22.1.0",
+    "@angular/cli": "^22.2.0",
+    "@angular/common": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/forms": "^22.2.0",
     "typescript": "^7.0.2",
     "web-codegen-scorer": "^0.0.70"
   }

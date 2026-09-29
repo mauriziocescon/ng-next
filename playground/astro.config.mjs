@@ -11,7 +11,7 @@ function llmsTxt() {
   const sections = [
     { file: 'readme.md', title: 'Proposal narrative, syntax, and examples — covers component/directive/derivation/fragment APIs, binding syntax, composition patterns, and DI enhancements.' },
     { file: 'types/ng-types.ts', title: 'Core runtime type contracts — `TemplateMarkup`, component/directive/derivation/fragment factories, `ref`, `expose`, `provide`, `injectionToken`.' },
-    { file: 'types/ng-types.spec.ts', title: 'Type-level test suite — usage examples showing how the type system enforces binding correctness, directive forwarding, and DI wiring.' },
+    { file: 'types/ng-types.spec.ts', title: 'Type-level test suite — usage examples showing how the type system enforces binding correctness, directive host/root compatibility, and DI wiring.' },
     { file: 'types/ng-dsl-type-checking-spec.md', title: 'DSL type-checking specification — formal judgments for what the template type checker must verify inside `@{ }` (element resolution, binding arity, directive host constraints, etc.).' },
   ];
 
@@ -23,11 +23,11 @@ function llmsTxt() {
     { anchor: 'one-time-bindings-once', desc: '`once:` freezes an input at creation time — never updated afterwards.' },
     { anchor: 'input-driven-providers', desc: 'Inputs hoisted for provider initialization; `providers` receives only inputs (not models or outputs); factories run in injection context.' },
     { anchor: 'expose-and-template-refs', desc: '`expose` defines a component/directive\'s public API through refs; `ref<T>()` and `refMany<T>()` for element/component/directive access.' },
-    { anchor: 'composition-with-fragments-directives-and-forwarding', desc: 'Fragments as functions (like Svelte snippets); `forward: surface<T>()` declares a directive-compatible native surface; `@forward()` marks placement.' },
+    { anchor: 'composition-with-fragments-and-directives', desc: 'Fragments as functions (like Svelte snippets); every component has a `rootNode` that defaults to `RootNode` or is declared via `element<T>()` for a native-element root; call-site directives attach to that root.' },
     { anchor: 'dependency-injection-enhancements', desc: '`injectionToken` with four flavours (with factory, auto-provided, without factory, multi); `provide()` shorthand.' },
     { anchor: 'final-considerations', desc: 'Concepts impacted (ng-content, ng-template, structural directives, pipes, queries, etc.); pros and cons of the approach.' },
     { anchor: 'appendix-co-located-templates-in-angular-via-ng-files', desc: 'Rationale for `*.ng` files; co-location benefits; boilerplate tax trade-off analysis.' },
-    { anchor: 'appendix-binding-prefix-and-modifier-reference', desc: 'Canonical list of every prefix/modifier (`bind:`, `model:`, `on:`, `once:`, `class:`, `style:`, `animate:`, `use:`, `:when`, `:ref`, `ref`, `@forward()`).' },
+    { anchor: 'appendix-binding-prefix-and-modifier-reference', desc: 'Canonical list of every prefix/modifier (`bind:`, `model:`, `on:`, `once:`, `class:`, `style:`, `animate:`, `use:`, `:when`, `:ref`, `ref`).' },
     { anchor: 'appendix-relevant-github-issues', desc: 'Well-known community requests related to these proposals.' },
     { anchor: 'appendix-consuming-decorator-based-classes-sketch', desc: 'Consuming existing `@Component`/`@Directive`/`@Pipe` classes in `.ng` files; `:element` suffix for multi-selector components, `use:ClassName(...)` for directives, pipe-to-derivation wrapping.' },
   ];
@@ -40,7 +40,7 @@ function llmsTxt() {
     'One-time bindings (`once:`)',
     'Input-driven providers',
     'Expose and Template Refs',
-    'Composition with Fragments, Directives, and Forwarding',
+    'Composition with Fragments and Directives',
     'Dependency Injection Enhancements',
     'Final considerations',
     'Appendix: Co-located templates in Angular via `.ng` files',
@@ -79,7 +79,7 @@ function llmsTxt() {
           '4. Hostless components + TS lexical scoping for templates,',
           '5. Component inputs: lifted up + immediately available in setup and providers,',
           '6. Expose and Template Refs,',
-          '7. Composition with Fragments, Directives, and Forwarding,',
+          '7. Composition with Fragments and Directives,',
           '8. Dependency Injection Enhancements,',
           '9. Final considerations + types.',
           '',

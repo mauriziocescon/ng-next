@@ -229,7 +229,7 @@ No new branded type or type-level changes are required. `input.once<T>()` produc
 | `once:` + `on:` on the same binding | D018 — `once:on:*` is invalid |
 | `once:prop` and `prop` on the same element | D019 — duplicate binding name |
 | `input.once` receives later parent changes | No error — updates are silently ignored by contract |
-| `once:prop` / `input.required.once` without an initial value | D013/D014/D034 — standard required-input diagnostic |
+| `once:prop` / `input.required.once` without an initial value | D013/D014/D036 — standard required-input diagnostic |
 | `input.once` in directive bindings | Valid |
 | `input.once` in `@derive` bindings | Valid |
 | `once:` on a `fragment` binding | D018 — fragments are not inputs |

@@ -15,9 +15,12 @@ import {
 import {
   type ComponentInstance,
   type ComponentBindingValue,
+  type ComponentRootOf,
   type ComponentTemplateOf,
+  type RootNode,
   type DerivationBindingValue,
   type DerivationInstance,
+  type DirectiveHostType,
   type DirectiveInstance,
   type IntrinsicElementDescriptor,
   type IntrinsicElementHost,
@@ -29,18 +32,18 @@ import {
   type TemplateAST,
   type TemplateAstOf,
   type TemplateMarkup,
-  type Surface,
   type __ValidateComponentBindings,
   component,
   derivation,
   directive,
+  element,
   fragment,
   inject,
   injectionToken,
+  isRootNode,
   provide,
   ref,
   refMany,
-  surface,
 } from './ng-types';
 
 declare const tmpl: TemplateMarkup;
@@ -77,12 +80,10 @@ type Assert<T extends true> = T;
 // TemplateMarkup is a branded type — distinct from plain objects.
 // ────────────────────────────────────────────────────────────────
 
-// TemplateMarkup is assignable to itself
 const _tmplAssign: TemplateMarkup = tmpl;
 
 declare const specificTmpl: TemplateMarkup<SpecificTemplateAST>;
 
-// Specific TemplateMarkup is assignable to the generic TemplateMarkup API
 const _specificTmplAssign: TemplateMarkup = specificTmpl;
 
 type _SpecificTemplateAst = Assert<
@@ -92,7 +93,6 @@ type _SpecificTemplateAst = Assert<
 // @ts-expect-error generic TemplateMarkup does not carry the specific AST
 const _genericTmplNotSpecific: TemplateMarkup<SpecificTemplateAST> = tmpl;
 
-// TemplateMarkup is not assignable from a plain object
 // @ts-expect-error plain object is not TemplateMarkup
 const _tmplNotPlain: TemplateMarkup = {};
 
@@ -102,7 +102,6 @@ const _tmplNotPlain: TemplateMarkup = {};
 // FragmentBinding optional/required forms are distinct.
 // ────────────────────────────────────────────────────────────────
 
-// Required vs optional fragment are distinct types
 type ReqIsOpt =
   RequiredFragmentBinding<void> extends OptionalFragmentBinding<void>
     ? 'LEAK'
@@ -121,7 +120,7 @@ const _optIsReq: OptIsReq = 'OK';
 // The Angular DSL parser keeps native tag names as template syntax, but the
 // type checker resolves them through an IntrinsicElements-like registry.
 // These tests model the part of that registry used by directive hosts,
-// @forward(), and native refs.
+// component root types, and native refs.
 // ────────────────────────────────────────────────────────────────
 
 interface TestIntrinsicElements {
@@ -144,16 +143,51 @@ type _IntrinsicInputHost = Assert<
 const _negIntrinsicInputIsNotButton: HTMLButtonElement =
   undefined as unknown as TestHost<'input'>;
 
+type _ContainerRootIsNotHtml = Assert<
+  IsEqual<RootNode extends HTMLElement ? true : false, false>
+>;
+type _HtmlIsNotContainerRoot = Assert<
+  IsEqual<HTMLElement extends RootNode ? true : false, false>
+>;
+
+type _HtmlIsHostType = Assert<
+  IsEqual<HTMLButtonElement extends DirectiveHostType ? true : false, true>
+>;
+type _ContainerIsHostType = Assert<
+  IsEqual<RootNode extends DirectiveHostType ? true : false, true>
+>;
+
+// @ts-expect-error a RootNode cannot stand in for a DOM element
+const _negContainerAsElement: HTMLElement =
+  undefined as unknown as RootNode;
+// @ts-expect-error nor the reverse
+const _negElementAsContainer: RootNode =
+  undefined as unknown as HTMLElement;
+
+declare const containerHost: RootNode;
+// @ts-expect-error RootNode exposes no DOM members
+const _negContainerHasNoDomMembers = containerHost.tagName;
+
+declare const someHost: DirectiveHostType;
+if (isRootNode(someHost)) {
+  type _NarrowedToContainer = Assert<IsEqual<typeof someHost, RootNode>>;
+} else {
+  type _NarrowedToElement = Assert<IsEqual<typeof someHost, HTMLElement>>;
+  const _tagName: string = someHost.tagName;
+}
+
+declare const maybeHost: HTMLElement | RootNode | undefined;
+// @ts-expect-error undefined is not a DirectiveHostType
+const _negGuardOnMaybeHost = isRootNode(maybeHost);
+
 // ────────────────────────────────────────────────────────────────
 // 4. COMPONENT — basics
 // ────────────────────────────────────────────────────────────────
 
-// Shorthand return: raw template
 const Minimal = component({
   setup: () => tmpl,
 });
 
-// style + styleUrl + providers all accepted (single combined check)
 const StyledWithProviders = component({
   setup: () => tmpl,
   style: `.danger { color: red; }`,
@@ -161,12 +195,10 @@ const StyledWithProviders = component({
   providers: () => [],
 });
 
-// Full form return: { template }
 const MinimalFull = component({
   setup: () => ({ template: tmpl }),
 });
 
-// Component instances preserve the specific TemplateMarkup<TAst> returned by setup
 const SpecificTemplateComponent = component({
   setup: () => specificTmpl,
 });
@@ -203,9 +235,7 @@ type UserDetailBindings = {
   children: OptionalFragmentBinding<void>;
 };
 
-// A declared forward surface does not change how bindings are inferred.
 const UserDetail = component({
-  forward: surface<HTMLElement>(),
   bindings: {
     user: input.required<User>(),
     email: model.required<string>(),
@@ -223,19 +253,15 @@ const UserDetail = component({
   },
 });
 
-// The bindings record is inferred from the object, not hand-written: the
-// UserDetailBindings alias must stay in sync with what component(...)
-// actually infers.
 type _UserDetailBindingsInferred = Assert<
   IsEqual<
-    typeof UserDetail extends ComponentInstance<infer B, any, any, any>
+    typeof UserDetail extends ComponentInstance<infer B, any, any>
       ? B
       : never,
     UserDetailBindings
   >
 >;
 
-// fragment.required: children must be present in setup
 const RequiredChildren = component({
   bindings: {
     children: fragment.required<void>(),
@@ -249,8 +275,6 @@ const RequiredChildren = component({
   },
 });
 
-// Reserved names enforcement on component bindings:
-// - children must be fragment(...)
 const _NegChildrenMustBeFragment = component({
   // @ts-expect-error reserved name 'children' must use fragment(...)
   bindings: {
@@ -259,7 +283,6 @@ const _NegChildrenMustBeFragment = component({
   setup: () => tmpl,
 });
 
-// - ref cannot be used as a binding name in components
 const _NegRefReserved = component({
   // @ts-expect-error reserved name 'ref' cannot be a component binding
   bindings: {
@@ -268,7 +291,6 @@ const _NegRefReserved = component({
   setup: () => tmpl,
 });
 
-// Parameterized fragment: callable with declared arguments
 const RenderItem = component({
   bindings: {
     itemTpl: fragment.required<[Item]>(),
@@ -281,7 +303,6 @@ const RenderItem = component({
   },
 });
 
-// Void fragment: callable with no arguments only
 const RenderVoidFragment = component({
   bindings: {
     emptyTpl: fragment<void>(),
@@ -296,7 +317,6 @@ const RenderVoidFragment = component({
   },
 });
 
-// Tuple fragments define the fragment parameter list
 const RenderTupleFragment = component({
   bindings: {
     itemTpl: fragment.required<[Item]>(),
@@ -327,7 +347,6 @@ const RenderTupleFragment = component({
   },
 });
 
-// Open array fragments are a single array payload, not variadic item args
 const RenderArrayPayloadFragment = component({
   bindings: {
     rowsTpl: fragment.required<Item[]>(),
@@ -357,9 +376,6 @@ const RenderArrayPayloadFragment = component({
   },
 });
 
-// input<T>() vs input<T>(default): supplying a default removes undefined from
-// the signal type. This is the distinction that decides what a provider factory
-// closing over the input is allowed to return (see §7).
 const InputDefaults = component({
   bindings: {
     req: input.required<string>(),
@@ -376,8 +392,6 @@ const InputDefaults = component({
   },
 });
 
-// Optional *parameterized* fragment: undefined in setup, and still requires its
-// declared arguments once narrowed. Mirrors the readme's DataTable rowTemplate.
 interface Row {
   id: string;
 }
@@ -414,7 +428,6 @@ const DataTable = component({
 // contexts (component, directive, derivation).
 // ────────────────────────────────────────────────────────────────
 
-// Component: alias input via destructuring
 const AliasedInput = component({
   bindings: {
     class: input<string>(),
@@ -427,7 +440,6 @@ const AliasedInput = component({
   },
 });
 
-// Component: alias model and output via destructuring
 const AliasedModelOutput = component({
   bindings: {
     value: model.required<number>(),
@@ -447,7 +459,6 @@ const AliasedModelOutput = component({
 
 class Store { readonly __brand = 'Store' as const; }
 
-// All four binding kinds: providers excludes everything except InputSignal
 const AllBindingKinds = component({
   bindings: {
     a: input.required<string>(),
@@ -468,7 +479,6 @@ const AllBindingKinds = component({
   },
 });
 
-// Concrete provide(...) usage in providers
 const Counter = component({
   bindings: {
     c: input.required<number>(),
@@ -480,8 +490,6 @@ const Counter = component({
   },
 });
 
-// A provider factory may close over an input and pass the InputSignal itself
-// as a () => T getter (the readme's input-driven CounterStore).
 class CounterStore {
   readonly value: Signal<number>;
 
@@ -498,8 +506,6 @@ const CounterWithStore = component({
   providers: ({ c }) => [provide(CounterStore, () => new CounterStore(c))],
 });
 
-// An input without a default reads as T | undefined, so it is not assignable
-// where the factory must return T. Documented examples have hit this.
 const seedToken = injectionToken.multi({ factory: () => 0 });
 
 const SeededFromInput = component({
@@ -533,12 +539,10 @@ const Child = component({
   },
 });
 
-// Shorthand: no expose → raw template
 const NoExpose = component({
   setup: () => tmpl,
 });
 
-// Mixed: inputs + local signals in expose (subsumes input-only expose)
 const MixedExpose = component({
   bindings: {
     label: input.required<string>(),
@@ -558,10 +562,6 @@ const mixedRef = ref<typeof MixedExpose>();
 const _mixedLabel: InputSignal<string> | undefined = mixedRef()?.label;
 const _mixedDoubled: Signal<number> | undefined = mixedRef()?.doubled;
 
-// Void expose through ref: resolves to Ref<undefined>, not Ref<void | undefined>
-const voidExposeRef = ref<typeof NoExpose>();
-const _voidExposeCheck: Ref<undefined> = voidExposeRef;
-
 // ────────────────────────────────────────────────────────────────
 // 9. DIRECTIVE — host as separate config, expose
 //
@@ -570,7 +570,6 @@ const _voidExposeCheck: Ref<undefined> = voidExposeRef;
 // setup receives bindings as first arg, { host } as second.
 // ────────────────────────────────────────────────────────────────
 
-// Directive with expose
 const tooltip = directive({
   host: ref<HTMLElement>(),
   bindings: {
@@ -586,7 +585,6 @@ const tooltip = directive({
   },
 });
 
-// Directive without bindings
 const ripple = directive({
   host: ref<HTMLElement>(),
   setup: ({}, { host }) => {
@@ -594,15 +592,6 @@ const ripple = directive({
   },
 });
 
-// Directive with void expose: ref resolves to Ref<undefined>
-const voidDir = directive({
-  host: ref<HTMLElement>(),
-  setup: ({}, { host }) => {},
-});
-const voidDirRef = ref<typeof voidDir>();
-const _voidDirCheck: Ref<undefined> = voidDirRef;
-
-// Directive expose flows through ref with correct type
 const typedDir = directive({
   host: ref<HTMLButtonElement>(),
   bindings: { label: input<string>() },
@@ -613,7 +602,6 @@ const _typedDirRefCheck: Ref<
   { getLabel: () => string | undefined } | undefined
 > = typedDirRef;
 
-// Host type constraint: narrows to specific element type
 const buttonOnly = directive({
   host: ref<HTMLButtonElement>(),
   bindings: { label: input<string>() },
@@ -626,7 +614,6 @@ const inputOnly = directive({
   setup: ({ label }, { host }) => {},
 });
 
-// Directive exposing its input
 const highlight = directive({
   host: ref<HTMLElement>(),
   bindings: {
@@ -638,8 +625,6 @@ const highlight = directive({
 const highlightRef = ref<typeof highlight>();
 const _highlightColor: InputSignal<string> | undefined = highlightRef()?.color;
 
-// Zero-parameter setup returning expose: neither bindings nor host are needed
-// in the body, and the expose still flows through ref (readme's tooltip sketch).
 const toggleOnly = directive({
   host: ref<HTMLElement>(),
   setup: () => ({ toggle: () => {} }),
@@ -649,7 +634,6 @@ const toggleOnlyRef = ref<typeof toggleOnly>();
 const _toggleOnlyRefType: Ref<{ toggle: () => void } | undefined> =
   toggleOnlyRef;
 
-// Directive accepts fragment bindings (TemplateRef-style use cases)
 const directiveWithFragment = directive({
   host: ref<HTMLElement>(),
   bindings: {
@@ -662,6 +646,26 @@ const directiveWithFragment = directive({
   },
 });
 
+const containerOnly = directive({
+  host: ref<RootNode>(),
+  setup: ({}, { host }) => {
+    const _hostRef: Ref<RootNode | undefined> = host;
+  },
+});
+
+const logDirective = directive({
+  host: ref<HTMLElement | RootNode>(),
+  bindings: { tag: input<string>('') },
+  setup: ({ tag }, { host }) => {
+    const _hostRef: Ref<HTMLElement | RootNode | undefined> = host;
+    const _tag: string = tag();
+    const el = host();
+    if (el !== undefined && !isRootNode(el)) {
+      const _tagName: string = el.tagName;
+    }
+  },
+});
+
 // ────────────────────────────────────────────────────────────────
 // 10. REF UTILITIES — ref, refMany, read-only enforcement
 //
@@ -670,90 +674,63 @@ const directiveWithFragment = directive({
 // Both resolve after afterNextRender.
 // ────────────────────────────────────────────────────────────────
 
-// Native element
 const divRef = ref<HTMLDivElement>();
 const _divRefType: Ref<HTMLDivElement | undefined> = divRef;
 
-// Component with expose
 const childRef = ref<typeof Child>();
 const _childRefType: Ref<{ text: Signal<string> } | undefined> = childRef;
 
-// Ref<T> extends Signal<T>
 const _childRefAsSignal: Signal<{ text: Signal<string> } | undefined> =
   childRef;
 
-// Component without expose
 const noExposeRef = ref<typeof NoExpose>();
 const _noExposeType: Ref<undefined> = noExposeRef;
 
-// Directive with expose
 const tooltipRef = ref<typeof tooltip>();
 const _tooltipRefType: Ref<{ toggle: () => void } | undefined> = tooltipRef;
 
-// Directive without expose
 const rippleRef = ref<typeof ripple>();
 const _rippleRefType: Ref<undefined> = rippleRef;
 
-// refMany — component with expose
 const manyChildren = refMany<typeof Child>();
 const _manyType: Ref<{ text: Signal<string> }[]> = manyChildren;
 
-// refMany — native element
 const manyDivs = refMany<HTMLDivElement>();
 const _manyDivsType: Ref<HTMLDivElement[]> = manyDivs;
 
-// refMany without expose → Ref<[]>
 const manyNoExpose = refMany<typeof NoExpose>();
 const _manyNoExposeType: Ref<[]> = manyNoExpose;
 
-// Refs are read-only — .set() must not exist (representative: single + many)
 // @ts-expect-error
 divRef.set(document.createElement('div'));
 // @ts-expect-error
 manyChildren.set([]);
 
-// ref() must not accept runtime arguments — generic-only
 // @ts-expect-error ref does not accept a runtime argument
 ref(Child);
 // @ts-expect-error refMany does not accept a runtime argument
 refMany(Child);
 
-// Passing a ref as an input
-const Sibling = component({
-  bindings: {
-    childRef: input<{ text: Signal<string> } | undefined>(),
-  },
-  setup: ({ childRef }) => {
-    const _val = childRef();
-    return tmpl;
-  },
-});
+const containerRef = ref<RootNode>();
+const _containerRefType: Ref<RootNode | undefined> = containerRef;
+
+const manyContainers = refMany<RootNode>();
+const _manyContainersType: Ref<RootNode[]> = manyContainers;
+
+const containerOnlyRef = ref<typeof containerOnly>();
+const _containerOnlyRefType: Ref<undefined> = containerOnlyRef;
 
 // ────────────────────────────────────────────────────────────────
-// 11. COMPONENT — forward surface
+// 11. COMPONENT — rootNode declaration (element<...>())
 //
-// `forward: surface<S>()` declares the surface in a value position, so one
-// component(...) signature covers plain and forwarding components: with the
-// key present S is inferred from it, with the key absent there is no
-// inference site and S falls back to its `never` default.
+// A component declares its root type with `rootNode: element<T>()`, defaulting
+// to RootNode when omitted. The declared root is reflected in ComponentInstance
+// as its fourth parameter, so it is observable via ComponentRootOf and two
+// components that differ only in their root differ in type.
 // ────────────────────────────────────────────────────────────────
 
-const ForwardingButton = component({
-  forward: surface<HTMLButtonElement>(),
-  setup: () => tmpl,
-});
-type _ForwardingButtonType = Assert<
-  IsEqual<
-    typeof ForwardingButton,
-    ComponentInstance<{}, void, HTMLButtonElement>
-  >
->;
-
-// WITH bindings: S, B, E and TMarkup are all inferred from one config object —
-// no type argument anywhere. Mirrors the readme's Button (forwarding directives
-// to an internal element), including class/style binding names aliased in setup.
 const ButtonWithBindings = component({
-  forward: surface<HTMLButtonElement>(),
+  rootNode: element<HTMLButtonElement>(),
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -781,7 +758,6 @@ const ButtonWithBindings = component({
   },
 });
 
-// The bindings record is inferred from the object — never hand-written.
 type _ButtonWithBindingsInferred = Assert<
   IsEqual<
     typeof ButtonWithBindings extends ComponentInstance<infer B, any, any, any>
@@ -798,130 +774,166 @@ type _ButtonWithBindingsInferred = Assert<
   >
 >;
 
-// TemplateMarkup<TAst> survives a config carrying `forward`.
-// RESOLVED-FORWARD-HOSTS reads T(C) to locate the single @forward() placement,
-// so a forwarding component is precisely the case that must not lose its
-// template AST.
-type _ForwardingKeepsTemplateAst = Assert<
+type _RootNodeKeepsTemplateAst = Assert<
   IsEqual<
     TemplateAstOf<ComponentTemplateOf<typeof ButtonWithBindings>>,
     SpecificTemplateAST
   >
 >;
 
-const _NegInvalidSurface = component({
-  // @ts-expect-error forward surface must be an HTMLElement subtype
-  forward: surface<string>(),
+const FlaggedNoBindings = component({
+  rootNode: element<HTMLElement>(),
   setup: () => tmpl,
 });
 
-const _NegComponentAsSurface = component({
-  // @ts-expect-error component instances are not valid forward surface types
-  forward: surface<typeof UserDetail>(),
+const DefaultRootNoBindings = component({
+  // @ts-expect-error RootNode is not a declarable root (only the omitted default)
+  rootNode: element<RootNode>(),
   setup: () => tmpl,
 });
 
-const _NegDirectiveAsSurface = component({
-  // @ts-expect-error directive instances are not valid forward surface types
-  forward: surface<typeof tooltip>(),
+const UnionRootNoBindings = component({
+  // @ts-expect-error a RootNode-containing union is not a declarable root
+  rootNode: element<HTMLElement | RootNode>(),
   setup: () => tmpl,
 });
 
-// The surface is a declaration, not a binding: it is never visible in setup
-// and cannot be smuggled into the bindings record.
-const _NegSurfaceInSetup = component({
-  forward: surface<HTMLElement>(),
+const PlainNoBindings = component({
+  setup: () => tmpl,
+});
+
+type _NativeRootIsReflected = Assert<
+  IsEqual<ComponentRootOf<typeof FlaggedNoBindings>, HTMLElement>
+>;
+type _NativeRootDiffersFromDefault = Assert<
+  IsEqual<
+    IsEqual<typeof FlaggedNoBindings, typeof PlainNoBindings>,
+    false
+  >
+>;
+type _OmittedRootDefaultsToRootNode = Assert<
+  IsEqual<ComponentRootOf<typeof PlainNoBindings>, RootNode>
+>;
+type _FlaggedShape = Assert<
+  IsEqual<
+    typeof FlaggedNoBindings,
+    ComponentInstance<{}, void, TemplateMarkup, HTMLElement>
+  >
+>;
+
+const _NegRootNodeRawBoolean = component({
+  // @ts-expect-error rootNode accepts only an element<...>() declaration
+  rootNode: true,
+  setup: () => tmpl,
+});
+
+const _NegRootNodeRawObject = component({
+  // @ts-expect-error rootNode accepts only an element<...>() declaration
+  rootNode: {},
+  setup: () => tmpl,
+});
+
+const _NegRootNodeOutOfDomain = component({
+  // @ts-expect-error element<string>() is not a native element (R extends HTMLElement)
+  rootNode: element<string>(),
+  setup: () => tmpl,
+});
+
+const _NegRootNodeIsRootNode = component({
+  // @ts-expect-error RootNode is the default, never a declarable root
+  rootNode: element<RootNode>(),
+  setup: () => tmpl,
+});
+
+const _NegRootNodeIsUnion = component({
+  // @ts-expect-error a RootNode-containing union is not a declarable root
+  rootNode: element<HTMLElement | RootNode>(),
+  setup: () => tmpl,
+});
+
+const _NegRootNodeInSetup = component({
+  rootNode: element<HTMLElement>(),
   bindings: {
     label: input<string>(),
   },
   setup: (bindings) => {
-    // @ts-expect-error forward surface metadata is not visible in setup bindings
-    bindings.forward;
+    // @ts-expect-error rootNode is not visible in setup bindings
+    bindings.rootNode;
     return tmpl;
   },
 });
-type _SurfaceIsNotABindingValue = Assert<
-  IsEqual<Surface<HTMLElement> extends ComponentBindingValue ? true : false, false>
->;
-
-// A second forward surface, used by §12's directive-compatibility checks.
-const ForwardingInput = component({
-  forward: surface<HTMLInputElement>(),
-  setup: () => tmpl,
-});
-type _ForwardingInputType = Assert<
-  IsEqual<typeof ForwardingInput, ComponentInstance<{}, void, HTMLInputElement>>
->;
-
-// `forward` omitted: no inference site, so F(C) = never.
-const NoForwardingTarget = component({
-  setup: () => tmpl,
-});
-type _NoForwardSurface = Assert<
-  IsEqual<typeof NoForwardingTarget, ComponentInstance<{}, void, never>>
->;
 
 // ────────────────────────────────────────────────────────────────
-// 12. DIRECTIVE — forwarding compatibility
+// 12. DIRECTIVE — host compatibility with the component's rootNode
 //
-// Directive host must accept the component's forward surface.
+// A directive applied at <C .../> attaches to C's root, so its declared host
+// type must accept that root. The roots here are read back out of REAL
+// component instances via ComponentRootOf, then checked against each
+// directive's host — plain directive.host vs component-root assignability.
 // ────────────────────────────────────────────────────────────────
 
-type ForwardSurfaceOf<C extends ComponentInstance<any, any, any>> =
-  C extends ComponentInstance<any, any, infer S> ? S : never;
+const ButtonRootComponent = component({
+  rootNode: element<HTMLButtonElement>(),
+  setup: () => tmpl,
+});
+const InputRootComponent = component({
+  rootNode: element<HTMLInputElement>(),
+  setup: () => tmpl,
+});
+const NoElementRootComponent = component({
+  // Inert (RootNode) root is expressed by omitting rootNode, not by declaring it.
+  setup: () => tmpl,
+});
+
+type ButtonRootType = ComponentRootOf<typeof ButtonRootComponent>;
+type InputRootType = ComponentRootOf<typeof InputRootComponent>;
+type NoElementRootType = ComponentRootOf<typeof NoElementRootComponent>;
+
 type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
   D extends DirectiveInstance<infer H, any, any> ? H : never;
-type DirectiveFitsForwardSurface<
-  C extends ComponentInstance<any, any, any>,
-  D extends DirectiveInstance<any, any, any>,
-> =
-  ForwardSurfaceOf<C> extends never
-    ? false
-    : ForwardSurfaceOf<C> extends DirectiveHost<D>
-      ? true
-      : false;
 
-type _ButtonAcceptsButtonDirective = Assert<
-  IsEqual<
-    DirectiveFitsForwardSurface<typeof ForwardingButton, typeof buttonOnly>,
-    true
-  >
+type DirectiveFitsRoot<RootType, D extends DirectiveInstance<any, any, any>> =
+  RootType extends DirectiveHost<D> ? true : false;
+
+type _ButtonRootAcceptsButtonDirective = Assert<
+  IsEqual<DirectiveFitsRoot<ButtonRootType, typeof buttonOnly>, true>
 >;
-type _ButtonAcceptsGenericDirective = Assert<
-  IsEqual<
-    DirectiveFitsForwardSurface<typeof ForwardingButton, typeof tooltip>,
-    true
-  >
+type _ButtonRootAcceptsGenericDirective = Assert<
+  IsEqual<DirectiveFitsRoot<ButtonRootType, typeof tooltip>, true>
 >;
-// @ts-expect-error input-host directive cannot attach to a button forward surface
-const _negButtonRejectsInputDirective: DirectiveFitsForwardSurface<
-  typeof ForwardingButton,
+type _InputRootAcceptsInputDirective = Assert<
+  IsEqual<DirectiveFitsRoot<InputRootType, typeof inputOnly>, true>
+>;
+type _InputRootAcceptsGenericDirective = Assert<
+  IsEqual<DirectiveFitsRoot<InputRootType, typeof tooltip>, true>
+>;
+// @ts-expect-error an input-host directive cannot attach to a <button> root
+const _negButtonRootRejectsInputDirective: DirectiveFitsRoot<
+  ButtonRootType,
   typeof inputOnly
 > = true;
-
-type _InputAcceptsInputDirective = Assert<
-  IsEqual<
-    DirectiveFitsForwardSurface<typeof ForwardingInput, typeof inputOnly>,
-    true
-  >
->;
-type _InputAcceptsGenericDirective = Assert<
-  IsEqual<
-    DirectiveFitsForwardSurface<typeof ForwardingInput, typeof tooltip>,
-    true
-  >
->;
-// @ts-expect-error button-host directive cannot attach to an input forward surface
-const _negInputRejectsButtonDirective: DirectiveFitsForwardSurface<
-  typeof ForwardingInput,
+// @ts-expect-error a button-host directive cannot attach to an <input> root
+const _negInputRootRejectsButtonDirective: DirectiveFitsRoot<
+  InputRootType,
   typeof buttonOnly
 > = true;
 
-type _PlainComponentRejectsDirective = Assert<
-  IsEqual<
-    DirectiveFitsForwardSurface<typeof NoForwardingTarget, typeof tooltip>,
-    false
-  >
+type _NoElementRootRejectsDomDirective = Assert<
+  IsEqual<DirectiveFitsRoot<NoElementRootType, typeof tooltip>, false>
+>;
+type _NoElementRootAcceptsContainerDirective = Assert<
+  IsEqual<DirectiveFitsRoot<NoElementRootType, typeof containerOnly>, true>
+>;
+
+type _NoElementRootAcceptsLogicalDirective = Assert<
+  IsEqual<DirectiveFitsRoot<NoElementRootType, typeof logDirective>, true>
+>;
+type _ButtonRootAcceptsLogicalDirective = Assert<
+  IsEqual<DirectiveFitsRoot<ButtonRootType, typeof logDirective>, true>
+>;
+
+type _ButtonRootRejectsContainerDirective = Assert<
+  IsEqual<DirectiveFitsRoot<ButtonRootType, typeof containerOnly>, false>
 >;
 
 // ────────────────────────────────────────────────────────────────
@@ -941,14 +953,12 @@ const _simType: DerivationInstance<
   string
 > = simulation;
 
-// Derivation without bindings: setup receives no args
 const simple = derivation({
   setup: () => computed(() => 42),
 });
 
 const _simpleType: DerivationInstance<{}, number> = simple;
 
-// Derivation must reject non-input bindings
 const _NegDerivationNonInput = derivation({
   // @ts-expect-error derivations cannot declare model bindings
   bindings: {
@@ -977,11 +987,9 @@ const _NegDerivationFragment = derivation({
 // 14. INJECTION TOKEN
 // ────────────────────────────────────────────────────────────────
 
-// Token without factory — returns DiToken
 const noFactoryToken = injectionToken<string>();
 const _noFactoryTokenType: DiToken<string> = noFactoryToken;
 
-// Token with factory — returns DiToken (DiTokenWithFactory is assignable)
 const withFactoryToken = injectionToken({
   factory: () => {
     const counter = signal(0);
@@ -996,7 +1004,6 @@ const _withFactoryTokenType: DiToken<{
   increase: () => void;
 }> = withFactoryToken;
 
-// Auto-provided: factory invoked once at root scope
 const rootToken = injectionToken({
   autoProvided: true,
   factory: () => {
@@ -1012,64 +1019,52 @@ const _rootTokenType: DiToken<{
   decrease: () => void;
 }> = rootToken;
 
-// Multi without factory — returns DiMultiToken<T>
 const multiNoFactoryToken = injectionToken.multi<number>();
 const _multiNoFactoryTokenType: DiMultiToken<number> = multiNoFactoryToken;
 
-// Multi with factory — returns DiMultiToken<T> (DiMultiTokenWithFactory is assignable)
 const multiToken = injectionToken.multi({
   factory: () => Math.random(),
 });
 const _multiTokenType: DiMultiToken<number> = multiToken;
 
-// Explicit autoProvided: false — accepted
 const explicitFalseWithFactory = injectionToken({
   autoProvided: false,
   factory: () => 99,
 });
 const _explicitFalseWithFactoryType: DiToken<number> = explicitFalseWithFactory;
 
-// Single token with array value type
 const arrayValueToken = injectionToken<string[]>({ debugName: 'tags' });
 const _arrayValueTokenType: DiToken<string[]> = arrayValueToken;
 
-// Single token with array value type and factory
 const arrayValueWithFactory = injectionToken({
   factory: () => ['a', 'b', 'c'],
 });
 const _arrayValueWithFactoryType: DiToken<string[]> = arrayValueWithFactory;
 
-// provide(token, factory) for array-valued non-multi token: factory returns the full array
 const _provideArrayValue = provide(arrayValueToken, () => ['x', 'y']);
 
-// Multi token is NOT assignable to DiToken
 // @ts-expect-error DiMultiToken is not assignable to DiToken
 const _multiNotAssignableToNonMulti: typeof arrayValueToken =
   multiNoFactoryToken;
 
-// Empty object config — equivalent to no-arg call
 const emptyConfigToken = injectionToken<string>({});
 const _emptyConfigTokenType: DiToken<string> = emptyConfigToken;
 
-// Unknown token preserves unknown as the inject result
 const unknownTypeToken = injectionToken<unknown>();
 const _unknownValue: unknown = inject(unknownTypeToken);
 const _unknownCast = <string>inject(unknownTypeToken);
 
-// Negative: autoProvided: true without factory
 const _negAutoProvidedNoFactory = injectionToken<string>({
   // @ts-expect-error autoProvided: true requires a factory
   autoProvided: true,
 });
 
-// Negative: multi is no longer a config flag on injectionToken(...)
 // @ts-expect-error use injectionToken.multi(...) for multi tokens
 const _negOldMultiNoFactory = injectionToken<number>({ multi: true });
 
 // @ts-expect-error multi: false is no longer accepted; omit the option
 const _negOldMultiFalseNoFactory = injectionToken<string>({ multi: false });
 
-// Negative: autoProvided is not valid on injectionToken.multi(...)
 const _negMultiAutoProvidedTrue = injectionToken.multi({
   // @ts-expect-error autoProvided is not an option for injectionToken.multi(...)
   autoProvided: true,
@@ -1080,23 +1075,18 @@ const _negMultiAutoProvidedTrue = injectionToken.multi({
 // 15. INJECT
 // ────────────────────────────────────────────────────────────────
 
-// inject(Component) → expose type
 const _injectedChild: { text: Signal<string> } = inject(Child);
 
-// inject(Component without expose) → void
 const _injectedNoExpose: void = inject(NoExpose);
 
-// inject(Directive) → expose type
 const _injectedTooltip: { toggle: () => void } = inject(tooltip);
 
-// inject(DiToken) → token type
 const _injectedWithFactory: { value: Signal<number>; increase: () => void } =
   inject(withFactoryToken);
 const _injectedNoFactory: string = inject(noFactoryToken);
 const _injectedMulti: number[] = inject(multiToken);
 const _injectedMultiNoFactory: number[] = inject(multiNoFactoryToken);
 
-// optional: true → T | null; optional: false / omitted → T
 const _optionalInjectedNoFactory: string | null = inject(noFactoryToken, {
   optional: true,
 });
@@ -1110,10 +1100,8 @@ inject<string>(withFactoryToken);
 // @ts-expect-error generic is token type, not value type
 inject<string>(multiToken);
 
-// inject(Class) → class instance
 const _injectedStore: Store = inject(Store);
 
-// inject(abstract class) → class instance
 abstract class AbstractService {
   abstract run(): void;
 }
@@ -1123,27 +1111,23 @@ class ConcreteService extends AbstractService {
 
 const _injectedAbstract: AbstractService = inject(AbstractService);
 
-// inject(generic class) → class instance
 class GenericClass<T extends number> {
   value!: T;
 }
 const _injectedGeneric: GenericClass<number> = inject(GenericClass);
 
-// inject(generic abstract class) → class instance
 abstract class GenericAbstract<T extends string> {
   abstract get(): T;
 }
 const _injectedGenericAbstract: GenericAbstract<string> =
   inject(GenericAbstract);
 
-// inject(HostAttributeToken) → string
 const _injectedAttr: string = inject(new HostAttributeToken('role'));
 const _injectedAttrOptional: string | null = inject(
   new HostAttributeToken('role'),
   { optional: true },
 );
 
-// inject(legacy InjectionToken<T>) → T
 const legacyToken = new InjectionToken<number>('legacyToken');
 const _injectedLegacy: number = inject(legacyToken);
 const _injectedLegacyOptional: number | null = inject(legacyToken, {
@@ -1154,21 +1138,18 @@ const _injectedLegacyOptional: number | null = inject(legacyToken, {
 // 16. PROVIDE
 // ────────────────────────────────────────────────────────────────
 
-// provide shorthand — only works with DiToken (with factory)
 const _providersShorthand = [
   provide(withFactoryToken),
   provide(multiToken),
   provide(rootToken),
 ];
 
-// provide shorthand with factory-less token — compile-time error
 // @ts-expect-error provide(token) shorthand requires token with factory
 provide(noFactoryToken);
 
 // @ts-expect-error provide(token) shorthand requires token with factory
 provide(multiNoFactoryToken);
 
-// Explicit factory form — works with both DiToken (base) and DiTokenWithFactory
 const _providersExplicitFactory = [
   provide(noFactoryToken, () => 'explicit'),
   provide(multiNoFactoryToken, () => 42),
@@ -1185,41 +1166,32 @@ const _providersExplicitFactory = [
   provide(multiToken, () => 99),
 ];
 
-// Multi provide factory returns a single item, not an array
 // @ts-expect-error factory for multi token must return number, not number[]
 provide(multiToken, () => [1, 2, 3]);
 
-// Array-valued non-multi token: factory returns the full array
 // @ts-expect-error factory for non-multi string[] token must return string[]
 provide(arrayValueToken, () => 'single');
 
-// Class token: factory must return an instance of the class
 // @ts-expect-error factory returns boolean, not Store
 provide(Store, () => true);
 
-// Abstract class token: factory must return an instance of the abstract class
 const _provideAbstract = provide(AbstractService, () => new ConcreteService());
 
 // @ts-expect-error factory returns string, not AbstractService
 provide(AbstractService, () => 'wrong');
 
-// Negative: wrong factory return type for single token
 // @ts-expect-error factory returns number, not string
 provide(noFactoryToken, () => 123);
 
-// Negative: wrong factory return type for multi token
 // @ts-expect-error factory returns string, not number
 provide(multiToken, () => 'wrong');
 
-// Negative: provide(Class) shorthand — classes are not DiTokenWithFactory
 // @ts-expect-error class shorthand is not allowed; use explicit factory form
 provide(Store);
 
-// Negative: legacy InjectionToken shorthand — not DiTokenWithFactory
 // @ts-expect-error legacy token shorthand is not allowed; use explicit factory form
 provide(legacyToken);
 
-// Negative: wrong factory return type for legacy token
 // @ts-expect-error factory returns string, not number
 provide(legacyToken, () => 'wrong');
 
@@ -1235,14 +1207,11 @@ provide(legacyToken, () => 'wrong');
 // to allow extra keys in the component binding surface.
 // ────────────────────────────────────────────────────────────────
 
-// -- Bindings conformance: component --------------
-
 interface Sortable {
   sortKey: InputSignal<string>;
   sortDirection: InputSignal<'asc' | 'desc'>;
 }
 
-// Exact match: all bindings are in the interface
 const SortableTable = component({
   bindings: {
     sortKey: input.required<string>(),
@@ -1251,7 +1220,6 @@ const SortableTable = component({
   setup: ({ sortKey, sortDirection }) => tmpl,
 });
 
-// Extra bindings: interface + Record allows additional keys
 const SortableTableExtra = component({
   bindings: {
     sortKey: input.required<string>(),
@@ -1260,8 +1228,6 @@ const SortableTableExtra = component({
   } satisfies Sortable & Record<string, ComponentBindingValue>,
   setup: ({ sortKey, sortDirection, pageSize }) => tmpl,
 });
-
-// -- Bindings conformance: multiple interfaces ----
 
 interface Paginated {
   page: InputSignal<number>;
@@ -1278,8 +1244,6 @@ const SortablePaginatedTable = component({
   setup: ({ sortKey, sortDirection, page, pageSize }) => tmpl,
 });
 
-// -- Bindings conformance: directive --------------
-
 interface Dismissable {
   message: InputSignal<string>;
   dismiss: OutputEmitterRef<void>;
@@ -1294,8 +1258,6 @@ const dismissableTooltip = directive({
   setup: ({ message, dismiss }, { host }) => {},
 });
 
-// -- Bindings conformance: derivation -------------
-
 interface QuantityBound {
   qty: InputSignal<number>;
   item: InputSignal<Item>;
@@ -1309,8 +1271,6 @@ const quantityDerivation = derivation({
   setup: ({ qty, item }) => computed(() => qty() * 2),
 });
 
-// Extra bindings: the Record intersection needs a surface-specific alias, same
-// as the component case above — hence DerivationBindingValue is exported.
 const quantityDerivationExtra = derivation({
   bindings: {
     qty: input.required<number>(),
@@ -1320,8 +1280,6 @@ const quantityDerivationExtra = derivation({
   setup: ({ qty, discount }) => computed(() => qty() * (discount() ?? 1)),
 });
 
-// The alias is pre-validation: ValidateDerivationBindings still rejects
-// non-inputs, so widening with it cannot smuggle a model in.
 const _NegDerivationBindingValueStillValidated = derivation({
   // @ts-expect-error derivations cannot declare model bindings
   bindings: {
@@ -1329,8 +1287,6 @@ const _NegDerivationBindingValueStillValidated = derivation({
   } satisfies Record<string, DerivationBindingValue>,
   setup: () => computed(() => 1),
 });
-
-// -- Expose conformance: component ----------------
 
 interface Toggleable {
   toggle: () => void;
@@ -1351,11 +1307,8 @@ const Accordion = component({
   },
 });
 
-// ref infers expose correctly through satisfies
 const accordionRef = ref<typeof Accordion>();
 const _accordionRefType: Ref<Toggleable | undefined> = accordionRef;
-
-// -- Expose conformance: directive ----------------
 
 const toggleDirective = directive({
   host: ref<HTMLElement>(),
@@ -1372,8 +1325,6 @@ const toggleDirective = directive({
 const toggleDirRef = ref<typeof toggleDirective>();
 const _toggleDirRefType: Ref<Toggleable | undefined> = toggleDirRef;
 
-// -- Negative: missing key in bindings ------------
-
 const _NegMissingKey = component({
   bindings: {
     sortKey: input.required<string>(),
@@ -1381,8 +1332,6 @@ const _NegMissingKey = component({
   } satisfies Sortable,
   setup: ({ sortKey }) => tmpl,
 });
-
-// -- Negative: wrong type in bindings -------------
 
 const _NegWrongBindingType = component({
   bindings: {
@@ -1392,8 +1341,6 @@ const _NegWrongBindingType = component({
   } satisfies Sortable,
   setup: ({ sortKey, sortDirection }) => tmpl,
 });
-
-// -- Negative: missing key in expose --------------
 
 const _NegMissingExpose = component({
   setup: () => ({
@@ -1427,7 +1374,6 @@ type _ReservedOk = __ValidateComponentBindings<{
 }>;
 type _ReservedOkCheck = Assert<IsEqual<_ReservedOk['children'], OptionalFragmentBinding<void>>>;
 
-// ref is reserved — any binding named 'ref' on a component is an error
 type _ReservedRefDiag = __ValidateComponentBindings<{
   ref: InputSignal<string>;
 }>;

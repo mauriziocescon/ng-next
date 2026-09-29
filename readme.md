@@ -15,7 +15,7 @@ Highlights:
 4. Hostless components + TS lexical scoping for templates,
 5. Component inputs: lifted up + immediately available in setup and providers,
 6. Expose and Template Refs,
-7. Composition with Fragments, Directives, and Forwarding,
+7. Composition with Fragments and Directives,
 8. Dependency Injection Enhancements,
 9. Final considerations + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
@@ -31,7 +31,7 @@ Highlights:
 - [One-time bindings (`once:`)](#one-time-bindings-once)
 - [Input-driven providers](#input-driven-providers)
 - [Expose and Template Refs](#expose-and-template-refs)
-- [Composition with Fragments, Directives, and Forwarding](#composition-with-fragments-directives-and-forwarding)
+- [Composition with Fragments and Directives](#composition-with-fragments-and-directives)
 - [Dependency Injection Enhancements](#dependency-injection-enhancements)
 - [Final considerations](#final-considerations)
 - [Appendix: Co-located templates in Angular via `.ng` files](#appendix-co-located-templates-in-angular-via-ng-files)
@@ -409,13 +409,11 @@ export const RefShowcase = component({
 });
 ```
 
-## Composition with Fragments, Directives, and Forwarding
+## Composition with Fragments and Directives
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Forwarding lets a component take directives from its user and pass them to an element inside it: declare the entry point with `forward: surface<T>()`, mark the receiving element with `@forward()`. Write `use:tooltip(...)` on the component and it lands on that inner element — no props object, the compiler just rewrites it into normal directive instructions.
-
-`surface<T>()` never runs; it only declares what a component accepts — the kind of element the incoming directives must be compatible with.
+Every component has a `rootNode`: the target that directives at its call site match against. Omit `rootNode` and it defaults to `RootNode`, which leaves the template unconstrained. Declare a native-element root with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`) and the template must have a single root node that is a native element, not wrapped in control flow (`@if`/`@for`/`@switch`); that declared type then decides which directives are compatible.
 
 ### Implicit children fragment
 
@@ -518,9 +516,9 @@ export const Menu = component({
 });
 ```
 
-### Forwarding directives to an internal element
+### Applying directives to a component's root element
 
-`Button` declares an `HTMLButtonElement` forward surface. Directives applied to `<Button />` are accepted only if their `host` type is compatible, then placed on the `@forward()` target. The same directive cannot be applied more than once to the same final element.
+`Button` declares `rootNode: element<HTMLButtonElement>()`, so directives attach to its `<button>` root and are accepted only if their `host` accepts `HTMLButtonElement`. Since a directive cannot apply twice to the same element, a call-site `use:tooltip(...)` collides with one written on the root inside `Button`.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -551,10 +549,10 @@ export const Consumer = component({
 });
 
 // -- button in @mylib/button --------------------
-import { component, input, output, computed, fragment, surface } from '@angular/core';
+import { component, input, output, computed, fragment, element } from '@angular/core';
 
 export const Button = component({
-  forward: surface<HTMLButtonElement>(),
+  rootNode: element<HTMLButtonElement>(),
   bindings: {
     type: input<'button' | 'submit' | 'reset'>('button'),
     class: input<string>(''),
@@ -566,10 +564,9 @@ export const Button = component({
   setup: ({ type, class: className, style, disabled, click, children }) => {
     const innerStyle = computed(() => `${style()}; color: red;`);
 
-    // Directives applied to <Button /> are forwarded here
+    // Directives applied to <Button /> attach to this root element
     return @{
       <button
-        @forward()
         type={type()}
         class={className()}
         style={innerStyle()}
@@ -678,7 +675,7 @@ export const Counter = component({
 - `pipes`: can be modeled with derivations or components (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
-- `directives` attached to the host (components): no longer possible, but directives can be passed in and attached to elements (forwarding),
+- `directives` attached to the host (components): there is no host to attach to, but a component can declare a native element root via `rootNode: element<HTMLElement>()` and directives applied at its call site then attach to that root element,
 - `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
 - `template reference variables`: can be modeled with `ref`,
 - `queries`: can be modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
@@ -688,18 +685,15 @@ export const Counter = component({
 ### Scope and caveats
 
 - `interoperability layer`: the full incremental migration story (mixed projects, build boundaries) is not covered intentionally — the topic is important but requires many micro-decisions that depend on compiler architecture choices out of scope for this proposal;
-- other decorator properties: in this proposal a component config carries only `bindings`, `forward`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings` and `setup` — notably no directive-level `providers`. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
+- other decorator properties: in this proposal a component config carries only `bindings`, `rootNode`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings` and `setup` — notably no directive-level `providers`. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,
   - [`no-param-reassign`](https://eslint.org/docs/latest/rules/no-param-reassign);
 - programmatic view creation (dialogs, overlays): not covered here; likely requires a dedicated API — `createComponent` / `renderFragment` with an attachment target — rather than `ViewContainerRef`;
-- `formField` integration with Signal Forms: not considered here. On a component with a forward surface, all `use:` directives forward to `@forward()` — but a form field directive needs the *component's* binding surface (its `value` model, `disabled`, `errors`, etc.), not the inner native element. This likely requires `formField` to be a reserved binding name (alongside `ref` and `children`) with dedicated compiler support, so the form system can target the component boundary directly:
+- `formField` integration with Signal Forms: not considered here, though on a component with the default `rootNode` it could be fine or require minimal adaptation:
   ```ts
-  <TextInput
-    formField={signupForm.username}
-    use:autoFocus()
-    ariaLabel="Username" />
+  <TextInput use:formField={signupForm.username} />
   ```
 - testing story: not covered here — large topic on its own. `TestBed` and `ComponentFixture` are a poor fit for this architecture. It likely requires new APIs — a `runInInjectionContext` helper for unit-testing `setup` directly, and a thin `render(Component, { bindings, providers })` harness for DOM tests closer to [`@testing-library/angular`](https://github.com/testing-library/angular-testing-library/tree/main) than to `TestBed`. Default mantra: "test behavior, not implementation" — query by role/label/text, interact as a user would, assert on visible output.
 
@@ -798,13 +792,12 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `class:` | native elements | Yes | Conditional CSS class binding. Multiple `class:` on the same element are valid. |
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
-| `use:` | native elements, components declaring a `forward` surface | Yes (different directives) | Attaches a directive. On forwarding components, directives are placed at the `@forward()` target. Same directive cannot appear twice on the same final element. |
+| `use:` | native elements, components | Yes (different directives) | Attaches a directive; on a component, to its root. No directive twice on the same element. |
 | `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. Reserved — cannot be declared as a component binding. |
-| `@forward()` | compatible native element | No (exactly one per component) | Places the directive payload declared by `forward: surface<T>()`. |
 
-`ref` and `@forward()` are special attributes, not binding prefixes — included here for completeness. Both `ref` and `children` are reserved at component level only; directives and derivations may use them as binding names (though not recommended).
+`ref` is a special attribute, not a binding prefix — included here for completeness. Both `ref` and `children` are reserved at component level only; directives and derivations may use them as binding names (though not recommended).
 
 ### Compile-time validation rules
 
