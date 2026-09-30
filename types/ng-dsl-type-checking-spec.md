@@ -57,7 +57,7 @@ C : ComponentInstance<B, E, M, R>
 B = bindings record
 E = expose type (void when absent)
 M = TemplateMarkup<TAst>
-R = root type (RootNode when rootNode omitted; the declared element<T>() type, T ⊑ HTMLElement, otherwise)
+R = root type (RootNode when rootNode omitted; the declared element<T>() type, T ⊑ HTMLElement | SVGElement, otherwise)
 ```
 
 ### Template node vocabulary
@@ -609,7 +609,7 @@ node.children = []         (nested content is lowered to the
 ∀ dir ∈ node.directives:
   CHECK-DIRECTIVE-USE(Γ, Root(C), HostSet(C, node), dir)
   where HostSet(C, node) = {RN(C)}  if C declares a native-element rootNode
-                                          (rootNode: element<T>() where T ⊑ HTMLElement)
+                                          (rootNode: element<T>() where T ⊑ HTMLElement | SVGElement)
                          = {node}         otherwise
 CHECK-REQUIRED(B, provided, "component")
 NO-DUPLICATE-BINDINGS(node)
@@ -698,9 +698,9 @@ Reported once at the declaration site, not at each call site.
 ELEMENT-ROOT
 ─────────────────────────────────────────────────────────────────
 `rootNode` defaults to `RootNode` when omitted; it is not declared as
-`element<RootNode>()`. Declaring `element<T>()` with `T ⊑ HTMLElement` (e.g.
-`element<HTMLElement>()`, `element<HTMLButtonElement>()`) opts into a
-native-element root. The declared
+`element<RootNode>()`. Declaring `element<T>()` with `T ⊑ HTMLElement | SVGElement`
+(e.g. `element<HTMLElement>()`, `element<HTMLButtonElement>()`,
+`element<SVGSVGElement>()`) opts into a native-element root. The declared
 root type is reflected in `ComponentInstance` as its `R` parameter, read via
 `ComponentRootOf<C>`.
 
@@ -710,7 +710,7 @@ RR(C) = the root nodes of T(C), excluding
 A top-level @let or @fragment declaration beside the root element is therefore
 not a second root.
 
-When C declares a native-element rootNode (rootNode: element<T>() where T ⊑ HTMLElement):
+When C declares a native-element rootNode (rootNode: element<T>() where T ⊑ HTMLElement | SVGElement):
   |RR(C)| = 1                                    → D041 otherwise
   RN(C) = the single member of RR(C)
   RN(C) is not a block construct (@if/@for/@switch/@defer/@boundary)  → D042

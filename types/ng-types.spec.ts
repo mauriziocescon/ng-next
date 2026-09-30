@@ -127,6 +127,8 @@ interface TestIntrinsicElements {
   div: IntrinsicElementDescriptor<HTMLDivElement>;
   input: IntrinsicElementDescriptor<HTMLInputElement>;
   button: IntrinsicElementDescriptor<HTMLButtonElement>;
+  svg: IntrinsicElementDescriptor<SVGSVGElement>;
+  circle: IntrinsicElementDescriptor<SVGCircleElement>;
 }
 
 type TestHost<K extends keyof TestIntrinsicElements> =
@@ -138,10 +140,20 @@ type _IntrinsicButtonHost = Assert<
 type _IntrinsicInputHost = Assert<
   IsEqual<TestHost<'input'>, HTMLInputElement>
 >;
+type _IntrinsicSvgHost = Assert<
+  IsEqual<TestHost<'svg'>, SVGSVGElement>
+>;
+type _IntrinsicCircleHost = Assert<
+  IsEqual<TestHost<'circle'>, SVGCircleElement>
+>;
 
 // @ts-expect-error an input intrinsic host is not a button host
 const _negIntrinsicInputIsNotButton: HTMLButtonElement =
   undefined as unknown as TestHost<'input'>;
+
+// @ts-expect-error an svg intrinsic host is not an html host
+const _negIntrinsicSvgIsNotHtml: HTMLElement =
+  undefined as unknown as TestHost<'svg'>;
 
 type _ContainerRootIsNotHtml = Assert<
   IsEqual<RootNode extends HTMLElement ? true : false, false>
@@ -149,9 +161,18 @@ type _ContainerRootIsNotHtml = Assert<
 type _HtmlIsNotContainerRoot = Assert<
   IsEqual<HTMLElement extends RootNode ? true : false, false>
 >;
+type _ContainerRootIsNotSvg = Assert<
+  IsEqual<RootNode extends SVGElement ? true : false, false>
+>;
+type _SvgIsNotContainerRoot = Assert<
+  IsEqual<SVGElement extends RootNode ? true : false, false>
+>;
 
 type _HtmlIsHostType = Assert<
   IsEqual<HTMLButtonElement extends DirectiveHostType ? true : false, true>
+>;
+type _SvgIsHostType = Assert<
+  IsEqual<SVGSVGElement extends DirectiveHostType ? true : false, true>
 >;
 type _ContainerIsHostType = Assert<
   IsEqual<RootNode extends DirectiveHostType ? true : false, true>
@@ -163,6 +184,12 @@ const _negContainerAsElement: HTMLElement =
 // @ts-expect-error nor the reverse
 const _negElementAsContainer: RootNode =
   undefined as unknown as HTMLElement;
+// @ts-expect-error a RootNode cannot stand in for an SVG element
+const _negContainerAsSvgElement: SVGElement =
+  undefined as unknown as RootNode;
+// @ts-expect-error nor the reverse
+const _negSvgElementAsContainer: RootNode =
+  undefined as unknown as SVGElement;
 
 declare const containerHost: RootNode;
 // @ts-expect-error RootNode exposes no DOM members
@@ -172,7 +199,9 @@ declare const someHost: DirectiveHostType;
 if (isRootNode(someHost)) {
   type _NarrowedToContainer = Assert<IsEqual<typeof someHost, RootNode>>;
 } else {
-  type _NarrowedToElement = Assert<IsEqual<typeof someHost, HTMLElement>>;
+  type _NarrowedToElement = Assert<
+    IsEqual<typeof someHost, HTMLElement | SVGElement>
+  >;
   const _tagName: string = someHost.tagName;
 }
 
@@ -614,6 +643,14 @@ const inputOnly = directive({
   setup: ({ label }, { host }) => {},
 });
 
+const svgOnly = directive({
+  host: ref<SVGSVGElement>(),
+  bindings: { label: input<string>() },
+  setup: ({ label }, { host }) => {
+    const _hostEl: Ref<SVGSVGElement | undefined> = host;
+  },
+});
+
 const highlight = directive({
   host: ref<HTMLElement>(),
   bindings: {
@@ -654,10 +691,10 @@ const containerOnly = directive({
 });
 
 const logDirective = directive({
-  host: ref<HTMLElement | RootNode>(),
+  host: ref<HTMLElement | SVGElement | RootNode>(),
   bindings: { tag: input<string>('') },
   setup: ({ tag }, { host }) => {
-    const _hostRef: Ref<HTMLElement | RootNode | undefined> = host;
+    const _hostRef: Ref<HTMLElement | SVGElement | RootNode | undefined> = host;
     const _tag: string = tag();
     const el = host();
     if (el !== undefined && !isRootNode(el)) {
@@ -676,6 +713,9 @@ const logDirective = directive({
 
 const divRef = ref<HTMLDivElement>();
 const _divRefType: Ref<HTMLDivElement | undefined> = divRef;
+
+const svgRef = ref<SVGSVGElement>();
+const _svgRefType: Ref<SVGSVGElement | undefined> = svgRef;
 
 const childRef = ref<typeof Child>();
 const _childRefType: Ref<{ text: Signal<string> } | undefined> = childRef;
@@ -697,6 +737,9 @@ const _manyType: Ref<{ text: Signal<string> }[]> = manyChildren;
 
 const manyDivs = refMany<HTMLDivElement>();
 const _manyDivsType: Ref<HTMLDivElement[]> = manyDivs;
+
+const manySvgs = refMany<SVGSVGElement>();
+const _manySvgsType: Ref<SVGSVGElement[]> = manySvgs;
 
 const manyNoExpose = refMany<typeof NoExpose>();
 const _manyNoExposeType: Ref<[]> = manyNoExpose;
@@ -786,6 +829,11 @@ const FlaggedNoBindings = component({
   setup: () => tmpl,
 });
 
+const SvgRootNoBindings = component({
+  rootNode: element<SVGSVGElement>(),
+  setup: () => tmpl,
+});
+
 const DefaultRootNoBindings = component({
   // @ts-expect-error RootNode is not a declarable root (only the omitted default)
   rootNode: element<RootNode>(),
@@ -804,6 +852,9 @@ const PlainNoBindings = component({
 
 type _NativeRootIsReflected = Assert<
   IsEqual<ComponentRootOf<typeof FlaggedNoBindings>, HTMLElement>
+>;
+type _SvgNativeRootIsReflected = Assert<
+  IsEqual<ComponentRootOf<typeof SvgRootNoBindings>, SVGSVGElement>
 >;
 type _NativeRootDiffersFromDefault = Assert<
   IsEqual<
@@ -834,7 +885,7 @@ const _NegRootNodeRawObject = component({
 });
 
 const _NegRootNodeOutOfDomain = component({
-  // @ts-expect-error element<string>() is not a native element (R extends HTMLElement)
+  // @ts-expect-error element<string>() is not a native element (R extends HTMLElement | SVGElement)
   rootNode: element<string>(),
   setup: () => tmpl,
 });
@@ -880,6 +931,10 @@ const InputRootComponent = component({
   rootNode: element<HTMLInputElement>(),
   setup: () => tmpl,
 });
+const SvgRootComponent = component({
+  rootNode: element<SVGSVGElement>(),
+  setup: () => tmpl,
+});
 const NoElementRootComponent = component({
   // Inert (RootNode) root is expressed by omitting rootNode, not by declaring it.
   setup: () => tmpl,
@@ -887,6 +942,7 @@ const NoElementRootComponent = component({
 
 type ButtonRootType = ComponentRootOf<typeof ButtonRootComponent>;
 type InputRootType = ComponentRootOf<typeof InputRootComponent>;
+type SvgRootType = ComponentRootOf<typeof SvgRootComponent>;
 type NoElementRootType = ComponentRootOf<typeof NoElementRootComponent>;
 
 type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
@@ -906,6 +962,18 @@ type _InputRootAcceptsInputDirective = Assert<
 >;
 type _InputRootAcceptsGenericDirective = Assert<
   IsEqual<DirectiveFitsRoot<InputRootType, typeof tooltip>, true>
+>;
+type _SvgRootAcceptsSvgDirective = Assert<
+  IsEqual<DirectiveFitsRoot<SvgRootType, typeof svgOnly>, true>
+>;
+type _SvgRootRejectsHtmlDirective = Assert<
+  IsEqual<DirectiveFitsRoot<SvgRootType, typeof tooltip>, false>
+>;
+type _ButtonRootRejectsSvgDirective = Assert<
+  IsEqual<DirectiveFitsRoot<ButtonRootType, typeof svgOnly>, false>
+>;
+type _SvgRootAcceptsLogicalDirective = Assert<
+  IsEqual<DirectiveFitsRoot<SvgRootType, typeof logDirective>, true>
 >;
 // @ts-expect-error an input-host directive cannot attach to a <button> root
 const _negButtonRootRejectsInputDirective: DirectiveFitsRoot<
