@@ -1,0 +1,65 @@
+---
+layout: ../layouts/Base.astro
+title: "Component Root & Directives — Interactive Tour"
+description: "Declare a native-element root with rootNode: element<T>() so directives applied at a component's call site attach to its root element."
+---
+
+## Component Root & Directives
+
+<p class="subtitle"><code>rootNode: element&lt;T&gt;()</code> declares a native-element root — directives applied to the component attach to that root at compile time.</p>
+
+Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element.
+
+A native-element root can instead be declared with `element<T>()`; in that case the template must have a single root node that is a native element and is not wrapped in any control flow, `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
+
+```typescript
+import { component, input, output, computed, fragment, signal, element } from '@angular/core';
+import { ripple } from '@mylib/ripple';
+import { tooltip } from '@mylib/tooltip';
+
+// -- Definition: a native-element root --
+export const Button = component({
+  rootNode: element<HTMLButtonElement>(),
+  bindings: {
+    type: input<'button' | 'submit' | 'reset'>('button'),
+    disabled: input<boolean>(false),
+    click: output<void>(),
+    children: fragment.required<void>(),
+  },
+  setup: ({ type, disabled, click, children }) => @{
+    <button
+      type={type()}
+      disabled={disabled()}
+      on:click={() => click.emit()}>
+      @render(children())
+    </button>
+  },
+});
+
+// -- Usage: directives attach to the root --
+export const Consumer = component({
+  setup: () => {
+    const tooltipMsg = signal('Hover me');
+    const valid = signal(false);
+
+    return @{
+      <Button
+        type="button"
+        use:ripple()
+        use:tooltip(message={tooltipMsg()})
+        disabled={!valid()}
+        on:click={() => {}}>
+          Click me
+      </Button>
+    };
+  },
+});
+```
+
+<div class="annotation" role="note">
+  <strong>Directives land on the root:</strong> because <code>Button</code> declares <code>rootNode: element&lt;HTMLButtonElement&gt;()</code>, its single <code>&lt;button&gt;</code> root is where call-site directives attach. <code>use:ripple()</code> and <code>use:tooltip(...)</code> are accepted because their <code>host</code> types accept <code>HTMLButtonElement</code>.
+</div>
+
+<div class="annotation" role="note">
+  <strong>No duplicate directives:</strong> the same directive cannot appear twice on the same resolved element — a call-site <code>use:tooltip(...)</code> collides with one already written on the root inside <code>Button</code>.
+</div>
