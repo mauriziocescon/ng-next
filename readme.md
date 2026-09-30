@@ -11,7 +11,7 @@ Highlights:
   - `derivation`: a factory for template-scoped computed values that requires DI,
   - `fragment`: a way to capture some markup in the form of a function,
 2. TS expressions with `{}`: bindings + text interpolation
-3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `once:`, `class:`, `style:`, `animate:`, `use:`,
+3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `class:`, `style:`, `animate:`, `use:`,
 4. Hostless components + TS lexical scoping for templates,
 5. Component inputs: lifted up + immediately available in setup and providers,
 6. Expose and Template Refs,
