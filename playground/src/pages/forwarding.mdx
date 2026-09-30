@@ -8,7 +8,7 @@ description: "Declare a native-element root with rootNode: element<T>() so direc
 
 <p class="subtitle"><code>rootNode: element&lt;T&gt;()</code> declares a native-element root — directives applied to the component attach to that root at compile time.</p>
 
-Every component has a `rootNode`: the target that directives at its call site match against. Omit `rootNode` and it defaults to `RootNode`, which leaves the template unconstrained and exposes no native element. Declare a native-element root with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`) and the template must have a single root node that is a native element, not wrapped in control flow (`@if`/`@for`/`@switch`). That declared type then decides which directives are compatible.
+Every component has a `rootNode`: the target that directives at its call site match against. Omit `rootNode` and it defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does, matching every directive that does not require a real element. Declare a native-element root with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`) and the template must have a single root node that is a native element, not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. That declared type then decides which directives are compatible.
 
 ```typescript
 import { component, input, output, computed, fragment, signal, element } from '@angular/core';

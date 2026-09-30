@@ -240,7 +240,7 @@ export const Consumer = component({
 const variantRootNodeAnnotations = [
   {
     token: 'rootNode: element<HTMLButtonElement>(),',
-    explanation: 'Declares the native-element root. The template must have a single <button> root (not wrapped in @if/@for/@switch), and directives applied to <Button /> attach to it. Declaration-only — element<T>() is a phantom brand, never passed to setup.',
+    explanation: 'Declares the native-element root. The template must have a single <button> root (not wrapped in any control flow (@if/@for/@switch), @defer block, or @boundary block), and directives applied to <Button /> attach to it. Declaration-only — element<T>() is a phantom brand, never passed to setup.',
     category: 'keyword',
   },
   {
@@ -312,10 +312,10 @@ const variants = [
   </div>
 
   <div class="annotation" role="note">
-    <strong>Host is <code>HTMLElement | RootNode</code>:</strong> a directive's <code>host</code> type is
-    the <code>DirectiveHostType</code> union — a native element (the common case, e.g. <code>host: ref&lt;HTMLElement&gt;()</code>)
-    or a component's default <code>RootNode</code>. Use <code>isRootNode(host)</code> to narrow the union;
-    it's preferred over <code>instanceof</code>, which is unreliable under SSR.
+    <strong>Host is <code>HTMLElement | SVGElement | RootNode</code>:</strong> a directive's <code>host</code> type is
+    the <code>DirectiveHostType</code> union — a native HTML element (the common case, e.g. <code>host: ref&lt;HTMLElement&gt;()</code>),
+    a native SVG element (e.g. <code>host: ref&lt;SVGSVGElement&gt;()</code>),
+    or a component's default <code>RootNode</code>.
   </div>
 
 </Base>
