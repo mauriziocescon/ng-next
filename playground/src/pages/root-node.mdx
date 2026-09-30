@@ -8,7 +8,9 @@ description: "Declare a native-element root with rootNode: element<T>() so direc
 
 <p class="subtitle"><code>rootNode: element&lt;T&gt;()</code> declares a native-element root — directives applied to the component attach to that root at compile time.</p>
 
-Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. A native-element root can instead be declared with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`, or an SVG element such as `element<SVGSVGElement>()`); in that case the template must have a single root node that is a native element and is not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
+Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element.
+
+A native-element root can instead be declared with `element<T>()`; in that case the template must have a single root node that is a native element and is not wrapped in any control flow, `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
 
 ```typescript
 import { component, input, output, computed, fragment, signal, element } from '@angular/core';
@@ -55,9 +57,9 @@ export const Consumer = component({
 ```
 
 <div class="annotation" role="note">
-  <strong>Directives land on the root:</strong> because <code>Button</code> declares <code>rootNode: element&lt;HTMLButtonElement&gt;()</code>, its single <code>&lt;button&gt;</code> root is where call-site directives attach. <code>use:ripple()</code> and <code>use:tooltip(...)</code> are accepted because their <code>host</code> types accept <code>HTMLButtonElement</code>. The same directive cannot appear twice on the same resolved element — a call-site <code>use:tooltip(...)</code> collides with one already written on the root inside <code>Button</code>.
+  <strong>Directives land on the root:</strong> because <code>Button</code> declares <code>rootNode: element&lt;HTMLButtonElement&gt;()</code>, its single <code>&lt;button&gt;</code> root is where call-site directives attach. <code>use:ripple()</code> and <code>use:tooltip(...)</code> are accepted because their <code>host</code> types accept <code>HTMLButtonElement</code>.
 </div>
 
 <div class="annotation" role="note">
-  <strong>Declaration, not a value:</strong> <code>element&lt;T&gt;()</code> is a phantom brand — nothing to call, nothing to allocate, and never passed to <code>setup</code>. It sits in a value position for the same reason <code>fragment.required&lt;void&gt;()</code> does: so <code>T</code> can be written where TypeScript will infer it, leaving <code>bindings</code>, <code>expose</code>, and the template type inferred from the same config object. <code>element&lt;RootNode&gt;()</code> is rejected; <code>RootNode</code> is not declarable.
+  The same directive cannot appear twice on the same resolved element — a call-site <code>use:tooltip(...)</code> collides with one already written on the root inside <code>Button</code>.
 </div>
