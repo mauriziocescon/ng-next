@@ -141,11 +141,12 @@ export type DerivationBindingValue = AnyBindingValue;
 //
 // ComponentInstance carries bindings + expose + template markup + the declared
 // root type R. DirectiveInstance mirrors this: it carries a host type H, which
-// is a DirectiveHostType, i.e. `HTMLElement | RootNode`.
+// is a DirectiveHostType, i.e. `HTMLElement | SVGElement | RootNode`.
 //
 // Every component has a root type R. Omit `rootNode` and R defaults to
-// RootNode; set it to element<HTMLElement>() (or a subtype) and R becomes that
-// native element type. Directive-host compatibility is ordinary TypeScript
+// RootNode; set it to element<HTMLElement>() (or a subtype, or element<SVGElement>()
+// / an SVG subtype) and R becomes that native element type. Directive-host
+// compatibility is ordinary TypeScript
 // assignability: a directive with host H fits a component when the component's
 // root R is assignable to H (equivalently, `R extends DirectiveHost`).
 //
@@ -165,7 +166,7 @@ export interface RootNode {
   readonly [ROOT_NODE]: true;
 }
 
-export type DirectiveHostType = HTMLElement | RootNode;
+export type DirectiveHostType = HTMLElement | SVGElement | RootNode;
 
 export declare function isRootNode(
   host: DirectiveHostType,
@@ -210,12 +211,13 @@ type StoredRoot<R> = [R] extends [never] ? RootNode : R;
  *
  * The real compiler/tooling owns the complete native tag registry. These
  * helper types describe the contract used by template type checking:
- * a native tag resolves to a concrete HTMLElement subtype, and that host
- * type is then used for native bindings, directive compatibility,
+ * a native tag resolves to a concrete HTMLElement or SVGElement subtype, and
+ * that host type is then used for native bindings, directive compatibility,
  * root-type resolution for components whose `rootNode` declares a native
- * element (via `element<HTMLElement>()` or a subtype), and native refs.
+ * element (via `element<HTMLElement>()` or a subtype, or `element<SVGElement>()`
+ * / an SVG subtype), and native refs.
  */
-export interface IntrinsicElementDescriptor<H extends HTMLElement> {
+export interface IntrinsicElementDescriptor<H extends HTMLElement | SVGElement> {
   readonly element: H;
 }
 
@@ -318,11 +320,12 @@ export function refMany(): any {
 //
 // `rootNode` declares the component's root node, typed via element<...>(). Its
 // value is an ElementBinding<R> where R is a native element type, e.g.
-// element<HTMLElement>() or any HTMLElement subtype.
+// element<HTMLElement>() / any HTMLElement subtype, or element<SVGElement>() /
+// any SVGElement subtype.
 // RootNode is not a declarable root: element<RootNode>() and
 // element<HTMLElement | RootNode>() are rejected. Omitting the key defaults the
-// component root to RootNode; declaring element<HTMLElement>() (or a subtype)
-// gives the component a native element root.
+// component root to RootNode; declaring element<HTMLElement>() (or a subtype, or
+// an SVG element) gives the component a native element root.
 //
 // The declaration is never visible to setup, but the declared root type R
 // is inferred and carried in ComponentInstance so consumers can read it via ComponentRootOf.
@@ -338,7 +341,7 @@ export function component<
   B extends Record<string, ComponentBindingValue>,
   E = void,
   TMarkup extends TemplateMarkup = TemplateMarkup,
-  R extends HTMLElement = never,
+  R extends HTMLElement | SVGElement = never,
 >(
   config: {
     bindings: B & ValidateComponentBindings<B>;
@@ -354,7 +357,7 @@ export function component<
 export function component<
   E = void,
   TMarkup extends TemplateMarkup = TemplateMarkup,
-  R extends HTMLElement = never,
+  R extends HTMLElement | SVGElement = never,
 >(config: {
   bindings?: never;
   rootNode?: ElementBinding<R>;

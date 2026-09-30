@@ -346,7 +346,7 @@ export const Counter = component({
 
 - `ref<typeof Type>()` reads as `Signal<expose | undefined>`
 - `refMany<typeof Type>()` reads as `Signal<expose[]>`
-- `ref<HTMLElement>()` reads as `Signal<HTMLElement | undefined>`
+- `ref<HTMLElement>()` reads as `Signal<HTMLElement | undefined>` (SVG works too, e.g. `ref<SVGSVGElement>()`)
 
 Without `expose`: `ref()` reads as `Signal<undefined>`, and `refMany()` reads as `Signal<[]>`. Refs are readable after `afterNextRender`.
 
@@ -413,7 +413,7 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. A native-element root can instead be declared with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`); in that case the template must have a single root node that is a native element and is not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
+Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. A native-element root can instead be declared with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`, or an SVG element such as `element<SVGSVGElement>()`); in that case the template must have a single root node that is a native element and is not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
 
 ### Implicit children fragment
 
@@ -675,8 +675,8 @@ export const Counter = component({
 - `pipes`: can be modeled with derivations or components (since hostless),
 - `@let`: unchanged,
 - `bindings aliasing`: the key is the public name (`alias` is ignored); local renaming via destructuring,
-- `directives` attached to the host (components): there is no host to attach to, but a component can declare a native element root via `rootNode: element<HTMLElement>()` and directives applied at its call site then attach to that root element,
-- `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags, the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
+- `directives` attached to the host (components): there is no host to attach to, but a component can declare a native element root via `rootNode: element<HTMLElement>()` (or an SVG element such as `rootNode: element<SVGSVGElement>()`) and directives applied at its call site then attach to that root element,
+- `directive` types: since `host` is declared as a typed `ref` at the directive config level, static type checking is built in. For native tags (HTML or SVG), the target element type comes from `IntrinsicElements`, so directives can only be applied to compatible elements,
 - `template reference variables`: can be modeled with `ref`,
 - `queries`: can be modeled with `ref`; `ref` should be extended to cover programmatic component creation, but must not allow arbitrary `read` of providers from the injector tree (see [`viewChild abuses`](https://stackblitz.com/edit/stackblitz-starters-wkkqtd9j)),
 - `component and directive injection`: with `ref`/`expose` in place, component and directive injection is safer by design — directive-to-directive and child-to-parent injection are established patterns worth keeping (see [`ngModel hijacking`](https://stackblitz.com/edit/stackblitz-starters-ezryrmmy) for the kind of unintended coupling that `expose` helps prevent). The trade-off is that some Angular-reserved names are necessary (`children`, `ref`);
@@ -695,6 +695,7 @@ export const Counter = component({
   ```ts
   <TextInput use:formField={signupForm.username} />
   ```
+- `CSS custom properties on native-root components`: out of scope; something like `<MyComp --my-background={color()} />` on components that declare a native element root makes sense to support for styling. It collides with the `class:`/`style:`-on-component rule and would need its own binding kind;
 - testing story: not covered here — large topic on its own. `TestBed` and `ComponentFixture` are a poor fit for this architecture. It likely requires new APIs — a `runInInjectionContext` helper for unit-testing `setup` directly, and a thin `render(Component, { bindings, providers })` harness for DOM tests closer to [`@testing-library/angular`](https://github.com/testing-library/angular-testing-library/tree/main) than to `TestBed`. Default mantra: "test behavior, not implementation" — query by role/label/text, interact as a user would, assert on visible output.
 
 ### Pros and cons
