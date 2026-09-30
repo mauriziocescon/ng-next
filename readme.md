@@ -696,6 +696,7 @@ export const Counter = component({
   <TextInput use:formField={signupForm.username} />
   ```
 - `CSS custom properties on native-root components`: out of scope; something like `<MyComp --my-background={color()} />` on components that declare a native element root makes sense to support for styling. It collides with the `class:`/`style:`-on-component rule and would need its own binding kind;
+- `rootNode as an element`: a component whose `rootNode` is a fixed native element is locked to that one tag, so a single component cannot render as either a `button` or an `a` depending on usage (although approaches like [`svelte:element`](https://svelte.dev/docs/svelte/svelte-element) show it can be achieved);
 - testing story: not covered here — large topic on its own. `TestBed` and `ComponentFixture` are a poor fit for this architecture. It likely requires new APIs — a `runInInjectionContext` helper for unit-testing `setup` directly, and a thin `render(Component, { bindings, providers })` harness for DOM tests closer to [`@testing-library/angular`](https://github.com/testing-library/angular-testing-library/tree/main) than to `TestBed`. Default mantra: "test behavior, not implementation" — query by role/label/text, interact as a user would, assert on visible output.
 
 ### Pros and cons
