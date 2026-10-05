@@ -518,7 +518,91 @@ export const Menu = component({
 });
 ```
 
-### Applying directives to a component's root element
+### Applying directives to a default root (`RootNode`)
+
+A component that omits `rootNode` has `RootNode` as its root, acting like an `ng-container`. Directives applied at its call site attach to that `RootNode`, so a directive must declare a `RootNode`-compatible host to be accepted.
+
+```ts
+import { directive, ref, input, output, inject, DestroyRef, RootNode } from '@angular/core';
+
+export const autoDismiss = directive({
+  host: ref<RootNode>(),
+  bindings: {
+    delay: input<number>(3000),
+    dismissed: output<void>(),
+  },
+  setup: ({ delay, dismissed }) => {
+    const destroyRef = inject(DestroyRef);
+
+    const handle = setTimeout(() => dismissed.emit(), delay());
+
+    destroyRef.onDestroy(() => clearTimeout(handle));
+
+    return {
+      dismissNow: () => {
+        clearTimeout(handle);
+        dismissed.emit();
+      },
+    };
+  },
+});
+```
+
+```ts
+import { component, input, output, fragment } from '@angular/core';
+
+export const Alert = component({
+  bindings: {
+    kind: input<'info' | 'warn' | 'error'>('info'),
+    dismiss: output<void>(),
+    children: fragment<void>(),
+  },
+  setup: ({ kind, dismiss, children }) => @{
+    <div class={'alert alert-' + kind()}>
+      @if (children) {
+        @render(children())
+      } @else {
+        <span>Something happened.</span>
+      }
+      <button type="button" on:click={() => dismiss.emit()}>×</button>
+    </div>
+  },
+});
+```
+
+```ts
+import { component, signal, ref } from '@angular/core';
+import { Alert } from '@mylib/alert';
+import { autoDismiss } from '@mylib/auto-dismiss';
+
+export const Consumer = component({
+  setup: () => {
+    const showAlert = signal(true);
+    const tip = ref<typeof autoDismiss>();
+
+    function onDismissed() {
+      showAlert.set(false);
+    }
+
+    return @{
+      @if (showAlert()) {
+        <Alert
+          kind="warn"
+          on:dismiss={onDismissed}
+          use:autoDismiss(delay={5000} on:dismissed={onDismissed}):ref={tip}>
+          Your session will expire soon.
+        </Alert>
+      }
+
+      <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
+    };
+  },
+});
+```
+
+Because `Alert` omits `rootNode`, its root is `RootNode`, so `use:autoDismiss` attaches to the call-site node and is accepted only because `autoDismiss` declares `host: ref<RootNode>()`. A directive declaring `host: ref<HTMLElement>()` would be rejected (D024) for a default-root component.
+
+### Applying directives to a native-element root (concrete `rootNode`)
 
 `Button` declares `rootNode: element<HTMLButtonElement>()`, so directives attach to its `<button>` root and are accepted only if their `host` accepts `HTMLButtonElement`.
 
