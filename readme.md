@@ -540,7 +540,7 @@ export const Consumer = component({
           kind="warn"
           on:dismiss={onDismissed}
           use:autoDismiss(delay={5000} on:dismissed={onDismissed}):ref={tip}>
-          Your session will expire soon.
+            Your session will expire soon.
         </Alert>
       }
 
