@@ -11,18 +11,21 @@ description: "When a component omits rootNode it defaults to RootNode; a host: r
 Omitting `rootNode` defaults it to `RootNode`, which acts as a parent node for the template much like an `ng-container` does. A directive declaring `host: ref<RootNode>()` targets that default root: it never touches a real element, so its call-site node is the `RootNode`.
 
 ```typescript
-import { component, directive, ref, input, output, fragment, inject, DestroyRef, RootNode } from '@angular/core';
+import { component, directive, ref, input, output, fragment, inject, DestroyRef, RootNode, signal } from '@angular/core';
 
 export const Consumer = component({
   setup: () => {
     const tip = ref<typeof autoDismiss>();
+    const visible = signal(true);
 
     return @{
-      <Alert
-        kind="warn"
-        use:autoDismiss(delay={5000}):ref={tip}>
-          Your session will expire soon.
-      </Alert>
+      @if (visible()) {
+        <Alert
+          kind="warn"
+          use:autoDismiss(delay={5000} on:dismissed={() => visible.set(false)}):ref={tip}>
+            Your session will expire soon.
+        </Alert>
+      }
 
       <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
     };
