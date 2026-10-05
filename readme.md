@@ -413,7 +413,9 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. A native-element root can instead be declared with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`, or an SVG element such as `element<SVGSVGElement>()`); in that case the template must have a single root node that is a native element and is not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
+Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. 
+
+A native-element root can instead be declared with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`, or an SVG element such as `element<SVGSVGElement>()`); in that case the template must have a single root node that is a native element and is not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
 
 ### Implicit children fragment
 
