@@ -1,42 +1,20 @@
 ---
 layout: ../layouts/Base.astro
-title: "Component Root & Directives — Interactive Tour"
+title: "Component Root: Native Element — Interactive Tour"
 description: "Declare a native-element root with rootNode: element<T>() so directives applied at a component's call site attach to its root element."
 ---
 
-## Component Root & Directives
+## Component Root: Native Element
 
 <p class="subtitle"><code>rootNode: element&lt;T&gt;()</code> declares a native-element root — directives applied to the component attach to that root at compile time.</p>
 
-Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element.
-
-A native-element root can instead be declared with `element<T>()`; in that case the template must have a single root node that is a native element and is not wrapped in any control flow, `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
+Declaring `rootNode: element<T>()` gives a component a single native-element root — one native root node, not wrapped in control flow, a `@defer` block, or a `@boundary` block. Call-site directives attach to that element, accepted only when their `host` type accepts it.
 
 ```typescript
 import { component, input, output, computed, fragment, signal, element } from '@angular/core';
 import { ripple } from '@mylib/ripple';
 import { tooltip } from '@mylib/tooltip';
 
-// -- Definition: a native-element root --
-export const Button = component({
-  rootNode: element<HTMLButtonElement>(),
-  bindings: {
-    type: input<'button' | 'submit' | 'reset'>('button'),
-    disabled: input<boolean>(false),
-    click: output<void>(),
-    children: fragment.required<void>(),
-  },
-  setup: ({ type, disabled, click, children }) => @{
-    <button
-      type={type()}
-      disabled={disabled()}
-      on:click={() => click.emit()}>
-      @render(children())
-    </button>
-  },
-});
-
-// -- Usage: directives attach to the root --
 export const Consumer = component({
   setup: () => {
     const tooltipMsg = signal('Hover me');
@@ -52,6 +30,24 @@ export const Consumer = component({
           Click me
       </Button>
     };
+  },
+});
+
+export const Button = component({
+  rootNode: element<HTMLButtonElement>(),
+  bindings: {
+    type: input<'button' | 'submit' | 'reset'>('button'),
+    disabled: input<boolean>(false),
+    click: output<void>(),
+    children: fragment.required<void>(),
+  },
+  setup: ({ type, disabled, click, children }) => @{
+    <button
+      type={type()}
+      disabled={disabled()}
+      on:click={() => click.emit()}>
+      @render(children())
+    </button>
   },
 });
 ```

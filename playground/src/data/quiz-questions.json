@@ -155,6 +155,13 @@
   },
   {
     "category": "Component Root",
+    "description": "A host: ref<RootNode>() directive applied to a component that omits rootNode (default RootNode).",
+    "code": "const autoDismiss = directive({\n  host: ref<RootNode>(),\n  bindings: {\n    delay: input<number>(3000),\n    dismissed: output<void>(),\n  },\n  setup: ({ delay, dismissed }) => {\n    const destroyRef = inject(DestroyRef);\n    const handle = setTimeout(() => dismissed.emit(), delay());\n    destroyRef.onDestroy(() => clearTimeout(handle));\n\n    return {\n      dismissNow: () => {\n        clearTimeout(handle);\n        dismissed.emit();\n      },\n    };\n  },\n});\n\n// Alert omits rootNode, so its root is the default RootNode\nexport const Alert = component({\n  bindings: {\n    kind: input<'info' | 'warn' | 'error'>('info'),\n    children: fragment<void>(),\n  },\n  setup: ({ kind, children }) => @{\n    <div class={'alert alert-' + kind()}>@render(children?.())</div>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Alert kind=\"warn\" use:autoDismiss(delay={5000})>\n      Your session will expire soon.\n    </Alert>\n  },\n});",
+    "valid": true,
+    "explanation": "Correct. Alert omits rootNode, so its call-site node is the default RootNode. autoDismiss declares host: ref<RootNode>() and only runs a timer with DestroyRef cleanup — it never touches a real element, so it attaches to the RootNode. A host: ref<HTMLElement>() directive would be rejected here."
+  },
+  {
+    "category": "Component Root",
     "description": "rootNode: element<HTMLButtonElement>() with a single <button> root receiving use:tooltip.",
     "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const IconButton = component({\n  rootNode: element<HTMLButtonElement>(),\n  bindings: {\n    icon: input.required<string>(),\n    click: output<void>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, click, children }) => @{\n    <button on:click={() => click.emit()}>\n      <i class={icon()} />\n      @render(children())\n    </button>\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = signal('Save changes');\n\n    return @{\n      <IconButton\n        icon={'icon-save'}\n        use:tooltip(message={tip()})\n        on:click={() => {}}>\n        Save\n      </IconButton>\n    };\n  },\n});",
     "valid": true,

@@ -1,0 +1,72 @@
+---
+layout: ../layouts/Base.astro
+title: "Component Root: Default (RootNode) — Interactive Tour"
+description: "When a component omits rootNode it defaults to RootNode; a host: ref<RootNode>() directive attaches there without touching a real element."
+---
+
+## Component Root: Default (RootNode)
+
+<p class="subtitle">When a component omits <code>rootNode</code>, its root is the default <code>RootNode</code> — a <code>host: ref&lt;RootNode&gt;()</code> directive attaches there without touching a real element.</p>
+
+Omitting `rootNode` defaults it to `RootNode`, which acts as a parent node for the template much like an `ng-container` does. A directive declaring `host: ref<RootNode>()` targets that default root: it never touches a real element, so its call-site node is the `RootNode`.
+
+```typescript
+import { component, directive, ref, input, output, fragment, inject, DestroyRef, RootNode, signal } from '@angular/core';
+
+export const Consumer = component({
+  setup: () => {
+    const tip = ref<typeof autoDismiss>();
+    const visible = signal(true);
+
+    return @{
+      @if (visible()) {
+        <Alert
+          kind="warn"
+          use:autoDismiss(delay={5000} on:dismissed={() => visible.set(false)}):ref={tip}>
+            Your session will expire soon.
+        </Alert>
+      }
+
+      <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
+    };
+  },
+});
+
+export const Alert = component({
+  bindings: {
+    kind: input<'info' | 'warn' | 'error'>('info'),
+    children: fragment<void>(),
+  },
+  setup: ({ kind, children }) => @{
+    <div class={'alert alert-' + kind()}>@render(children?.())</div>
+  },
+});
+
+export const autoDismiss = directive({
+  host: ref<RootNode>(),
+  bindings: {
+    delay: input<number>(3000),
+    dismissed: output<void>(),
+  },
+  setup: ({ delay, dismissed }) => {
+    const destroyRef = inject(DestroyRef);
+    const handle = setTimeout(() => dismissed.emit(), delay());
+    destroyRef.onDestroy(() => clearTimeout(handle));
+
+    return {
+      dismissNow: () => {
+        clearTimeout(handle);
+        dismissed.emit();
+      },
+    };
+  },
+});
+```
+
+<div class="annotation" role="note">
+  <strong>RootNode host attaches to a default root:</strong> <code>Alert</code> omits <code>rootNode</code>, so its call-site node is the default <code>RootNode</code>. <code>use:autoDismiss(...)</code> is accepted because its <code>host: ref&lt;RootNode&gt;()</code> is <code>RootNode</code>-compatible: the directive runs on a timer and never reads a real element.
+</div>
+
+<div class="annotation" role="note">
+  <strong>The host must match:</strong> because <code>RootNode</code> and <code>HTMLElement</code> are mutually non-assignable, a <code>host: ref&lt;HTMLElement&gt;()</code> directive is rejected on a default-root component, and <code>use:autoDismiss(...)</code> would be rejected on a native-element root such as <code>element&lt;HTMLButtonElement&gt;()</code>.
+</div>
