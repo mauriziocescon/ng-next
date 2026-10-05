@@ -32,6 +32,7 @@ const OUT = join(ROOT, 'node_modules', '.readme-snippets');
 const DSL = [
   'component', 'directive', 'derivation', 'fragment', 'element',
   'ref', 'refMany', 'inject', 'provide', 'injectionToken',
+  'RootNode', 'isRootNode',
 ];
 
 /** Always available, so blocks that omit their imports still compile. */

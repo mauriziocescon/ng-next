@@ -413,7 +413,9 @@ export const RefShowcase = component({
 
 Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
 
-Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. A native-element root can instead be declared with `element<HTMLElement>()` (or a subtype like `element<HTMLButtonElement>()`, or an SVG element such as `element<SVGSVGElement>()`); in that case the template must have a single root node that is a native element and is not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
+Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. 
+
+A native-element root can instead be declared with `element<HTMLElement>()` (or a subtype or an SVG element); in that case the template must have a single root node that is a native element and is not wrapped in any control flow (`@if`/`@for`/`@switch`), `@defer` block, or `@boundary` block. Compatible directives declared at the call site are then attached to it.
 
 ### Implicit children fragment
 
@@ -516,9 +518,86 @@ export const Menu = component({
 });
 ```
 
-### Applying directives to a component's root element
+### Applying directives to a default root
 
-`Button` declares `rootNode: element<HTMLButtonElement>()`, so directives attach to its `<button>` root and are accepted only if their `host` accepts `HTMLButtonElement`. Since a directive cannot apply twice to the same element, a call-site `use:tooltip(...)` collides with one written on the root inside `Button`.
+```ts
+import { component, signal, ref } from '@angular/core';
+import { Alert } from '@mylib/alert';
+import { autoDismiss } from '@mylib/auto-dismiss';
+
+export const Consumer = component({
+  setup: () => {
+    const showAlert = signal(true);
+    const tip = ref<typeof autoDismiss>();
+
+    function onDismissed() {
+      showAlert.set(false);
+    }
+
+    return @{
+      @if (showAlert()) {
+        <Alert
+          kind="warn"
+          on:dismiss={onDismissed}
+          use:autoDismiss(delay={5000} on:dismissed={onDismissed}):ref={tip}>
+            Your session will expire soon.
+        </Alert>
+      }
+
+      <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
+    };
+  },
+});
+
+// -- autoDismiss in @mylib/auto-dismiss ----------------
+import { directive, ref, input, output, inject, DestroyRef, RootNode } from '@angular/core';
+
+export const autoDismiss = directive({
+  host: ref<RootNode>(),
+  bindings: {
+    delay: input<number>(3000),
+    dismissed: output<void>(),
+  },
+  setup: ({ delay, dismissed }) => {
+    const destroyRef = inject(DestroyRef);
+
+    const handle = setTimeout(() => dismissed.emit(), delay());
+
+    destroyRef.onDestroy(() => clearTimeout(handle));
+
+    return {
+      dismissNow: () => {
+        clearTimeout(handle);
+        dismissed.emit();
+      },
+    };
+  },
+});
+
+// -- Alert in @mylib/alert -----------------------------
+import { component, input, output, fragment } from '@angular/core';
+
+export const Alert = component({
+  bindings: {
+    kind: input<'info' | 'warn' | 'error'>('info'),
+    dismiss: output<void>(),
+    children: fragment<void>(),
+  },
+  setup: ({ kind, dismiss, children }) => @{
+    <div class={'alert alert-' + kind()}>
+      @if (children) {
+        @render(children())
+      } @else {
+        <span>Something happened.</span>
+      }
+      <button type="button" on:click={() => dismiss.emit()}>×</button>
+    </div>
+  },
+});
+```
+
+
+### Applying directives to a native-element root
 
 ```ts
 import { component, signal } from '@angular/core';
