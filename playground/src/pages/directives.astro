@@ -3,8 +3,7 @@ import Base from '../layouts/Base.astro';
 import InteractiveCode from '../components/InteractiveCode.astro';
 
 // Main example code
-const originalCode = `import { directive, ref, input, output, inject, DestroyRef, afterRenderEffect } from '@angular/core';
-import { component, signal } from '@angular/core';
+const originalCode = `import { directive, ref, input, output, inject, DestroyRef, afterRenderEffect, component, signal } from '@angular/core';
 
 export const tooltip = directive({
   host: ref<HTMLElement>(),
@@ -127,8 +126,7 @@ const variantExposeAnnotations = [
   },
 ];
 
-const variantHostMismatch = `import { directive, ref, input } from '@angular/core';
-import { component } from '@angular/core';
+const variantHostMismatch = `import { directive, ref, input, component } from '@angular/core';
 
 export const inputMask = directive({
   host: ref<HTMLInputElement>(),
@@ -161,8 +159,7 @@ const variantHostMismatchAnnotations = [
   },
 ];
 
-const variantDuplicate = `import { directive, ref, input } from '@angular/core';
-import { component, signal } from '@angular/core';
+const variantDuplicate = `import { directive, ref, input, component, signal } from '@angular/core';
 
 export const tooltip = directive({
   host: ref<HTMLElement>(),
@@ -203,8 +200,7 @@ const variantDuplicateAnnotations = [
 ];
 
 // Variant 4: Directive on a component with a native-element rootNode (valid)
-const variantRootNode = `import { directive, ref, input } from '@angular/core';
-import { component, element, fragment } from '@angular/core';
+const variantRootNode = `import { directive, ref, input, component, element, fragment } from '@angular/core';
 
 export const tooltip = directive({
   host: ref<HTMLElement>(),
