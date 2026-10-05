@@ -520,9 +520,35 @@ export const Menu = component({
 
 ### Applying directives to a default root (`RootNode`)
 
-A component that omits `rootNode` has `RootNode` as its root, acting like an `ng-container`. Directives applied at its call site attach to that `RootNode`, so a directive must declare a `RootNode`-compatible host to be accepted.
-
 ```ts
+import { component, signal, ref } from '@angular/core';
+import { Alert } from '@mylib/alert';
+import { autoDismiss } from '@mylib/auto-dismiss';
+
+export const Consumer = component({
+  setup: () => {
+    const showAlert = signal(true);
+    const tip = ref<typeof autoDismiss>();
+
+    function onDismissed() {
+      showAlert.set(false);
+    }
+
+    return @{
+      @if (showAlert()) {
+      <Alert
+        kind="warn"
+      on:dismiss={onDismissed}
+      use:autoDismiss(delay={5000} on:dismissed={onDismissed}):ref={tip}>
+        Your session will expire soon.
+      </Alert>
+    }
+
+    <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
+  };
+  },
+});
+
 // -- autoDismiss in @mylib/auto-dismiss ----------------
 import { directive, ref, input, output, inject, DestroyRef, RootNode } from '@angular/core';
 
@@ -568,42 +594,10 @@ export const Alert = component({
     </div>
   },
 });
-
-// -- Consumer ------------------------------------------
-import { component, signal, ref } from '@angular/core';
-import { Alert } from '@mylib/alert';
-import { autoDismiss } from '@mylib/auto-dismiss';
-
-export const Consumer = component({
-  setup: () => {
-    const showAlert = signal(true);
-    const tip = ref<typeof autoDismiss>();
-
-    function onDismissed() {
-      showAlert.set(false);
-    }
-
-    return @{
-      @if (showAlert()) {
-        <Alert
-          kind="warn"
-          on:dismiss={onDismissed}
-          use:autoDismiss(delay={5000} on:dismissed={onDismissed}):ref={tip}>
-          Your session will expire soon.
-        </Alert>
-      }
-
-      <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
-    };
-  },
-});
 ```
 
-Because `Alert` omits `rootNode`, its root is `RootNode`, so `use:autoDismiss` attaches to the call-site node and is accepted only because `autoDismiss` declares `host: ref<RootNode>()`. A directive declaring `host: ref<HTMLElement>()` would be rejected (D024) for a default-root component.
 
 ### Applying directives to a native-element root (concrete `rootNode`)
-
-`Button` declares `rootNode: element<HTMLButtonElement>()`, so directives attach to its `<button>` root and are accepted only if their `host` accepts `HTMLButtonElement`.
 
 ```ts
 import { component, signal } from '@angular/core';
