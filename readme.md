@@ -518,7 +518,7 @@ export const Menu = component({
 });
 ```
 
-### Applying directives to a default root (`RootNode`)
+### Applying directives to a default root
 
 ```ts
 import { component, signal, ref } from '@angular/core';
@@ -536,16 +536,16 @@ export const Consumer = component({
 
     return @{
       @if (showAlert()) {
-      <Alert
-        kind="warn"
-      on:dismiss={onDismissed}
-      use:autoDismiss(delay={5000} on:dismissed={onDismissed}):ref={tip}>
-        Your session will expire soon.
-      </Alert>
-    }
+        <Alert
+          kind="warn"
+          on:dismiss={onDismissed}
+          use:autoDismiss(delay={5000} on:dismissed={onDismissed}):ref={tip}>
+          Your session will expire soon.
+        </Alert>
+      }
 
-    <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
-  };
+      <button on:click={() => tip()?.dismissNow()}>Dismiss now</button>
+    };
   },
 });
 
@@ -597,7 +597,7 @@ export const Alert = component({
 ```
 
 
-### Applying directives to a native-element root (concrete `rootNode`)
+### Applying directives to a native-element root
 
 ```ts
 import { component, signal } from '@angular/core';
