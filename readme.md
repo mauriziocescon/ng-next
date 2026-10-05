@@ -523,6 +523,7 @@ export const Menu = component({
 A component that omits `rootNode` has `RootNode` as its root, acting like an `ng-container`. Directives applied at its call site attach to that `RootNode`, so a directive must declare a `RootNode`-compatible host to be accepted.
 
 ```ts
+// -- autoDismiss in @mylib/auto-dismiss ----------------
 import { directive, ref, input, output, inject, DestroyRef, RootNode } from '@angular/core';
 
 export const autoDismiss = directive({
@@ -546,9 +547,8 @@ export const autoDismiss = directive({
     };
   },
 });
-```
 
-```ts
+// -- Alert in @mylib/alert -----------------------------
 import { component, input, output, fragment } from '@angular/core';
 
 export const Alert = component({
@@ -568,9 +568,8 @@ export const Alert = component({
     </div>
   },
 });
-```
 
-```ts
+// -- Consumer ------------------------------------------
 import { component, signal, ref } from '@angular/core';
 import { Alert } from '@mylib/alert';
 import { autoDismiss } from '@mylib/auto-dismiss';
