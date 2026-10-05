@@ -518,7 +518,7 @@ export const Menu = component({
 
 ### Applying directives to a component's root element
 
-`Button` declares `rootNode: element<HTMLButtonElement>()`, so directives attach to its `<button>` root and are accepted only if their `host` accepts `HTMLButtonElement`. Since a directive cannot apply twice to the same element, a call-site `use:tooltip(...)` collides with one written on the root inside `Button`.
+`Button` declares `rootNode: element<HTMLButtonElement>()`, so directives attach to its `<button>` root and are accepted only if their `host` accepts `HTMLButtonElement`.
 
 ```ts
 import { component, signal } from '@angular/core';
