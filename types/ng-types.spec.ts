@@ -872,6 +872,24 @@ type _FlaggedShape = Assert<
   >
 >;
 
+type RootDeclarationAccepts<
+  C extends ComponentInstance<any, any, any, any>,
+  Tag extends keyof TestIntrinsicElements,
+> = [TestHost<Tag>] extends [ComponentRootOf<C>] ? true : false;
+
+type _BroadRootAcceptsActualButton = Assert<
+  IsEqual<RootDeclarationAccepts<typeof FlaggedNoBindings, 'button'>, true>
+>;
+type _ButtonRootRejectsActualInput = Assert<
+  IsEqual<RootDeclarationAccepts<typeof ButtonWithBindings, 'input'>, false>
+>;
+type _HtmlRootRejectsActualSvg = Assert<
+  IsEqual<RootDeclarationAccepts<typeof FlaggedNoBindings, 'svg'>, false>
+>;
+type _SvgRootAcceptsActualSvg = Assert<
+  IsEqual<RootDeclarationAccepts<typeof SvgRootNoBindings, 'svg'>, true>
+>;
+
 const _NegRootNodeRawBoolean = component({
   // @ts-expect-error rootNode accepts only an element<...>() declaration
   rootNode: true,
@@ -950,6 +968,21 @@ type DirectiveHost<D extends DirectiveInstance<any, any, any>> =
 
 type DirectiveFitsRoot<RootType, D extends DirectiveInstance<any, any, any>> =
   RootType extends DirectiveHost<D> ? true : false;
+
+// A broad public contract stays broad even when an actual button is valid.
+// Native directives inside the template use TestHost<'button'> instead.
+type _BroadRootAcceptsGenericDirective = Assert<
+  IsEqual<
+    DirectiveFitsRoot<ComponentRootOf<typeof FlaggedNoBindings>, typeof tooltip>,
+    true
+  >
+>;
+type _BroadRootRejectsButtonOnlyDirective = Assert<
+  IsEqual<
+    DirectiveFitsRoot<ComponentRootOf<typeof FlaggedNoBindings>, typeof buttonOnly>,
+    false
+  >
+>;
 
 type _ButtonRootAcceptsButtonDirective = Assert<
   IsEqual<DirectiveFitsRoot<ButtonRootType, typeof buttonOnly>, true>

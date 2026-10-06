@@ -149,11 +149,13 @@ export type DerivationBindingValue = AnyBindingValue;
 // compatibility is ordinary TypeScript
 // assignability: a directive with host H fits a component when the component's
 // root R is assignable to H (equivalently, `R extends DirectiveHost`).
+// The template compiler checks the actual native root against R at declaration
+// time. Call-site compatibility uses R, even when the actual root is narrower.
 //
 // ExposeOf<T> works for components and directives thanks to structural match
 // on EXPOSE. ComponentTemplateOf<T> exposes the template markup metadata and
 // ComponentRootOf<C> exposes the declared root type that component(...)
-// inferred from setup's return value / rootNode.
+// inferred from rootNode (or defaulted to RootNode when omitted).
 //
 // InputsOnly<B> filters a bindings record to InputSignal keys
 // only (excluding ModelSignal, which extends InputSignal in
@@ -326,6 +328,9 @@ export function refMany(): any {
 // element<HTMLElement | RootNode>() are rejected. Omitting the key defaults the
 // component root to RootNode; declaring element<HTMLElement>() (or a subtype, or
 // an SVG element) gives the component a native element root.
+// The template compiler requires the actual root element type to be assignable
+// to the declared R. This is a template judgment, not a check performed
+// by these TypeScript overloads, because TemplateAST is opaque here.
 //
 // The declaration is never visible to setup, but the declared root type R
 // is inferred and carried in ComponentInstance so consumers can read it via ComponentRootOf.

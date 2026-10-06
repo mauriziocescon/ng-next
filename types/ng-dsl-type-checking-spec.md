@@ -46,7 +46,9 @@ conformance; **may** describes implementation freedom.
 | `I(tag)` | Intrinsic element host type (e.g. `I("button") = HTMLButtonElement`) |
 | `RR(C)` | Renderable root nodes of C's template (excludes `@let`/`@derive`/`@fragment` and whitespace-only text) (§5.1) |
 | `RN(C)` | The sole renderable root of C when C declares a native-element `rootNode`; undefined otherwise (§5.1) |
-| `Root(C)` | Root type a directive attaches to at `<C .../>`: `I(tag(RN(C)))` for a native-element root, else `RootNode` (§6) |
+| `DeclaredRoot(C)` | Public root contract carried as R in `ComponentInstance`; the declared `element<T>()` type, or `RootNode` when omitted |
+| `ActualRoot(C)` | Native element type `I(tag(RN(C)))`, resolved at declaration time; undefined for a default `RootNode` root (§5.1) |
+| `Root(C)` | Root type used for directive compatibility at `<C .../>`: `DeclaredRoot(C)` (§6) |
 | `⊑` | Assignability (subtype) |
 | `≡` | Exact type equality |
 
@@ -715,19 +717,24 @@ When C declares a native-element rootNode (rootNode: element<T>() where T ⊑ HT
   RN(C) = the single member of RR(C)
   RN(C) is not a block construct (@if/@for/@switch/@defer/@boundary)  → D042
   RN(C) is a native element                                          → D043
-  Root(C) = I(tag(RN(C)))
+  ActualRoot(C) = I(tag(RN(C)))
+  DeclaredRoot(C) = T
+  ActualRoot(C) ⊑ DeclaredRoot(C)                                     → D044 otherwise
+  Root(C) = DeclaredRoot(C)
 
   A block construct is any control-flow block (@if/@for/@switch), a @defer
   block (or its companion @placeholder/@loading/@error blocks), or a @boundary
   block. RN(C) must be a statically/unconditionally present node, not nested in
   any of these.
 
-  Diagnostic precedence: D041 is checked first, then D042, then D043. D042 is
+  Diagnostic precedence: D041 is checked first, then D042, then D043, then D044.
+  D044 is checked only after a valid native root has been established. D042 is
   the specific case of D043 that has a better message, so a block-wrapped root
   reports D042 and never D043.
 
 Otherwise C has the default rootNode:
-  RN(C) is undefined     Root(C) = RootNode     no root diagnostic applies
+  RN(C) and ActualRoot(C) are undefined
+  DeclaredRoot(C) = Root(C) = RootNode     no root diagnostic applies
 
 Root(C) is what a directive applied at a `<C .../>` call site attaches to; see
 §6 for resolution and §7 for the RootNode-root (inert) mechanism.
@@ -751,9 +758,10 @@ Native element N:
 
 Component C declaring a native-element rootNode:
   RN(C) = the single renderable root node of T(C)
-                (§5.1 ELEMENT-ROOT; D041/D042/D043)
+                (§5.1 ELEMENT-ROOT; D041/D042/D043/D044)
   RN(C) is a native element by rule, so resolution terminates here.
-  Root(C) = I(tag(RN(C)))    host set = {RN(C)}
+  ActualRoot(C) ⊑ DeclaredRoot(C) was checked at declaration time.
+  Root(C) = DeclaredRoot(C)    host set = {RN(C)}
 
 Component C with the default rootNode:
   Root(C) = RootNode               host set = {the <C .../> call-site node}
@@ -764,7 +772,9 @@ CHECK-DIRECTIVE-USE (§7).
 ─────────────────────────────────────────────────────────────────
 ```
 
-RN(C) and Root(C) follow §5.1 ELEMENT-ROOT (D041/D042/D043).
+RN(C) and Root(C) follow §5.1 ELEMENT-ROOT (D041/D042/D043/D044).
+The host set identifies the attachment target; it does not narrow the public
+root type used for call-site directive compatibility.
 
 ---
 
@@ -1129,6 +1139,7 @@ BindingKind<V> =
 | D041 | Root node | a native-element `rootNode` is declared but the template does not have exactly one renderable root node | Error |
 | D042 | Root node | a native-element `rootNode` is declared but the root node is a block construct: a control-flow block (`@if`/`@for`/`@switch`), a `@defer` block, or a `@boundary` block | Error |
 | D043 | Root node | a native-element `rootNode` is declared but the root node is not a native element | Error |
+| D044 | Root node | The actual native root element type is not assignable to the declared `rootNode` type | Error |
 
 ### 13.1 Diagnostic Examples
 
@@ -1377,6 +1388,22 @@ const CompRoot = component({
   rootNode: element<HTMLElement>(),
   setup: () => @{ <Inner /> },               // ❌ D043
 });
+
+// D044 — a native root whose type violates the declared root contract
+const WrongRootType = component({
+  rootNode: element<HTMLButtonElement>(),
+  setup: () => @{ <input /> },              // ❌ D044: HTMLInputElement ⊄ HTMLButtonElement
+});
+
+// OK — the actual root may be more specific than the declared contract
+const BroadRoot = component({
+  rootNode: element<HTMLElement>(),
+  setup: () => @{ <button>X</button> },      // ✅ HTMLButtonElement ⊑ HTMLElement
+});
+<BroadRoot use:tooltip(message={'x'}) />     // ✅ tooltip accepts HTMLElement
+// buttonOnly declares host: ref<HTMLButtonElement>(); call-site checks use
+// the public HTMLElement contract, even though the private root is a button.
+<BroadRoot use:buttonOnly() />              // ❌ D024: HTMLElement ⊄ HTMLButtonElement
 
 // OK — the same template with the default rootNode. Root = RootNode, and the
 // directives applied to <NoFlag /> never reach Inner (attachment is not
