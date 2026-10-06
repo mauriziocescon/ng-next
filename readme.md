@@ -411,7 +411,7 @@ export const RefShowcase = component({
 
 ## Composition with Fragments and Directives
 
-Fragments are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children). 
+Fragment sources are similar to [Svelte snippets](https://svelte.dev/docs/svelte/snippet): branded functions that return HTML markup. The returned markup is opaque — it cannot be manipulated like [React Children (legacy)](https://react.dev/reference/react/Children) or [Solid children](https://www.solidjs.com/tutorial/props_children).
 
 Every component has a `rootNode`: the target that directives from the call site are attached to. When it is omitted from the component definition, `rootNode` defaults to `RootNode`, which acts as a parent node for the template, much like an `ng-container` does; it matches every directive that does not require a real element. 
 
@@ -443,16 +443,16 @@ import { component, fragment } from '@angular/core';
 
 export const Menu = component({
   bindings: {
-    // Provided by Angular from nested content (not bindable directly). Reserved name.
+    // Delivered from nested content, inline @fragment, or children={source}. Reserved name.
     children: fragment<void>(),
   },
   setup: ({ children }) => {
     /** ... **/
 
-    // No ng-container needed; full form: @render(fragment(), { injector })
+    // No ng-container needed; full form: @render(content(), { injector })
     return @{
-      @if (children) {
-        @render(children())
+      @if (children(); as content) {
+        @render(content())
       } @else {
         <span>Empty</span>
       }
@@ -465,7 +465,7 @@ export const MenuItem = component({
     children: fragment.required<void>(),
   },
   setup: ({ children }) => @{
-    @render(children())
+    @render(children()())
   },
 });
 ```
@@ -486,7 +486,7 @@ export const Consumer = component({
   setup: () => {
     const items = signal<Item[]>(/** ... **/);
 
-    // Inline @fragment is auto-passed as the matching fragment input
+    // Inline @fragment is delivered to the matching fragment binding
     return @{
       <Menu items={items()}>
         @fragment menuItem(item: Item) {
@@ -512,7 +512,7 @@ export const Menu = component({
     <h1> Total items: {items().length} </h1>
 
     @for (item of items(); track item.id) {
-      @render(menuItem(item))
+      @render(menuItem()(item))
     }
   },
 });
@@ -585,8 +585,8 @@ export const Alert = component({
   },
   setup: ({ kind, dismiss, children }) => @{
     <div class={'alert alert-' + kind()}>
-      @if (children) {
-        @render(children())
+      @if (children(); as content) {
+        @render(content())
       } @else {
         <span>Something happened.</span>
       }
@@ -651,7 +651,7 @@ export const Button = component({
         style={innerStyle()}
         disabled={disabled()}
         on:click={() => click.emit()}>
-        @render(children())
+        @render(children()())
       </button>
     };
   },

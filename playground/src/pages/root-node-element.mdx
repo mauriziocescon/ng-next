@@ -46,7 +46,7 @@ export const Button = component({
       type={type()}
       disabled={disabled()}
       on:click={() => click.emit()}>
-      @render(children())
+      @render(children()())
     </button>
   },
 });

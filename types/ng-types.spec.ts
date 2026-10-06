@@ -26,6 +26,7 @@ import {
   type IntrinsicElementHost,
   type DiToken,
   type DiMultiToken,
+  type Fragment,
   type OptionalFragmentBinding,
   type Ref,
   type RequiredFragmentBinding,
@@ -113,6 +114,27 @@ type OptIsReq =
     ? 'LEAK'
     : 'OK';
 const _optIsReq: OptIsReq = 'OK';
+
+declare const voidFragmentSource: Fragment<void>;
+declare const rowFragmentSource: Fragment<[Item]>;
+declare const optionalFragmentDeclaration: OptionalFragmentBinding<void>;
+declare const requiredFragmentDeclaration: RequiredFragmentBinding<void>;
+
+// Sources, declaration descriptors, and receiver signals have different roles.
+// @ts-expect-error an ordinary function lacks the source brand
+const _unbrandedFragment: Fragment<void> = () => tmpl;
+// @ts-expect-error a declaration descriptor is not a callable source
+optionalFragmentDeclaration();
+// @ts-expect-error required declarations are not callable sources either
+requiredFragmentDeclaration();
+// @ts-expect-error source values cannot replace binding declaration metadata
+const _sourceAsBinding: ComponentBindingValue = voidFragmentSource;
+// @ts-expect-error ordinary signals cannot replace binding declarations
+const _signalAsBinding: ComponentBindingValue = signal(voidFragmentSource);
+
+declare const acceptsStringsOrNumbers: Fragment<[string | number]>;
+// Callable source compatibility is contravariant in its arguments.
+const _acceptsStringSource: Fragment<[string]> = acceptsStringsOrNumbers;
 
 // ────────────────────────────────────────────────────────────────
 // 3. INTRINSIC ELEMENT HOST CONTRACT
@@ -254,7 +276,7 @@ type _SpecificFullComponentTemplateAst = Assert<
 // 5. COMPONENT — bindings (input, model, output, fragment)
 //
 // Setup receives raw Angular types: InputSignal, ModelSignal,
-// OutputEmitterRef, FragmentBinding.
+// OutputEmitterRef, and read-only signals containing fragment sources.
 // ────────────────────────────────────────────────────────────────
 
 type UserDetailBindings = {
@@ -274,8 +296,11 @@ const UserDetail = component({
   setup: ({ user, email, makeAdmin, children }) => {
     const _u: User = user();
     const _e: string = email();
-    const _children: OptionalFragmentBinding<void> | undefined = children;
-    const _rendered: TemplateMarkup | undefined = children?.();
+    const _children: Signal<Fragment<void> | undefined> = children;
+    type _OptionalFragmentSignal = Assert<
+      IsEqual<typeof children, Signal<Fragment<void> | undefined>>
+    >;
+    const _rendered: TemplateMarkup | undefined = children()?.();
     email.set('new');
     makeAdmin.emit();
     return tmpl;
@@ -296,10 +321,53 @@ const RequiredChildren = component({
     children: fragment.required<void>(),
   },
   setup: ({ children }) => {
-    const _c: RequiredFragmentBinding<void> = children;
-    const _rendered: TemplateMarkup = children();
-    // @ts-expect-error required fragment is not assignable to optional fragment shape
-    const _mustBeOptional: OptionalFragmentBinding<void> | undefined = children;
+    const _c: Signal<Fragment<void>> = children;
+    type _RequiredFragmentSignal = Assert<
+      IsEqual<typeof children, Signal<Fragment<void>>>
+    >;
+    const _rendered: TemplateMarkup = children()();
+    // Read-only required source signals safely fit optional source signals.
+    const _optional: Signal<Fragment<void> | undefined> = children;
+    return tmpl;
+  },
+});
+
+const FragmentSignalContracts = component({
+  bindings: {
+    optional: fragment<void>(),
+    required: fragment.required<void>(),
+  },
+  setup: ({ optional, required }) => {
+    const optionalSource: Fragment<void> | undefined = optional();
+    const requiredSource: Fragment<void> = required();
+    const optionalMarkup: TemplateMarkup | undefined = optional()?.();
+    const requiredMarkup: TemplateMarkup = required()();
+    // @ts-expect-error optional source may be absent
+    const _optionalAsRequiredSource: Fragment<void> = optional();
+    // @ts-expect-error optional rendering may produce undefined
+    const _optionalAsRequiredMarkup: TemplateMarkup = optional()?.();
+    // @ts-expect-error optional receiver signals cannot satisfy required ones
+    const _optionalAsRequiredSignal: Signal<Fragment<void>> = optional;
+    // @ts-expect-error forwarding requires reading the source signal
+    const _signalAsSource: Fragment<void> = required;
+    // @ts-expect-error fragment arguments belong to the inner source call
+    required('payload');
+    // @ts-expect-error setup receives a read-only signal
+    optional.set(voidFragmentSource);
+    // @ts-expect-error setup receives a read-only signal
+    optional.update(() => voidFragmentSource);
+    // @ts-expect-error required fragment signals are also read-only
+    required.set(voidFragmentSource);
+    // @ts-expect-error required fragment signals are also read-only
+    required.update(() => voidFragmentSource);
+    // A captured read can be narrowed with ordinary TypeScript control flow.
+    if (optionalSource) {
+      const narrowedMarkup: TemplateMarkup = optionalSource();
+    }
+    if (optional()) {
+      // @ts-expect-error one signal read does not narrow a subsequent call
+      optional()();
+    }
     return tmpl;
   },
 });
@@ -325,9 +393,9 @@ const RenderItem = component({
     itemTpl: fragment.required<[Item]>(),
   },
   setup: ({ itemTpl }) => {
-    const _ok = itemTpl({ id: '1', desc: 'A' });
+    const _ok = itemTpl()({ id: '1', desc: 'A' });
     // @ts-expect-error missing required argument
-    itemTpl();
+    itemTpl()();
     return tmpl;
   },
 });
@@ -337,11 +405,12 @@ const RenderVoidFragment = component({
     emptyTpl: fragment<void>(),
   },
   setup: ({ emptyTpl }) => {
-    const _args: Assert<IsEqual<Parameters<NonNullable<typeof emptyTpl>>, []>> =
-      true;
-    const _ok = emptyTpl?.();
+    const _args: Assert<
+      IsEqual<Parameters<NonNullable<ReturnType<typeof emptyTpl>>>, []>
+    > = true;
+    const _ok = emptyTpl()?.();
     // @ts-expect-error void fragment does not accept payload arguments
-    emptyTpl?.({ id: '1', desc: 'A' });
+    emptyTpl()?.({ id: '1', desc: 'A' });
     return tmpl;
   },
 });
@@ -354,24 +423,25 @@ const RenderTupleFragment = component({
   },
   setup: ({ itemTpl, indexedItemTpl, readonlyItemTpl }) => {
     const item: Item = { id: '1', desc: 'A' };
-    const _singleArgs: Assert<IsEqual<Parameters<typeof itemTpl>, [Item]>> =
-      true;
+    const _singleArgs: Assert<
+      IsEqual<Parameters<ReturnType<typeof itemTpl>>, [Item]>
+    > = true;
     const _multiArgs: Assert<
-      IsEqual<Parameters<typeof indexedItemTpl>, [Item, number]>
+      IsEqual<Parameters<ReturnType<typeof indexedItemTpl>>, [Item, number]>
     > = true;
     const _readonlyTupleArgs: Assert<
-      IsEqual<Parameters<typeof readonlyItemTpl>, [Item]>
+      IsEqual<Parameters<ReturnType<typeof readonlyItemTpl>>, [Item]>
     > = true;
 
-    itemTpl(item);
-    indexedItemTpl(item, 0);
-    readonlyItemTpl(item);
+    itemTpl()(item);
+    indexedItemTpl()(item, 0);
+    readonlyItemTpl()(item);
     // @ts-expect-error tuple fragment requires the declared argument
-    itemTpl();
+    itemTpl()();
     // @ts-expect-error tuple fragment does not accept extra arguments
-    itemTpl(item, 0);
+    itemTpl()(item, 0);
     // @ts-expect-error tuple fragment enforces argument order
-    indexedItemTpl(0, item);
+    indexedItemTpl()(0, item);
     return tmpl;
   },
 });
@@ -385,22 +455,23 @@ const RenderArrayPayloadFragment = component({
     const item: Item = { id: '1', desc: 'A' };
     const rows: Item[] = [item];
     const readonlyRows: readonly Item[] = rows;
-    const _arrayArgs: Assert<IsEqual<Parameters<typeof rowsTpl>, [Item[]]>> =
-      true;
+    const _arrayArgs: Assert<
+      IsEqual<Parameters<ReturnType<typeof rowsTpl>>, [Item[]]>
+    > = true;
     const _readonlyArrayArgs: Assert<
-      IsEqual<Parameters<typeof readonlyRowsTpl>, [readonly Item[]]>
+      IsEqual<Parameters<ReturnType<typeof readonlyRowsTpl>>, [readonly Item[]]>
     > = true;
 
-    rowsTpl(rows);
-    readonlyRowsTpl(readonlyRows);
+    rowsTpl()(rows);
+    readonlyRowsTpl()(readonlyRows);
     // @ts-expect-error open array fragment requires the whole array payload
-    rowsTpl(item);
+    rowsTpl()(item);
     // @ts-expect-error open array fragment is not variadic
-    rowsTpl(item, item);
+    rowsTpl()(item, item);
     // @ts-expect-error open array fragment still requires its payload
-    rowsTpl();
+    rowsTpl()();
     // @ts-expect-error readonly array payload still expects an array, not an item
-    readonlyRowsTpl(item);
+    readonlyRowsTpl()(item);
     return tmpl;
   },
 });
@@ -437,13 +508,13 @@ const DataTable = component({
     const _sel: Row | null | undefined = selected();
     sort.emit({ key: 'id' });
 
-    const _frag: OptionalFragmentBinding<[Row]> | undefined = rowTemplate;
+    const _frag: Signal<Fragment<[Row]> | undefined> = rowTemplate;
     const _args: Assert<
-      IsEqual<Parameters<NonNullable<typeof rowTemplate>>, [Row]>
+      IsEqual<Parameters<NonNullable<ReturnType<typeof rowTemplate>>>, [Row]>
     > = true;
-    const _rendered: TemplateMarkup | undefined = rowTemplate?.(rows()[0]);
+    const _rendered: TemplateMarkup | undefined = rowTemplate()?.(rows()[0]);
     // @ts-expect-error optional parameterized fragment still requires its argument
-    rowTemplate?.();
+    rowTemplate()?.();
     return tmpl;
   },
 });
@@ -677,9 +748,32 @@ const directiveWithFragment = directive({
     content: fragment.required<void>(),
   },
   setup: ({ content }, { host }) => {
-    const _content: RequiredFragmentBinding<void> = content;
-    const _rendered = content();
+    const _content: Signal<Fragment<void>> = content;
+    type _DirectiveRequiredFragmentSignal = Assert<
+      IsEqual<typeof content, Signal<Fragment<void>>>
+    >;
+    const _rendered: TemplateMarkup = content()();
     const _host: Ref<HTMLElement | undefined> = host;
+  },
+});
+
+const directiveWithOptionalFragment = directive({
+  host: ref<HTMLElement>(),
+  bindings: {
+    content: fragment<[Item]>(),
+  },
+  setup: ({ content }) => {
+    type _DirectiveOptionalFragmentSignal = Assert<
+      IsEqual<typeof content, Signal<Fragment<[Item]> | undefined>>
+    >;
+    const _source: Fragment<[Item]> | undefined = content();
+    const _rendered: TemplateMarkup | undefined = content()?.({
+      id: '1', desc: 'A',
+    });
+    // @ts-expect-error the source requires its Item argument
+    content()?.();
+    // @ts-expect-error directive setup receives read-only fragment signals too
+    content.set(rowFragmentSource);
   },
 });
 
@@ -787,7 +881,7 @@ const ButtonWithBindings = component({
     const _c: string = className();
     const _s: string = style();
     const _d: boolean = disabled();
-    const _rendered: TemplateMarkup = children();
+    const _rendered: TemplateMarkup = children()();
     click.emit();
     return specificTmpl;
   },
