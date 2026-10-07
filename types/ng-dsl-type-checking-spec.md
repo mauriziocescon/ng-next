@@ -1072,17 +1072,17 @@ Optional: if options.injector present:
 Γ ⊢ @render(expr, { injector? }) ✓
 ```
 
-When `expr` is `undefined`, nothing is rendered (no-op).
-This supports `@render(optionalFragment()?.())` for an optional receiver signal.
+An `undefined` expression clears the outlet. Optional fragments use
+`@render(optionalFragment()?.())`.
 
 D026 is a template-side code only. It is the invocation half of the fragment
 contract; §3.4 is the declaration half (an inline `@fragment`'s parameter list),
 both comparing a positional list to the same `FragmentArgs<T>`.
 
 **Injector resolution.** `@render` is an inline outlet: providers inside the rendered
-fragment resolve against the **render site's** injector, not the definition site's.
+fragment resolve against the **definition site's** injector, not the render site's.
 When `options.injector` is provided it overrides this default; when omitted the
-enclosing component's injector at the `@render` call site is used.
+definition component's injector at the `@render` call site is used.
 
 ---
 

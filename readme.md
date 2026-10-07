@@ -447,7 +447,7 @@ export const Menu = component({
   setup: ({ children }) => {
     /** ... **/
 
-    // No ng-container needed; full form: @render(content(), { injector })
+    // No ng-container needed; full form: @render(content(), { injector? })
     return @{
       @if (children(); as content) {
         @render(content())
