@@ -1079,10 +1079,13 @@ D026 is a template-side code only. It is the invocation half of the fragment
 contract; §3.4 is the declaration half (an inline `@fragment`'s parameter list),
 both comparing a positional list to the same `FragmentArgs<T>`.
 
-**Injector resolution.** `@render` is an inline outlet: providers inside the rendered
-fragment resolve against the **definition site's** injector, not the render site's.
-When `options.injector` is provided it overrides this default; when omitted the
-definition component's injector at the `@render` call site is used.
+**Injector resolution.** Fragment views retain declaration-site DI ancestry,
+including native-node providers, wherever rendered. A non-null `options.injector`
+supplies an embedded-view injector: fragment-local nodes, the override, and
+declaration ancestry participate under Angular's lookup rules and injection flags.
+Unresolved tokens may fall back through declaration ancestry. Omitted, `undefined`,
+and `null` mean no override. Rendering inside another component does not
+automatically select its providers.
 
 ---
 
