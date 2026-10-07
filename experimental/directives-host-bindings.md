@@ -1,359 +1,304 @@
 # Directive Host Bindings
 
-A declarative, framework-owned way for a `directive` to project bindings onto its
-host element — classes, styles, attributes, properties, and listeners — driven
-from the `host` handle it already has.
+A directive declares classes, styles, attributes, properties, and listeners in
+one binding object. Angular owns evaluation, rendering, ordering, and cleanup.
 
-> Status: proposal only. Nothing here is implemented in `types/ng-types.ts` or
-> specified in `ng-dsl-type-checking-spec.md`. It extends the existing
-> `directive({ host, bindings, setup })` surface (`ng-types.ts` §8) and reuses
-> the native-element binding judgments (`ng-dsl-type-checking-spec.md` §4.1,
-> §4, CHECK-NATIVE-\*).
+> Status: proposal. This extends `directive({ host, bindings, setup })` in
+> `types/ng-types.ts` §8; it is not implemented. The native binding rules in
+> `types/ng-dsl-type-checking-spec.md` §4 provide the starting point.
+> `MUST` and `MUST NOT` below identify required behavior.
 
-## Conventions
+## 1. Surface
 
-Normative keywords follow RFC-style meaning:
+Keep `host: ref<H>()` as the host-type declaration. In setup, the same handle
+provides two operations:
 
-- `MUST` / `MUST NOT`: mandatory behavior.
-- `SHOULD` / `SHOULD NOT`: recommended behavior with possible justified exceptions.
-- `MAY`: optional behavior.
-
-## Summary
-
-1. A directive projects host bindings by handing a list of **binding descriptors**
-   to its `host` handle: `host.apply([...])`.
-2. Descriptors are produced by pure factories — `classBinding`, `styleBinding`,
-   `attrBinding`, `propBinding`, `listener` — mirroring Angular's programmatic
-   `inputBinding()` / `outputBinding()` / `twoWayBinding()` creation API.
-3. The framework owns diffing, cross-directive merge, render timing, and SSR —
-   the directive never calls `Renderer2` for these.
-4. The host element type `H` from `host: ref<H>()` types the descriptors.
-   `Renderer2` + `afterRenderEffect` remains the escape hatch for genuinely
-   imperative DOM work.
-
----
-
-## 1. Motivation
-
-A decorator directive binds to its host declaratively:
+- `host()` reads `H | undefined`, for imperative DOM work.
+- `host.register({...})` declares the directive's host bindings once.
 
 ```ts
-@Directive({
-  selector: '[highlight]',
-  host: { '[class]': 'appliedClass()' },
-})
-export class Highlight {
-  readonly highlightClass = input.required<string>();
-  readonly highlighted = input(true);
-  protected readonly appliedClass = computed(() =>
-    this.highlighted() ? this.highlightClass() : '',
-  );
-}
-```
-
-Angular diffs `[class]` and applies it, merges it with other directives' host
-bindings on the same element, runs it in the render pass, and serializes it for
-SSR.
-
-The current ng-next `directive` (`ng-types.ts` §8) gives `setup` only a
-`Ref<H | undefined>` to the host. The sole way to touch the host is imperatively:
-
-```ts
-setup: ({ highlightClass, highlighted }, { host }) => {
-  const renderer = inject(Renderer2);
-  afterRenderEffect(() => {
-    const el = host();
-    if (!el) return;
-    if (highlighted()) renderer.addClass(el, highlightClass());
-    else renderer.removeClass(el, highlightClass());
-  });
-},
-```
-
-This re-implements, by hand, what a host binding does for free — and does it
-worse. The `addClass` / `removeClass` branch never removes the *old* class when
-`highlightClass()` changes value (`'a'` → `'b'` leaves `a` applied). It runs in
-`afterRenderEffect`, one step after the render pass, so there can be a frame
-without the class. Two directives each writing `class` on the same host have no
-defined merge order. And it does not run during SSR.
-
-The gap is not expressiveness — it is that imperative writes forfeit the
-framework's diffing, merge, timing, and SSR guarantees.
-
----
-
-## 2. Design: actionable from `host`
-
-`host` stays exactly one concept. In `ng-types.ts` §8 it is declared as
-`host: ref<H>()` and `setup` receives it as `{ host: Ref<H | undefined> }`.
-This proposal keeps that single declaration and single handle, and adds a
-*method* on it:
-
-- `host.apply(bindings)` — declarative projection, framework-owned.
-- `host()` — the existing read, returning `H | undefined` for imperative use.
-
-There is no second `host` key and no second return channel. Everything hangs off
-the one handle, so the earlier `host (ref)` versus `host (host-bindings)` naming
-collision does not arise.
-
-`host: ref<H>()` is **not** optional and is not inferred away. It remains the
-single source of the host element type `H`, which already gates `use:` placement
-(HOST-COMPAT, spec §7, D024) and now additionally types every descriptor passed
-to `host.apply(...)`.
-
-### 2.1 The `highlight` directive, restated
-
-```ts
-import { directive, ref, input, classBinding, computed } from '@angular/core';
+import { directive, ref, input } from '@angular/core';
 
 export const highlight = directive({
   host: ref<HTMLElement>(),
   bindings: {
     highlightClass: input.required<string>(),
-    highlighted: input<boolean>(true),
+    highlighted: input(true),
   },
   setup: ({ highlightClass, highlighted }, { host }) => {
-    const appliedClass = computed(() => highlighted() ? highlightClass() : '');
-    host.apply([
-      classBinding(appliedClass),
-    ]);
+    host.register({
+      class: () => highlighted() ? highlightClass() : '',
+    });
   },
 });
 ```
 
-No `Renderer2`, no `afterRenderEffect`, no manual add/remove. Changing
-`highlightClass()` from `'a'` to `'b'` removes `a` and adds `b` because the
-framework diffs the descriptor, exactly as a template `class:` binding does
-(spec §4.1 CLASS-BINDING).
+Changing `highlightClass()` from `'a'` to `'b'` withdraws this directive's
+contribution of `a` and adds `b`. Other sources' contributions remain subject to
+Angular's styling precedence.
 
----
+The object preserves the declarative binding-map experience of `host: {}` while
+allowing getters to close over setup-local state. The configuration's `host`
+key continues to declare the ref; setup's return value continues to be expose.
+There are no descriptor factories or separate host-binding return channel.
 
-## 3. Binding descriptor factories
+## 2. Binding keys and values
 
-Pure functions that return opaque, branded descriptors. They parallel Angular's
-`inputBinding(name, () => value)` shape: a name (where applicable) plus a
-**thunk returning the reactive value**, so the framework re-evaluates and diffs
-rather than the directive pushing updates.
+Keys follow the DSL's native binding vocabulary. Every bound value is a getter;
+every event value is a handler.
 
-```ts
-// one class, toggled by a boolean thunk
-classBinding(name: string, present: () => boolean): HostBinding;
-// a whole class map / string, like [class]="..."
-classBinding(value: () => string | Record<string, boolean>): HostBinding;
-
-// one style property; unit is folded into the property per Angular convention
-styleBinding(
-  prop: string,
-  value: () => string | number | null,
-  opts?: { unit?: string },
-): HostBinding;
-
-// attribute (setAttribute space); null removes it
-attrBinding(
-  name: string,
-  value: () => string | number | boolean | null,
-): HostBinding;
-
-// DOM property (the [prop] space)
-propBinding(name: string, value: () => unknown): HostBinding;
-
-// host event listener
-listener(
-  event: string,
-  handler: (event: Event) => void,
-  opts?: { capture?: boolean; passive?: boolean; once?: boolean },
-): HostBinding;
-```
-
-`HostBinding` is a branded descriptor (a `unique symbol`, like `ELEMENT`, `REF`,
-`FRAGMENT` in `ng-types.ts` §2–3). It is opaque data: the directive builds a
-`HostBinding[]`, the framework interprets it.
-
-### 3.1 Why a descriptor array, not `host.class()` / `host.attr()` methods
-
-An array of descriptors is preferred over per-concern methods on `host`:
-
-- It is the **same mental model** as Angular's programmatic component creation
-  (`bindings: [inputBinding(...), outputBinding(...)]`), so there is one shape to
-  learn and it already covers inputs/outputs/two-way for directive composition.
-- Descriptors **compose**: a `HostBinding[]` can be built conditionally, spread,
-  or shared between directives. A fixed set of methods on `host` cannot.
-- Adding a new binding kind is a **new factory**, not a new method on the host
-  handle, so the handle's surface stays small and stable.
-- The reactive value stays **data** (`() => expr`), which is what lets the
-  framework own diffing — the same reason Angular models creation-time bindings
-  as `inputBinding(name, signalOrThunk)`.
-
-`.class` alone was rejected for the obvious reason: a host surface MUST be able to
-bind anything a native element can — attributes, properties, classes, styles,
-events — not just classes.
-
----
-
-## 4. Type checking
-
-Host-binding descriptors are checked against `H` (the type in `host: ref<H>()`)
-with the **same judgments native elements already use** (spec §4). This proposal
-adds no new DOM type model; it points the existing one at `H`.
-
-```
-CHECK-HOST-BINDING(H, b)
-─────────────────────────────────────────────────
-b = classBinding(name, present)
-  Γ ⊢ present : () => boolean                              → D017 on mismatch
-b = classBinding(value)
-  Γ ⊢ value : () => string | Record<string, boolean>      → D017 on mismatch
-
-b = styleBinding(prop, value, opts?)
-  Γ ⊢ value : () => string | number | null                → D017 on mismatch
-      (reuses STYLE-BINDING value type, spec §4.1)
-
-b = attrBinding(name, value)
-  name ∈ Attrs(H)                                          → D010 if absent
-  Γ ⊢ value : () => string | number | boolean | null      → D017 on mismatch
-
-b = propBinding(name, value)
-  name ∈ Props(H)    Props(H)[name] = T                    → D010 if absent
-  Γ ⊢ value : () => U    U ⊑ T                             → D017 on mismatch
-      (reuses CHECK-NATIVE-INPUT, spec §4)
-
-b = listener(event, handler, opts?)
-  event ∈ Events(H)    Events(H)[event] = Event<T>         → D010 if absent
-  Γ ⊢ handler : (e: T) => void                             → D017 on mismatch
-      (reuses CHECK-NATIVE-OUTPUT, spec §4; arity-safe)
-─────────────────────────────────────────────────
-```
-
-Notes:
-
-- `classBinding` / `styleBinding` carry **no `D010` name check**: classes and
-  style properties are open namespaces, exactly as spec §4.1 treats template
-  `class:` / `style:` (truthiness and `string | number | null`, no DOM-name
-  membership test).
-- `attrBinding` / `propBinding` / `listener` **do** check the name against `H`'s
-  `Attrs` / `Props` / `Events` (D010), reusing CHECK-NATIVE-\* verbatim. This is
-  the second reason `host: ref<H>()` MUST stay: without `H`, these names cannot
-  be checked.
-- When `H` is `RootNode` (an inert, non-element host, `ng-types.ts` §5), there is
-  no DOM surface. A descriptor against a `RootNode` host is a new diagnostic,
-  **D044** (host bindings require a native-element host), consistent with how
-  `RootNode` directives are inert in spec §6–7.
-
-### 4.1 Merge with template bindings and other directives
-
-A host element may receive bindings from its own template site (`class:`,
-`style:`, properties — spec §4) *and* from every directive applied to it via
-`host.apply(...)`. The framework merges them with the **same rules as multiple
-template host bindings today**: classes and styles are additive (repeatable, per
-NO-DUPLICATE-BINDINGS in spec §3.7), while a property or attribute written by
-two sources is a conflict the framework resolves deterministically rather than
-by `apply` call order. Specifying the exact precedence (template vs directive,
-directive vs directive) is deferred, but it MUST be defined by the framework and
-MUST NOT depend on `afterRenderEffect` scheduling.
-
----
-
-## 5. `apply` semantics
-
-```
-HOST-APPLY
-─────────────────────────────────────────────────
-host.apply(bindings: HostBinding[]): void
-
-- Called in setup (an injection context), at most conceptually once per
-  directive instance: registration, not an update loop.
-- Each descriptor's value thunk is the reactive surface. The framework
-  re-evaluates thunks and diffs results across change detection.
-- A directive MUST NOT need to re-call apply to react to signal changes;
-  reactivity lives in the thunks.
-─────────────────────────────────────────────────
-```
-
-Rationale for registration-once: it matches `inputBinding(name, signal)`, where
-the binding is declared once and the signal carries the updates. Allowing
-repeated `apply` calls would reintroduce imperative, order-dependent state — the
-very thing this replaces.
-
-### Lowering
-
-Descriptors lower to the same host-binding instructions the compiler already
-emits for a directive's host bindings: a creation-pass registration plus
-update-pass writes gated on the thunk's dependencies. Conceptually:
-
-```
-// classBinding('active', () => highlighted())
-// creation pass: register host class binding slot
-// update pass:   ɵɵclassProp('active', highlighted())   — framework diffs
-```
-
-No `Renderer2` call is emitted for `apply` descriptors. `Renderer2` instructions
-appear only when the directive itself calls into it from the escape hatch (§6).
-
----
-
-## 6. Escape hatch
-
-The imperative path is unchanged and remains available on the same `host`
-handle for work that is genuinely not a declarative binding — focus management,
-measuring layout, integrating a third-party DOM library:
-
-```ts
-setup: (_, { host }) => {
-  const renderer = inject(Renderer2);
-  afterRenderEffect(() => {
-    const el = host();           // H | undefined, as today
-    if (!el) return;
-    // imperative, directive-owned DOM work
-  });
-},
-```
-
-Guidance: `host.apply(...)` is the default for projecting classes/styles/attrs/
-props/listeners; `host()` + `Renderer2` is the exception for imperative DOM that
-has no declarative descriptor.
-
----
-
-## 7. Type-Level Integration
-
-- `HostBinding` is a new branded type (a `unique symbol`), alongside `ELEMENT`,
-  `REF`, `FRAGMENT` in `ng-types.ts` §2–3.
-- The five factories (`classBinding`, `styleBinding`, `attrBinding`,
-  `propBinding`, `listener`) are new declared functions. The DOM-name-checked
-  ones (`attrBinding`, `propBinding`, `listener`) are generic over `H` so the
-  checker can resolve `Attrs(H)` / `Props(H)` / `Events(H)`.
-- The directive `host` context type changes from `Ref<H | undefined>` to a type
-  that is still callable as `() => H | undefined` **and** carries
-  `apply(bindings: HostBinding[]): void`. One handle, two capabilities — the
-  `Ref<H>` read is preserved, `apply` is added.
-- Nothing about `bindings`, `component`, `derivation`, or the existing refs
-  changes. `AnyBindingValue`, `InputsOnly`, `ValidateDerivationBindings` are
-  untouched — host bindings are a `setup`-side concern, not a `bindings`-record
-  one.
-
----
-
-## 8. Constraints and Diagnostics
-
-| Rule | Diagnostic |
-|:---|:---|
-| `attrBinding` name ∉ `Attrs(H)` | D010 |
-| `propBinding` name ∉ `Props(H)` | D010 |
-| `listener` event ∉ `Events(H)` | D010 |
-| descriptor value thunk type mismatch | D017 |
-| `host.apply(...)` on a `RootNode` host (no DOM surface) | D044 (new) |
-| `classBinding` / `styleBinding` unknown name | No error — open namespace, per spec §4.1 |
-| imperative `host()` + `Renderer2` for a value a descriptor could express | No error — allowed escape hatch, discouraged |
-
----
-
-## Comparison
-
-| Concern | Imperative `Renderer2` (today) | `host.apply([...])` (proposed) |
+| Key | Getter result / handler | Meaning |
 |:---|:---|:---|
-| Class value change (`'a'`→`'b'`) | Manual; old class leaks unless hand-removed | Framework diffs and swaps |
-| Render timing | `afterRenderEffect`, post-render (frame gap) | Render pass, no gap |
-| Merge with other directives | Undefined, call-order dependent | Framework-defined (§4.1) |
-| SSR | Client-only | Serialized |
-| Binds anything (attr/prop/class/style/event) | Yes, by hand | Yes, by descriptor |
-| Type-checked against host `H` | No | Yes (§4) |
+| `class` | `string \| Record<string, boolean> \| null \| undefined` | Whole-class contribution, using Angular's class-map pipeline |
+| `class:name` | Any value | Named class: truthiness, with `undefined` yielding to lower-priority styling |
+| `style:property` | `string \| number \| null \| undefined` | Named inline style; units are included in the returned CSS value |
+| `attr:name` | `string \| number \| boolean \| null \| undefined` | Native attribute; nullish values remove it |
+| `bind:property` | The native property's writable value type | Native DOM property, not a component/directive input |
+| `on:event` | `(event) => void \| boolean` | Native host event handler; returning `false` prevents default |
+
+For example, inside setup of a button-host directive:
+
+```ts
+host.register({
+  'class:active': active,
+  'style:width': () => `${width()}px`,
+  'attr:aria-disabled': () => disabled() ? 'true' : 'false',
+  'bind:disabled': disabled,
+  'on:click': onClick,
+});
+```
+
+Pass a signal directly or wrap an expression in a function. Passing its current
+value would capture a setup-time snapshot and is rejected:
+
+```ts
+host.register({
+  'class:active': active,                        // live signal getter
+  'class:selected': () => enabled() && active(), // live expression getter
+  'class:invalid': active(),                     // invalid: not a getter
+});
+```
+
+Static bound values use `() => value`. Getters MUST be side-effect-free.
+Class-map objects MUST be replaced when their contents change; in-place mutation
+does not establish reactivity or bypass Angular's identity-based diffing.
+
+The whole-class getter and `attr:name` prefix are additions to the current DSL
+spec. Template equivalents MUST receive the same native semantics when added
+there. Allowing `undefined` for named styles also extends the current style
+value rule to express Angular's fallback behavior.
+
+To keep one styling pipeline, property/attribute aliases that write the whole
+class or style surface, including `bind:className`, `attr:class`, and
+`attr:style`, are rejected. Use `class`, `class:name`, and `style:property`.
+Two-way binding, animations, global event targets, and listener options are
+outside this proposal.
+
+## 3. Registration and evaluation
+
+Registration is optional. When present, it MUST be one unconditional,
+synchronous `host.register` call in the directive's setup body, with an object
+literal containing a statically known set of unique literal keys. Computed keys,
+spreads, and conditional declaration shapes are unsupported in this version.
+Conditional behavior belongs inside getters and handlers.
+
+The framework snapshots getter/handler references without evaluating getters.
+Mutating the object afterward has no effect. A second call, a call outside this
+setup invocation, or a non-function value is an error.
+
+Listeners are installed during creation. Getters first run in the host-binding
+update phase after initial inputs have been seeded. Subsequent evaluation uses
+the normal render phase and diffing. Signal reads participate in Angular's view
+tracking and scheduling, including zoneless rendering; ordinary mutable state
+does not independently schedule an update. There is no separate effect per
+binding or promise of per-getter dependency optimization.
+
+Bindings attach to the framework's resolved native host, so registration does
+not require `host()` to already return an element. A host type admitting
+`RootNode` cannot register DOM bindings; narrowing a later `host()` read does
+not change this declaration-time requirement.
+
+### 3.1 Boundary: directive composition
+
+`host.register` declares DOM bindings only; `use:` entries are not supported.
+Composition belongs in declaration-level `hostDirectives`, retaining Angular's
+static array syntax and explicit public input/output forwarding:
+
+```ts
+export const help = directive({
+  host: ref<HTMLElement>(),
+  hostDirectives: [
+    {
+      directive: tooltip,
+      inputs: ['message: tooltipMessage'],
+      outputs: ['dismiss: dismissed'],
+    },
+  ],
+  setup: () => {},
+});
+```
+
+This is a future API sketch; `hostDirectives` is not yet declared in
+`ng-types.ts`. A bare directive reference composes behavior without exposing
+bindings. Lists select public bindings; `message` forwards the same name and
+`message: tooltipMessage` exposes it under an alias. There are no binding
+expressions, getter wiring, or setup callbacks in this metadata.
+
+Forwarding enriches the owner's public template API. The composed directive
+owns its binding signals/emitters; the owner's setup and providers continue to
+receive only its own declared bindings. The composition graph and provider
+registrations must be known before provider resolution or setup, and composed
+directives share the owner's lifetime.
+
+A separate composition proposal must specify effective public binding types,
+required-input forwarding, host compatibility, cycles, duplicate applications,
+and injector lifecycle under conditional removal.
+
+## 4. Collisions: retain Angular's ordering
+
+The framework MUST retain Angular's existing ordering among the sources present
+in ng-next: native template bindings and directive host bindings. Registration
+time and directive activation time MUST NOT introduce new priority. A
+conditionally applied directive retains its assigned position when it is
+removed and recreated.
+
+For styling, native template styling outranks directive host styling. Within a
+source, named bindings outrank whole-map bindings, which outrank static styling.
+Retain Angular's existing treatment of static styling and relative directive
+priority in the Ivy directive-definition order for the resolved host. ng-next
+components contribute no separate component host styling source.
+
+Distinct classes/styles can coexist. Overlapping names use this precedence,
+not OR-based class merging or concatenated style values:
+
+- Named class `false` or `null` explicitly removes the class; `undefined`
+  yields to a lower-priority source.
+- Named style `null` explicitly removes the style; `undefined` yields.
+- A missing class-map entry yields. Clearing a whole-class contribution with
+  `''`, `null`, or `undefined` withdraws that map's entries rather than erasing
+  other sources' classes. A map entry of `false` explicitly suppresses its class
+  at that source's priority.
+
+Properties and attributes retain Angular's update order and change-detection
+diffing; they do not acquire the styling precedence algorithm. There is no new
+universal “highest-priority writer always wins” resolver for these binding kinds.
+Attribute and property writes remain distinct operations, even when the native
+DOM reflects one into the other.
+
+Component call sites cannot use `class:` or `style:` (D023). A directive applied
+to a component with a declared native root binds to that root element, not a
+separate component host. Styling in that element's own template still has
+template precedence over directive host styling. With the default `RootNode`
+root, there is no native element to receive these bindings.
+
+## 5. Ownership and cleanup
+
+Conditional application (`use:D(...):when={condition}`) introduces removal while
+the element survives. Removal MUST withdraw declarative contributions; this is
+a new lifecycle guarantee beyond today's fixed Angular directive instances.
+
+The framework owns the baseline for each element/binding target, shared by all
+declarative writers. The baseline is its unbound state before the first managed
+writer takes ownership, including attribute absence, inline style value and
+priority, class presence, or the native property value. It MUST NOT capture
+another active directive's value as the original baseline. The baseline lasts
+until the last writer releases the target.
+
+On directive removal, in the render phase:
+
+1. Remove its listeners, stop its binding evaluation, release its reactive
+   references, and withdraw its contributions.
+2. Restore baselines for the affected native state before replaying any surviving
+   writers, accounting for coupled targets as described below.
+3. Resolve surviving styling with Angular's precedence and reapply affected
+   property/attribute bindings in Angular's update order, even if their values
+   are unchanged.
+4. Where no writer remains, leave the restored baseline and release its ownership
+   record.
+
+For reflected attributes/properties or otherwise coupled native targets,
+baseline capture and restoration MUST preserve coherent native state. Restore
+released state before replaying surviving writers so restoration cannot overwrite
+their current values. Independent per-directive snapshots are insufficient.
+
+For example, on an initially white background: A supplies green, then a
+higher-priority B supplies blue. Removing A leaves blue; removing B afterward
+restores white, not A's departed green. If A survives B instead, green returns.
+
+Property restoration is a normal native property write. It restores the value,
+not every side effect of the original setter; it cannot resurrect destroyed DOM
+nodes or undo arbitrary imperative work. Only writable native properties with a
+platform-supported baseline/restoration path are supported. Unsupported targets
+MUST be reported rather than silently retaining a departed binding's value.
+
+While a target is managed, its declarative bindings own its state. Imperative
+writes to that same target are outside the merge/cleanup contract. Destroying
+the entire element releases records and listeners without restoring a doomed
+element. A new directive instance registers afresh.
+
+## 6. Native behavior, SSR, and hydration
+
+All writes, including restoration, use Angular's renderer and security rules.
+Sanitization depends on the actual native tag and binding target, not just the
+declared host type. Existing restrictions on event-handler attributes and
+unsafe property writes remain in force.
+
+Attributes stringify non-nullish values: `false` becomes `'false'`, which still
+counts as present for a boolean HTML attribute such as `disabled`. Use
+`bind:disabled` for a boolean property, or return `null` to remove the attribute.
+
+`on:event` subscribes to the native host event only; it MUST NOT also subscribe
+to a same-named component/directive output. It uses Angular's event scheduling,
+error handling, teardown, and supported hydration/event-replay integration.
+
+Getters run during SSR and serializable DOM state is rendered. Arbitrary DOM
+properties and handler functions are not necessarily representable in HTML.
+Hydration MUST recreate instance-local getters/handlers without duplicate
+listeners and preserve or reconstruct cleanup baselines. The already-bound
+server DOM MUST NOT be mistaken for the unbound baseline. A platform unable to
+preserve a required baseline must report that target as unsupported.
+
+## 7. Checking and runtime integration
+
+The host declaration continues to determine placement compatibility (D024).
+Check literal keys and getter results against the native surface of `H`:
+
+- Property/attribute/event names reuse the DOM model (D010 for unknown names);
+  getter results and handler parameters use the corresponding native value/event
+  types (D017 for mismatches).
+- Class names and style properties remain open namespaces. Named class values
+  use truthiness; whole-class values use the class-map rule above.
+- Registration on a host type admitting `RootNode` is rejected (proposed D044).
+- Duplicate keys, unsupported forms, and registration-lifetime violations are
+  explicit errors; their diagnostic codes remain to be assigned.
+
+Exact TypeScript declarations are deferred. The setup host remains a callable
+`Ref<H | undefined>` with `register` added; the `bindings` and expose contracts
+are unchanged.
+
+Literal declaration shapes allow fixed host-binding slots. The compiler stores
+layout in shared metadata; each instance stores its own getter/handler closures.
+Rendering reuses native host-binding instructions and renderer paths. Cleanup
+requires additional ownership, baseline, and forced-replay machinery, including
+SSR/hydration support; this is not a compiler-only change.
+
+`host()` remains the escape hatch for focus, measurement, and third-party DOM
+integration. Such work uses render hooks where appropriate and explicit cleanup
+through `DestroyRef`. Declarative host bindings require no directive-owned
+renderer writes or cleanup callback.
+
+## 8. Required behavioral checks
+
+| Scenario | Required result |
+|:---|:---|
+| Whole-class getter changes `'a'` → `'b'` | Withdraw only this map's `a`; resolve `b` and other sources normally |
+| Native template and directive bind the same class/style | Preserve Angular's template styling precedence |
+| Named styling returns `undefined` versus `false` / `null` | Yield versus explicit class/style removal, as defined above |
+| Two instances read different inputs | Independent values, handlers, and baselines |
+| A is removed beneath B, then B is removed | B remains effective; the original baseline returns after B leaves |
+| A property writer leaves while another survives unchanged | Reapply the surviving writer; no stale snapshot wins |
+| Attribute and reflected property writers overlap | Restore coherent native state, then replay surviving writes |
+| `attr:disabled` returns `false` versus `null` | Present attribute containing `'false'` versus removed attribute |
+| Directive is removed and recreated through `:when` | No leaked listeners; stable ordering; fresh instance callbacks |
+| Server-rendered directive is later removed after hydration | Restore the unbound baseline, not its server-applied value |
+| A baseline cannot be preserved/restored on the target platform | Report the unsupported target rather than promise cleanup |

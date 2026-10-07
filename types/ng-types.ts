@@ -391,7 +391,8 @@ export function component(config: any): any {
 // host is a separate config property — not a binding — because
 // it is framework-provided context, not something the consumer
 // can bind to. setup receives bindings as the first argument and
-// { host } as the second.
+// { host } as the second. Like components, directives can declare
+// providers; their callback receives inputs only, not host or expose.
 // ────────────────────────────────────────────────────────────────
 
 // With bindings
@@ -406,12 +407,14 @@ export function directive<
     bindings: SetupBindings<B>,
     context: { host: Ref<H | undefined> },
   ) => E;
+  providers?: (inputs: InputsOnly<B>) => Provider[];
 }): DirectiveInstance<H, B, E>;
 
 // No bindings
 export function directive<H extends DirectiveHostType, E = void>(config: {
   host: Ref<H | undefined>;
   bindings?: never;
+  providers?: () => Provider[];
   setup: (bindings: {}, context: { host: Ref<H | undefined> }) => E;
 }): DirectiveInstance<H, {}, E>;
 

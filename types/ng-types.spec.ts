@@ -797,6 +797,86 @@ const logDirective = directive({
   },
 });
 
+// Directive providers use the same input-only contract as component providers.
+const directiveWithProviders = directive({
+  host: ref<HTMLButtonElement>(),
+  bindings: {
+    label: input.required<string>(),
+    initialValue: input<number>(),
+    selected: model<boolean>(false),
+    dismissed: output<void>(),
+    content: fragment.required<void>(),
+    optionalContent: fragment<void>(),
+  },
+  providers: (inputs) => {
+    type _ProviderKeys = Assert<
+      IsEqual<keyof typeof inputs, 'label' | 'initialValue'>
+    >;
+    const _label: InputSignal<string> = inputs.label;
+    const _initialValue: InputSignal<number | undefined> = inputs.initialValue;
+    // @ts-expect-error models extend InputSignal but remain excluded
+    inputs.selected;
+    // @ts-expect-error outputs are excluded
+    inputs.dismissed;
+    // @ts-expect-error required fragments are excluded
+    inputs.content;
+    // @ts-expect-error optional fragments are excluded
+    inputs.optionalContent;
+    // @ts-expect-error the host is setup context, not provider input
+    inputs.host;
+    return [
+      provide(CounterStore, () => new CounterStore(() => inputs.initialValue() ?? 0)),
+      provide(seedToken),
+      provide(seedToken, () => inputs.initialValue() ?? 0),
+      // @ts-expect-error optional input cannot supply a required number unguarded
+      provide(seedToken, () => inputs.initialValue()),
+    ];
+  },
+  setup: ({ label, selected, dismissed, content }, { host }) => {
+    const _host: Ref<HTMLButtonElement | undefined> = host;
+    const _model: ModelSignal<boolean> = selected;
+    const _output: OutputEmitterRef<void> = dismissed;
+    const _fragment: Signal<Fragment<void>> = content;
+    const _store: CounterStore = inject(CounterStore);
+    return { label };
+  },
+});
+type _DirectiveProviderHost = Assert<
+  IsEqual<
+    typeof directiveWithProviders extends DirectiveInstance<infer H, any, any>
+      ? H : never,
+    HTMLButtonElement
+  >
+>;
+const _directiveProviderExpose: Ref<{ label: InputSignal<string> } | undefined> =
+  ref<typeof directiveWithProviders>();
+
+// Providers do not require bindings or a native DOM host.
+const inertDirectiveWithProviders = directive({
+  host: ref<RootNode>(),
+  providers: () => [provide(Store, () => new Store())],
+  setup: () => ({ store: inject(Store) }),
+});
+const _inertProviderExpose: Ref<{ store: Store } | undefined> =
+  ref<typeof inertDirectiveWithProviders>();
+
+const outputOnlyDirectiveWithProviders = directive({
+  host: ref<HTMLElement>(),
+  bindings: { dismissed: output<void>() },
+  providers: (inputs) => {
+    type _NoProviderInputs = Assert<IsEqual<keyof typeof inputs, never>>;
+    return [];
+  },
+  setup: () => {},
+});
+
+// @ts-expect-error providers must be a callback, not a provider array
+directive({ host: ref<HTMLElement>(), providers: [], setup: () => {} });
+// @ts-expect-error the callback must return valid Angular providers
+directive({ host: ref<HTMLElement>(), providers: () => ['invalid'], setup: () => {} });
+// @ts-expect-error the no-bindings callback receives no input argument
+directive({ host: ref<HTMLElement>(), providers: (inputs: {}) => [], setup: () => {} });
+
 // ────────────────────────────────────────────────────────────────
 // 10. REF UTILITIES — ref, refMany, read-only enforcement
 //
