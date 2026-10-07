@@ -321,7 +321,7 @@ Violation → D015 (component), D016 (directive), D031 (derivation)
 
 `provided_fragments` includes all delivery mechanisms defined in §10.2.
 
-Note that only fragments carry required-ness in the type:
+Note that only fragment binding declarations carry required-ness in the type:
 `RequiredFragmentBinding<T>` and `OptionalFragmentBinding<T>` are nominally
 distinct (`ng-types.ts`). Angular erases it for inputs and models —
 `input.required<User>()` and `input<User>(d)` are both `InputSignal<User>` —
@@ -819,9 +819,10 @@ Fragment-specific check for directives:
 ```
 CHECK-DIRECTIVE-FRAGMENT(Γ, B_D, frag)
 ─────────────────────────────────────────────────
-frag.name ∈ keys(B_D)
-B_D[frag.name] : FragmentBinding<T>
-Γ ⊢ frag.value : U    U ⊑ FragmentBinding<T>
+CHECK-FRAGMENT-PROP(Γ, B_D, frag)                      (§10.2)
+  required declaration → source must be Fragment<T>
+  optional declaration → source may be Fragment<T> | undefined
+  once: is rejected                                  → D020
 ─────────────────────────────────────────────────
 ```
 
@@ -966,7 +967,7 @@ standalone: it declares a name without delivering it.
   Γ' = Γ ∪ { p₁: T₁, ..., pₙ: Tₙ }
   CHECK-NODES(Γ', children)
 
-In both cases introduces name : RequiredFragmentBinding<T> in its lexical
+In both cases introduces name : Fragment<T> in its lexical
 template scope. T is derived from declared parameters: 0 params → void,
 n params → [T₁, ..., Tₙ]. Visible to every sibling in the child-list where it
 is declared and to their descendants; not visible outside it.
@@ -986,6 +987,12 @@ A standalone declaration is the DSL's local named template — the role
 Parameter type annotations are ordinary TypeScript types, carried as written
 and resolved by TypeScript in Γ (§2).
 
+`Fragment<T>` is a branded callable source returning opaque `TemplateMarkup`.
+It is distinct from `FragmentBinding<T>`, which is non-callable declaration
+metadata. Requiredness belongs to the receiving binding declaration, not to a
+lexical source. Local sources are invoked directly, as `row(item)` above;
+received sources are read through signals before invocation (§10.2).
+
 ### 10.2 Fragment Delivery
 
 Three mechanisms deliver a fragment to a component binding.
@@ -999,10 +1006,10 @@ prop.name ∈ keys(B)                                        → D011 if absent
 prop.once = false                                          → D020 otherwise
 
 B[prop.name] : RequiredFragmentBinding<T>
-  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T>              → D017 on mismatch
+  Γ ⊢ prop.value : U   U ⊑ Fragment<T>                     → D017 on mismatch
 
 B[prop.name] : OptionalFragmentBinding<T>
-  Γ ⊢ prop.value : U   U ⊑ FragmentBinding<T> | undefined  → D017 on mismatch
+  Γ ⊢ prop.value : U   U ⊑ Fragment<T> | undefined         → D017 on mismatch
 ─────────────────────────────────────────────────
 ```
 
@@ -1032,7 +1039,7 @@ RENDER
 Γ ⊢ expr : TemplateMarkup | undefined
 
 if expr is a fragment invocation f(a₁, ..., aₙ)  (incl. f?.(...)):
-  Γ ⊢ f : FragmentBinding<T> | undefined
+  Γ ⊢ f : Fragment<T> | undefined
   (a₁, ..., aₙ) match FragmentArgs<T> positionally         → D026
 
 Optional: if options.injector present:
@@ -1042,7 +1049,7 @@ Optional: if options.injector present:
 ```
 
 When `expr` is `undefined`, nothing is rendered (no-op).
-This supports `@render(optionalFragment?.())` directly.
+This supports `@render(optionalFragment()?.())` for an optional receiver signal.
 
 D026 is a template-side code only. It is the invocation half of the fragment
 contract; §3.4 is the declaration half (an inline `@fragment`'s parameter list),
@@ -1280,10 +1287,10 @@ const Button = component({
 <Button use:tooltip(message={'External'}) /> // ❌ D025: collides on Button's root
 
 // D026 — fragment arg mismatch at the invocation (§10.3).
-// A fragment is a callable, so this is an arity error against FragmentArgs<T>:
-// row : fragment.required<[string, number]>() declares (string, number)
-@render(row(item))          // ❌ D026: 1 argument, expected 2
-@render(row(label, 0))      // ✅
+// A receiver declared with fragment.required<[string, number]>() receives
+// row : Signal<Fragment<[string, number]>>. Read it, then invoke the source:
+@render(row()(item))        // ❌ D026: 1 argument, expected 2
+@render(row()(label, 0))    // ✅
 
 // D026 — the same code on the declaration side (§3.4): an inline @fragment's
 // parameter list must match the parent binding it is delivered to

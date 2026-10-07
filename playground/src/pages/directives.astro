@@ -220,7 +220,7 @@ const Button = component({
   },
   setup: ({ disabled, children }) => @{
     <button disabled={disabled()}>
-      @render(children())
+      @render(children()())
     </button>
   },
 });

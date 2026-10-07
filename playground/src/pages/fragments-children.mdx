@@ -8,7 +8,7 @@ description: "Implicit children fragments — nested markup becomes an opaque fr
 
 <p class="subtitle">Markup nested inside a component tag becomes an implicit <code>children</code> fragment — no ng-content needed.</p>
 
-Content between a component's opening and closing tags is automatically provided as `children`. The component renders it with `@render`.
+Content between a component's opening and closing tags is automatically provided as `children`. Setup receives a read-only signal of the current source. Render optional children with `@render(children()?.())` and required children with `@render(children()())`. Destructuring captures the stable signal, so later delivery updates remain visible.
 
 ```typescript
 import { component, signal, fragment } from '@angular/core';
@@ -34,8 +34,8 @@ export const Menu = component({
     children: fragment<void>(),
   },
   setup: ({ children }) => @{
-    @if (children) {
-      <ul>@render(children())</ul>
+    @if (children(); as content) {
+      <ul>@render(content())</ul>
     } @else {
       <span>Empty</span>
     }
@@ -47,11 +47,11 @@ export const MenuItem = component({
     children: fragment.required<void>(),
   },
   setup: ({ children }) => @{
-    <li>@render(children())</li>
+    <li>@render(children()())</li>
   },
 });
 ```
 
 <div class="annotation" role="note">
-  <strong>Implicit projection:</strong> <code>children</code> is a reserved name provided by Angular from nested content. It's optional by default (<code>fragment&lt;void&gt;()</code>) or required (<code>fragment.required&lt;void&gt;()</code>). Render it with <code>@render</code> — the markup is opaque, not manipulable like React Children.
+  <strong>Implicit projection:</strong> <code>children</code> is a reserved name provided by Angular from nested content. It's optional by default (<code>fragment&lt;void&gt;()</code>) or required (<code>fragment.required&lt;void&gt;()</code>). Read the signal, then invoke the source inside <code>@render</code> — the markup is opaque, not manipulable like React Children.
 </div>

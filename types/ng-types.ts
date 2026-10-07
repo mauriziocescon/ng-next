@@ -51,6 +51,7 @@ export type TemplateAstOf<T extends TemplateMarkup> =
 declare const FRAGMENT: unique symbol;
 declare const FRAGMENT_OPTIONAL: unique symbol;
 declare const FRAGMENT_REQUIRED: unique symbol;
+declare const FRAGMENT_SOURCE: unique symbol;
 
 type IsTuple<T extends readonly unknown[]> = number extends T['length']
   ? false
@@ -66,13 +67,16 @@ type FragmentArgs<T> = [T] extends [void]
       : [T]
     : [T];
 
-export type OptionalFragmentBinding<T> = {
+export type Fragment<T = void> = {
   (...args: FragmentArgs<T>): TemplateMarkup;
+  readonly [FRAGMENT_SOURCE]: true;
+};
+
+export type OptionalFragmentBinding<T> = {
   readonly [FRAGMENT]: T;
   readonly [FRAGMENT_OPTIONAL]: true;
 };
 export type RequiredFragmentBinding<T> = {
-  (...args: FragmentArgs<T>): TemplateMarkup;
   readonly [FRAGMENT]: T;
   readonly [FRAGMENT_REQUIRED]: true;
 };
@@ -237,9 +241,11 @@ type InputKeys<B> = {
 type InputsOnly<B> = Pick<B, InputKeys<B>>;
 
 type SetupBindingValue<V> =
-  V extends OptionalFragmentBinding<infer T>
-    ? OptionalFragmentBinding<T> | undefined
-    : V;
+  V extends RequiredFragmentBinding<infer T>
+    ? Signal<Fragment<T>>
+    : V extends OptionalFragmentBinding<infer T>
+      ? Signal<Fragment<T> | undefined>
+      : V;
 
 type SetupBindings<B> = {
   [K in keyof B]: SetupBindingValue<B[K]>;

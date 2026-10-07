@@ -38,7 +38,7 @@ export const Alert = component({
     children: fragment<void>(),
   },
   setup: ({ kind, children }) => @{
-    <div class={'alert alert-' + kind()}>@render(children?.())</div>
+    <div class={'alert alert-' + kind()}>@render(children()?.())</div>
   },
 });
 

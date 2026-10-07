@@ -128,49 +128,49 @@
   {
     "category": "Fragments: Children",
     "description": "Using a reserved name (ref) as a component binding.",
-    "code": "export const Card = component({\n  bindings: {\n    children: fragment<void>(),\n    ref: input<string>(''),\n  },\n  setup: ({ children, ref }) => @{\n    @render(children?.())\n  },\n});",
+    "code": "export const Card = component({\n  bindings: {\n    children: fragment<void>(),\n    ref: input<string>(''),\n  },\n  setup: ({ children, ref }) => @{\n    @render(children()?.())\n  },\n});",
     "valid": false,
     "explanation": "Invalid. 'ref' is a reserved attribute for components — it cannot be declared as a binding. The 'children: fragment<void>()' declaration is fine (children must be a FragmentBinding<void> when present)."
   },
   {
     "category": "Fragments: Children",
-    "description": "Optional children fragment guarded with @if before rendering.",
-    "code": "export const Tabs = component({\n  bindings: {\n    header: fragment.required<[string]>(),\n    children: fragment<void>(),\n  },\n  setup: ({ header, children }) => @{\n    @render(header('Tab 1'))\n    @if (children) {\n      @render(children())\n    }\n  },\n});",
+    "description": "Optional children source read and captured with an @if alias before rendering.",
+    "code": "export const Tabs = component({\n  bindings: {\n    header: fragment.required<[string]>(),\n    children: fragment<void>(),\n  },\n  setup: ({ header, children }) => @{\n    @render(header()('Tab 1'))\n    @if (children(); as content) {\n      @render(content())\n    }\n  },\n});",
     "valid": true,
-    "explanation": "Correct. 'children' can be declared as a binding if it uses fragment<void>() or fragment.required<void>(). Here children is optional (fragment<void>()), so @if (children) guards against it being undefined."
+    "explanation": "Correct. The children declaration uses fragment<void>(), so setup receives Signal<Fragment<void> | undefined>. @if (children(); as content) reads and narrows one source value. @render(content()) invokes that captured source; header()('Tab 1') reads the required header signal before invoking it."
   },
   {
     "category": "Fragments: Named",
     "description": "Named fragment with a typed parameter rendered inside @for.",
-    "code": "export const List = component({\n  bindings: {\n    items: input.required<Item[]>(),\n    row: fragment.required<[Item]>(),\n  },\n  setup: ({ items, row }) => @{\n    @for (item of items(); track item.id) {\n      @render(row(item))\n    }\n  },\n});",
+    "code": "export const List = component({\n  bindings: {\n    items: input.required<Item[]>(),\n    row: fragment.required<[Item]>(),\n  },\n  setup: ({ items, row }) => @{\n    @for (item of items(); track item.id) {\n      @render(row()(item))\n    }\n  },\n});",
     "valid": true,
-    "explanation": "Correct. Named fragment with typed parameter, rendered inside @for with the item passed as argument."
+    "explanation": "Correct. Setup receives row as Signal<Fragment<[Item]>>. row()(item) reads the required source, then invokes it with the typed item argument inside @for."
   },
   {
     "category": "Component Root",
     "description": "Applying a use: directive to a component that omits rootNode (default RootNode).",
-    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button omits rootNode, so its root defaults to RootNode\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button omits rootNode, so its root defaults to RootNode\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children()())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
     "valid": false,
     "explanation": "Invalid. Button omits rootNode, so its root defaults to RootNode — it exposes no native element for a tag-specific directive to land on. To accept use:tooltip at the call site, Button must declare a native-element root with rootNode: element<HTMLButtonElement>()."
   },
   {
     "category": "Component Root",
     "description": "A host: ref<RootNode>() directive applied to a component that omits rootNode (default RootNode).",
-    "code": "const autoDismiss = directive({\n  host: ref<RootNode>(),\n  bindings: {\n    delay: input<number>(3000),\n    dismissed: output<void>(),\n  },\n  setup: ({ delay, dismissed }) => {\n    const destroyRef = inject(DestroyRef);\n    const handle = setTimeout(() => dismissed.emit(), delay());\n    destroyRef.onDestroy(() => clearTimeout(handle));\n\n    return {\n      dismissNow: () => {\n        clearTimeout(handle);\n        dismissed.emit();\n      },\n    };\n  },\n});\n\n// Alert omits rootNode, so its root is the default RootNode\nexport const Alert = component({\n  bindings: {\n    kind: input<'info' | 'warn' | 'error'>('info'),\n    children: fragment<void>(),\n  },\n  setup: ({ kind, children }) => @{\n    <div class={'alert alert-' + kind()}>@render(children?.())</div>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Alert kind=\"warn\" use:autoDismiss(delay={5000})>\n      Your session will expire soon.\n    </Alert>\n  },\n});",
+    "code": "const autoDismiss = directive({\n  host: ref<RootNode>(),\n  bindings: {\n    delay: input<number>(3000),\n    dismissed: output<void>(),\n  },\n  setup: ({ delay, dismissed }) => {\n    const destroyRef = inject(DestroyRef);\n    const handle = setTimeout(() => dismissed.emit(), delay());\n    destroyRef.onDestroy(() => clearTimeout(handle));\n\n    return {\n      dismissNow: () => {\n        clearTimeout(handle);\n        dismissed.emit();\n      },\n    };\n  },\n});\n\n// Alert omits rootNode, so its root is the default RootNode\nexport const Alert = component({\n  bindings: {\n    kind: input<'info' | 'warn' | 'error'>('info'),\n    children: fragment<void>(),\n  },\n  setup: ({ kind, children }) => @{\n    <div class={'alert alert-' + kind()}>@render(children()?.())</div>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Alert kind=\"warn\" use:autoDismiss(delay={5000})>\n      Your session will expire soon.\n    </Alert>\n  },\n});",
     "valid": true,
     "explanation": "Correct. Alert omits rootNode, so its call-site node is the default RootNode. autoDismiss declares host: ref<RootNode>() and only runs a timer with DestroyRef cleanup — it never touches a real element, so it attaches to the RootNode. A host: ref<HTMLElement>() directive would be rejected here."
   },
   {
     "category": "Component Root",
     "description": "rootNode: element<HTMLButtonElement>() with a single <button> root receiving use:tooltip.",
-    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const IconButton = component({\n  rootNode: element<HTMLButtonElement>(),\n  bindings: {\n    icon: input.required<string>(),\n    click: output<void>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, click, children }) => @{\n    <button on:click={() => click.emit()}>\n      <i class={icon()} />\n      @render(children())\n    </button>\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = signal('Save changes');\n\n    return @{\n      <IconButton\n        icon={'icon-save'}\n        use:tooltip(message={tip()})\n        on:click={() => {}}>\n        Save\n      </IconButton>\n    };\n  },\n});",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const IconButton = component({\n  rootNode: element<HTMLButtonElement>(),\n  bindings: {\n    icon: input.required<string>(),\n    click: output<void>(),\n    children: fragment.required<void>(),\n  },\n  setup: ({ icon, click, children }) => @{\n    <button on:click={() => click.emit()}>\n      <i class={icon()} />\n      @render(children()())\n    </button>\n  },\n});\n\nexport const App = component({\n  setup: () => {\n    const tip = signal('Save changes');\n\n    return @{\n      <IconButton\n        icon={'icon-save'}\n        use:tooltip(message={tip()})\n        on:click={() => {}}>\n        Save\n      </IconButton>\n    };\n  },\n});",
     "valid": true,
     "explanation": "Correct. rootNode: element<HTMLButtonElement>() declares a native-element root, and the template has a single <button> root. use:tooltip on <IconButton /> lands on that root, accepted because tooltip's host (HTMLElement) accepts HTMLButtonElement by ordinary assignability."
   },
   {
     "category": "Component Root",
     "description": "A directive requiring HTMLButtonElement applied to a component whose root is element<HTMLElement>().",
-    "code": "const focusRing = directive({\n  host: ref<HTMLButtonElement>(),\n  bindings: {\n    color: input<string>('blue'),\n  },\n  setup: ({ color }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Promises only \"some HTML element\", even though its root is a <button>\nexport const Button = component({\n  rootNode: element<HTMLElement>(),\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:focusRing(color={'teal'})>\n      Save\n    </Button>\n  },\n});",
+    "code": "const focusRing = directive({\n  host: ref<HTMLButtonElement>(),\n  bindings: {\n    color: input<string>('blue'),\n  },\n  setup: ({ color }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Promises only \"some HTML element\", even though its root is a <button>\nexport const Button = component({\n  rootNode: element<HTMLElement>(),\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children()())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:focusRing(color={'teal'})>\n      Save\n    </Button>\n  },\n});",
     "valid": false,
     "explanation": "Invalid. The declared root is a promise, not a fact: Button says only HTMLElement, and HTMLElement is not assignable to focusRing's host: ref<HTMLButtonElement>() — the check uses the declaration, never the internal <button>. Widening the promise is deliberate (it keeps the inner tag a private detail); the cost is that tag-specific directives are refused. rootNode: element<HTMLButtonElement>() would accept this call and lock the tag into the public API."
   },
