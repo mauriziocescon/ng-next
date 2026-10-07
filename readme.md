@@ -664,7 +664,7 @@ Improved ergonomics for types and tokens.
 
 `injectionToken` creates a typed DI token. Four flavours:
 
-- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default; the factory is only invoked when a component explicitly lists `provide(token)` in its `providers`. Throws if missing from the injector tree.
+- **With factory** — `provide(token)` shorthand uses this factory. Not provided in root by default; the factory is only invoked when a component or directive explicitly lists `provide(token)` in its `providers` and the token is resolved. Throws if missing from the injector tree.
 - **With factory + `autoProvided: true`** — factory registered unconditionally at root scope; no explicit `provide` needed.
 - **Without factory** — must use `provide(token, factory)` with an explicit factory. The `provide(token)` shorthand is a compile-time error.
 - **Multi** (`injectionToken.multi`) — each `provide` call contributes one item; `inject` returns the collected array.
@@ -764,7 +764,7 @@ export const Counter = component({
 ### Scope and caveats
 
 - `interoperability layer`: the full incremental migration story (mixed projects, build boundaries) is not covered intentionally — the topic is important but requires many micro-decisions that depend on compiler architecture choices out of scope for this proposal;
-- other decorator properties: in this proposal a component config carries only `bindings`, `rootNode`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings` and `setup` — notably no directive-level `providers`. However, `@Component` and `@Directive` have many more properties, some of which (like `preserveWhitespaces`, directive-level `providers`) should probably remain. They are not covered here to avoid scope creep;
+- other decorator properties: in this proposal a component config carries only `bindings`, `rootNode`, `setup`, `providers`, `style` and `styleUrl`, and a directive config only `host`, `bindings`, `setup` and `providers`. Other decorator properties, such as `preserveWhitespaces` and directive composition via `hostDirectives`, are not covered here to avoid scope creep;
 - `event delegation`: not explicitly considered, but it could fit as "special attributes" (`onClick`, ...) similarly to [Solid events](https://docs.solidjs.com/concepts/components/event-handlers);
 - inputs and outputs can be reassigned inside the setup:
   - `https://github.com/microsoft/TypeScript/issues/18497`,

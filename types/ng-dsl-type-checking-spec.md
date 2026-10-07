@@ -668,8 +668,11 @@ Multiple @{ } literals in setup → D009
 
 PROVIDERS-INPUTS-ONLY
 ─────────────────────────────────────────────────────────────────
-providers receives Pick<B, input keys only>.
-Models, outputs, and fragments are excluded → D007.
+For component(...) and directive(...), providers receives
+Pick<B, input keys only>. Models (including ModelSignal's InputSignal
+supertype), outputs, and fragments are excluded → D007.
+The selected input signals retain their declared value types, including
+undefined for optional inputs.
 
 
 BINDING-PRIMITIVE-PLACEMENT
@@ -844,6 +847,29 @@ A directive on C's root element inside T(C) collides with the same directive
 applied at S. The merged set is per-instantiation: C's many call sites are
 independent. With the default `rootNode` there is no shared element, so
 uniqueness reduces to "at most once per call site".
+
+### 7.2 Directive Declaration Contracts
+
+TypeScript API well-formedness rules (not template-node judgments):
+
+```
+DIRECTIVE-PROVIDERS
+─────────────────────────────────────────────────────────────────
+With bindings B:
+  providers?: (inputs: InputsOnly<B>) => Provider[]
+Without a bindings record:
+  providers?: () => Provider[]
+
+InputsOnly uses PROVIDERS-INPUTS-ONLY (§5.1); excluded binding access → D007.
+The callback must return Angular Provider[]; other type mismatches → D017.
+Host context and setup's expose result are not callback arguments.
+─────────────────────────────────────────────────────────────────
+```
+
+`providers` is declaration configuration, not a consumer-bindable key and not
+part of `B`. It does not change `DirectiveInstance<H, B, E>`, host compatibility,
+required consumer bindings, or expose/ref inference. It is also permitted on
+inert `RootNode` directives: lack of a DOM surface does not prevent DI.
 
 ---
 
@@ -1109,7 +1135,7 @@ BindingKind<V> =
 | D004 | Declaration | `input()`/`output()`/`model()`/`fragment()` called outside `bindings` | Error |
 | D005 | Declaration | Reserved `children` binding is not a `FragmentBinding<void>` | Error |
 | D006 | Declaration | Reserved `ref` binding declared on a component | Error |
-| D007 | Declaration | `providers` reads model/output/fragment bindings | Error |
+| D007 | Declaration | Component/directive `providers` reads model/output/fragment bindings | Error |
 | D008 | Declaration | Setup does not return `TemplateMarkup` or `{ template }` | Error |
 | D009 | Declaration | Multiple `@{ }` literals in setup or `@{ }` not in tail position | Error |
 | D010 | Binding: Existence | Unknown attribute/property on native element | Error |
@@ -1181,7 +1207,7 @@ bindings: { children: input<string>() } // ❌ D005
 // D006 — reserved `ref` binding declared on a component
 bindings: { ref: input<string>() } // ❌ D006
 
-// D007 — providers reads non-input
+// D007 — component or directive providers reads non-input
 providers: (inputs) => { inputs.selected; return []; } // ❌ D007
 
 // D008 — invalid setup return
