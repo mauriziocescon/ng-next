@@ -71,7 +71,7 @@ them however it likes.
 | Node | Fields |
 |------|--------|
 | element (native or component) | `name`, `attributes`, `inputs`, `models`, `outputs`, `classes`, `styles`, `animations`, `references`, `directives`, `fragments`, `children` |
-| directive application | `directiveName`, `inputs`, `models`, `outputs`, `fragments`, `when`, `ref` |
+| directive application | `directiveName`, `inputs`, `models`, `outputs`, `fragments`, `ref` |
 | fragment | `name`, `origin` (`inline` \| `implicitChildren`), `parameters`, `children` |
 | derive | `name`, `derivation`, `inputs` |
 | binding entry | `name`, plus `value` or `handler`; input entries also carry `once` |
@@ -391,7 +391,6 @@ identity slots, independent of the element's:
 ∀ name: |{b ∈ dir.inputs ∪ dir.models | b.name = name}| ≤ 1
 ∀ name: |{b ∈ dir.outputs | b.name = name}| ≤ 1
 ∀ name: |{b ∈ dir.fragments | b.name = name}| ≤ 1
-|dir.when| ≤ 1
 |dir.ref| ≤ 1
 Violation → D012
 
@@ -800,7 +799,6 @@ CHECK-REQUIRED(B_D, provided, "directive")
 NO-UNKNOWN-BINDINGS(B_D, dir)
 NO-DUPLICATE-DIRECTIVE-BINDINGS(dir)
 
-if dir.when:  Γ ⊢ dir.when.condition : T    (any type — truthiness)
 if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ use:D(...) ✓

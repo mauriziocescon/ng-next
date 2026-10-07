@@ -251,7 +251,6 @@ export const PriceSimulator = component({
 ## Binding syntax helpers
 
 - Literal form equivalence for inputs: `prop="value"` is always a string literal — equivalent to `prop={'value'}`. Non-string inputs require expression syntax: `count={5}`, not `count="5"`.
-- `:when`: conditionally applies a `use:` binding; sits outside the directive's inputs and cannot clash with them.
 
 ```ts
 import { component, signal } from '@angular/core';
@@ -260,7 +259,6 @@ import { tooltip } from '@mylib/tooltip';
 export const SearchBox = component({
   setup: () => {
     const text = signal('');
-    const showTip = signal(true);
     const tip = signal('Type to search');
 
     return @{
@@ -269,7 +267,7 @@ export const SearchBox = component({
         type="text"
         placeholder="Search"
         model:value={text}
-        use:tooltip(message={tip()}):when={showTip()} />
+        use:tooltip(message={tip()}) />
     };
   },
 });
@@ -874,7 +872,6 @@ A canonical list of every prefix/modifier recognized in the template DSL.
 | `style:` | native elements | Yes | Conditional inline style binding. Multiple `style:` on the same element are valid. |
 | `animate:` | native elements | Yes (enter + leave) | Enter/leave animation class binding. `on:animate:` for event callback. |
 | `use:` | native elements, components | Yes (different directives) | Attaches a directive; on a component, to its root. No directive twice on the same element. |
-| `:when` | `use:` directives | No (per directive) | Conditionally applies the directive. Sits outside the directive's input parentheses. |
 | `:ref` | `use:` directives | No (per directive) | Captures the directive's `expose` into a `ref`. Syntax: `use:dir(...):ref={variable}`. |
 | `ref` | native elements, components | No | Captures element or component `expose` into a `ref` / `refMany`. Reserved — cannot be declared as a component binding. |
 
