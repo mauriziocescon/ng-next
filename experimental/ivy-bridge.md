@@ -18,7 +18,7 @@ The source baseline is checkout commit
 `ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2`. References to “existing Ivy” mean
 that checkout, not the latest upstream branch. PR
 `https://github.com/angular/angular/pull/70189` is a separate experiment:
-As of this review (2026-10-07), GitHub reports it as **closed and unmerged**.
+As of this review (2026-10-08), GitHub reports it as **closed and unmerged**.
 The inspected patch has head commit
 `098aaa9c239317f9e2d734c7537f3671840cd6e1`. Section 4 describes what that patch
 actually changes.
@@ -32,6 +32,9 @@ The proposal establishes several contracts:
 - Inputs, models, outputs, and received fragment signals belong to each instance.
   Component and directive `providers` callbacks receive **inputs only**, excluding
   models even though `ModelSignal` extends `InputSignal`.
+  They run synchronously once per instance after input seeding, before setup,
+  outside an injection context and without reactive tracking. Registrations are
+  fixed across instances; factory closures and resolved values can differ.
 - Components default to a logical `RootNode`. An explicit `rootNode: element<T>()`
   declares a public native-root contract. Call-site directives attach to that
   root, in one step.
@@ -133,7 +136,9 @@ execute it unchanged. Boundary allocation can precede expression evaluation if
 needed. For a node carrying several directives, allocation/seeding and provider
 publication must account for cross-directive injection before any setup resolves
 a peer. An early DI lookup must not instantiate a peer with unseeded inputs.
-Reentrant creation and cyclic injection require explicit handling.
+Reentrant creation, cyclic injection, and failure cleanup require explicit
+handling. When creation aborts, partially installed resources must be released
+and shared first-pass metadata must not be reused in a corrupted state.
 
 The `bindings` declaration must lower to **allocation metadata or factories**.
 Evaluating `input()`, `model()`, `output()`, or `host: ref<H>()` once at module load
@@ -142,6 +147,15 @@ In particular, existing
 [OutputEmitterRef](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/authoring/output/output_emitter_ref.ts)
 injects `ErrorHandler` and `DestroyRef` during allocation; models allocate an
 emitter too. These cannot simply be constructed outside their owning context.
+
+That allocation also exposes a bootstrap dependency: the proposed input-driven
+provider callback has not yet run when emitters are allocated. If emitter
+construction resolves a same-node provider, that provider must not be instantiated
+before its input captures are ready. One possible bridge separates input seeding
+and provider registration from DI-dependent emitter allocation; another supplies
+the emitter's framework dependencies without early user-provider resolution.
+The exact sub-order is open. Reusing `OutputEmitterRef` unchanged does not resolve
+it automatically.
 
 Setup receives stable binding identities:
 
@@ -182,9 +196,10 @@ tracking. Simply skipping the first update expression can leave the parent
 unsubscribed: existing
 [renderView](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/render.ts) executes creation
 without the template consumer installed by `refreshView` for update execution.
-Any seed cache therefore also needs a way to establish or transfer those reads
-into the correct consumer. Re-evaluating only expressions proven safe is another
-compiler strategy, not a restriction already present in the proposal.
+For live bindings, any seed cache therefore also needs a way to establish or
+transfer those reads into the correct consumer. Re-evaluating only expressions
+proven safe is another compiler strategy, not a restriction already present in
+the proposal.
 
 `once:` deliberately freezes **input** values for an instance's lifetime. It is
 valid on component, directive, and derivation inputs, and invalid on native
@@ -193,6 +208,9 @@ updates. On owning-view destruction and recreation, a new directive instance
 receives a new seed. Initial seeds referencing `@let`, loop context, or refs require a defined
 evaluation order; unavailable refs cannot be made valid merely by allocating
 binding nodes sooner.
+Unlike live bindings, `once:` does not need continuing subscriptions to its seed
+dependencies. Its one-time evaluation remains subject to the same lexical and
+creation ordering requirements.
 
 Setup and provider registration callbacks should execute outside the consumer
 evaluating the parent template, so incidental initialization reads do not become parent
@@ -211,11 +229,47 @@ Factories are resolved lazily through instance slots, but provider layout belong
 to shared `TView`/`TNode` metadata.
 
 Provider semantics are defined in [the checking spec, §5.1](../types/ng-dsl-type-checking-spec.md#51-component-declaration-contracts).
-The bridge must save, clear, and restore ambient injection/reactive state around
-`providers(inputs)`, including on failure, then register its array before setup.
-Shared token layout needs instance-specific binding access and factory closures;
-closures must never be cached in a shared `TView` or blueprint for other instances.
-Same-node visibility and collision rules must remain explicit.
+Call `providers(inputs)` synchronously once per instance after seeding and register
+its returned array before setup. Input reads are allowed without subscribing that
+callback to changes; `inject()` is unavailable in the callback. The registered
+value factories later resolve lazily in an injection context. Retaining an input
+signal in a service allows later reads but does not automatically rerun the
+callback, rebuild registrations, or recreate that service.
+
+The bridge must save, disable, and restore ambient injection/reactive state around
+the array-building callback, including on failure. Clearing the active consumer
+alone does not disable injection. Angular has both an inject implementation and
+a current-injector path; in the latter, `undefined` means no injection context,
+whereas `null` permits root limp-mode injection. See
+[injection context handling](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/di/contextual.ts) and
+[injector-only lookup](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/di/injector_compatibility.ts).
+Setup restores the owning injection context while remaining untracked. This
+context isolation is a bounded change, separate from provider layout integration.
+
+Token identities, registration count/order, and provider kinds are fixed across
+instances of a declaration. Only the closures and produced values vary. That
+invariant is part of the intended proposal, not implied by calling the callback
+once or typing its result as `Provider[]`. Compiler analysis and any syntax
+restrictions to enforce it remain undecided. The runtime need not support
+input-dependent registration layouts.
+
+A plausible integration reserves shared token/slot metadata and installs each
+instance's factories into its `LView`, or uses shared factory adapters that read
+an instance-local provider record. Neither strategy may retain the first
+instance's closures in the shared blueprint. Current `createLView` shallow-clones
+the blueprint; multi-provider factory lists also need instance isolation.
+Same-node collision order, lazy caching, cycles, and provider visibility must
+follow an explicit resolved directive order. A separate environment injector per
+instance would not automatically preserve node lookup, injection flags, or
+view-aware framework tokens.
+
+Preserve existing destruction semantics rather than promising every returned
+service gets an automatic `ngOnDestroy` call. Node-provider
+[`registerDestroyHooksIfSupported`](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/di_setup.ts)
+registers prototype hooks for type and `useClass` providers, not arbitrary
+`useFactory` results. A `provide(Store, factory)` lowering to `useFactory` can use
+`DestroyRef` for explicit cleanup; broader factory-result destruction would be
+an additional contract.
 
 ### 3.5 Component identity and public injection
 
@@ -247,6 +301,10 @@ The DI token helpers are more incremental. `provide(token, factory)` can map to
 tokens support `provide(token)` shorthand. A factory without `autoProvided: true`
 does not imply root registration. `autoProvided: true` could use Angular's
 root injectable-definition machinery; it does not imply eager factory execution.
+The non-auto helper should retain a shorthand factory separately from automatic
+root provisioning: this checkout's `InjectionToken` constructor uses
+`options.providedIn || 'root'`, so even passing `providedIn: null` with factory
+options does not disable its root default.
 The stronger token-derived typing mainly belongs to the TypeScript layer. See
 [InjectionToken](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/di/injection_token.ts) and
 [R3Injector](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/di/r3_injector.ts). Programmatic creation, testing,
@@ -395,12 +453,32 @@ the shared child `TView`. The remaining integration requirements are:
 - **Child lexical scope:** root bindings must still access setup locals and
   template declarations, even though the parent creates the host. Root-local
   directive inputs depending on those values need a defined initialization order.
+  Top-level `@let`/`@derive` declarations can precede the root and participate in
+  those seeds. Publishing all directive tokens does not make these values ready:
+  if child setup injects a root-local directive whose inputs require that setup
+  to finish, the bridge encounters an initialization cycle. A supported ordering
+  or a diagnosed cycle is needed; static composition alone cannot remove it.
+- **Reactive ownership:** normal host-binding opcodes run in the parent owning
+  view's update, before child component refresh. Reading child locals there can
+  subscribe the parent; running them only there can miss updates when only the
+  child refreshes during targeted traversal. Root-authored bindings and root-local
+  directive input updates need an execution/notification path that follows child
+  state while still addressing the parent-owned host and its binding layout.
 - **Styling precedence:** root-authored styling must retain native template
   precedence. Translating it into ordinary component host bindings could change
   which source wins; the lowering must preserve its source priority explicitly.
+  Ivy's styling list belongs to the host `TNode`/`TView`, and classifies bindings
+  using their slot position. Two independent styling lists on one DOM element
+  would not preserve cross-source precedence and fallback. See
+  [styling classification](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/styling.ts)
+  and [list insertion](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/styling/style_binding_list.ts).
 - **Directive semantics:** root-local and call-site directives need compatible
   input routing, injection contexts, ordering, duplicate checks, and cleanup.
   A composition-like layout alone does not establish these guarantees.
+  Host-site directive records ordinarily live in the parent `LView`, whereas
+  root-local authored logic originates in the child. The lowering must state
+  which view supplies `ViewContext`, `DestroyRef`, and update ownership for each,
+  rather than assuming lexical scope and slot ownership are interchangeable.
 - **Refs and declarations:** refs to the authored root and declarations beside
   it need correct scope and registration after the root is removed from the child
   template's native-node creation sequence.
@@ -559,8 +637,17 @@ inserted elsewhere. The proposed fragment default follows this model: lexical
 captures and default injection ancestry remain declaration-linked. Rendering a
 fragment inside another component does not automatically select that receiver's
 providers. If `Parent` declares content rendered by `Menu` and both provide
-`Theme`, a descendant within the fragment resolves the declaration-side value
-by default, absent a nearer provider or restrictive injection flags.
+`Theme`, a descendant within a fragment declared outside `Menu`'s node-injector
+ancestry resolves the declaration-side value by default, absent a nearer provider
+or restrictive injection flags.
+
+Declaration ancestry means the actual declaration node/view chain, not simply
+the setup component's injector. A receiver already on that chain can still supply
+dependencies. In particular, placing a generated fragment `TContainer` under a
+receiver's host `TNode` can include its providers in lookup. The compiler must
+define declaration sites for inline and implicit-children sources, preserving
+the checking spec's declaration-site contract. The existing `TemplateRef` model
+does not prove that every consumer-authored source bypasses receiver providers.
 
 An explicit non-null `options.injector` supplies an embedded-view injector.
 [createAndRenderEmbeddedLView](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/view_manipulation.ts)
@@ -572,10 +659,10 @@ all ancestors. Omitted, `undefined`, and `null` mean no override. Preserve
 Angular's injection-flag behavior instead of introducing a new lookup algorithm.
 
 This restriction improves reuse of declaration-linked embedded views. The
-composition trade-off is that consumer-authored fragments do not automatically
-inject the receiving menu/list/controller's services. Typed parameters and
-explicit injector overrides can supply that context. `inject()` still requires
-a supported injection context, such as descendant setup.
+composition trade-off is that inserting consumer-authored fragments does not
+automatically add the receiving menu/list/controller's services to their ancestry.
+Typed parameters and explicit injector overrides can supply that context.
+`inject()` still requires a supported injection context, such as descendant setup.
 
 ### 6.3 Proposed outlet reconciliation
 
@@ -595,6 +682,11 @@ must not retain instances with their old dependencies.
 This identity/lifetime policy is proposed runtime behavior, not proved by the
 type contracts. Source lifetime after its declaration view is destroyed, capture
 retention, and transplanted-view refresh still need validation.
+
+The checking spec also accepts a generic `TemplateMarkup` expression in `@render`,
+not only an identifiable fragment call. The lowering must either represent other
+accepted markup values with equivalent source/context identity or define their
+reconciliation separately. The current opaque type does not answer that question.
 
 Fragments generalize deferred view creation rather than merely renaming
 `ng-content` projection. Each outlet can own separate component/directive instances
@@ -640,6 +732,10 @@ hooks handle post-render work. Setup is not rerun on signal updates. Existing
 an environment-injector-only adapter could accidentally change both timing and
 cleanup. The bridge must preserve view-aware contexts for setup, directives,
 and derivations, with ordinary owning-view cleanup as described in section 5.
+It must also choose component view flags and input/event dirty-marking paths
+consistent with the retained consumer model; using signals does not independently
+specify when an `LView` is traversed. Existing automatic cleanup remains subject
+to explicit options such as an effect's `manualCleanup` or supplied injector.
 `afterNextRender` and `afterRenderEffect` do not execute during SSR. Removing lifecycle hooks from
 `.ng` authoring does not remove their runtime support for decorator-based classes.
 
@@ -658,9 +754,11 @@ predicate matching. Registration still needs lifecycle/order bookkeeping:
   site, or `undefined` when none remains. This fallback is a proposed runtime
   interpretation; unconditionally clearing on any site's destruction would lose
   an active match.
-- `refMany` should reflect active sites in rendered template order, including
-  tracked `@for` moves and view creation/destruction. A one-time append is
+- A proposed `refMany` ordering policy is active sites in rendered template order,
+  including tracked `@for` moves and view creation/destruction. A one-time append is
   insufficient; internal site identity must distinguish repeated instances.
+  The sketches describe collection but do not fully specify ordering across
+  transplanted fragments/outlets; that policy needs an explicit contract.
 - Publication must be consistent with completed rendering. The proposal tells
   users to read refs after render hooks; initial setup cannot assume child refs
   already exist. Render hooks do not make refs a browser-only storage mechanism.
@@ -729,29 +827,33 @@ no-DOM-host contract through legacy element APIs.
 
 ## 10. Work required and decisions still open
 
-| Area                     | Existing reuse                                              | Required extension or unresolved decision                                                               |
-| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Lexical authoring        | Shared template functions, `TView`/`LView`                  | `.ng` parser/checker/lowering; per-instance capture representation                                      |
-| Seeded setup             | Signal input nodes, node factories                          | Pre-setup allocation/seeding; initial expression reuse and tracking; subscription timing                |
-| Input-driven providers   | Lazy factories, provider/multi-provider machinery           | Per-instance closures for shared fixed layout; seeded inputs and execution contexts                     |
-| Identity and expose      | Definitions, DI lookup, component views                     | Internal/public separation, public injection, debug/API adapters                                        |
-| Hostless roots           | Element-container anchors, PR experiment                    | Full owned-node/renderer/hydration contract and logical handles                                         |
-| Native roots             | Parent-owned hosts, element renderer, directive composition | Compiler-generated host metadata; child-context root bindings and preserved directive/styling semantics |
-| View-lifetime directives | Static directive slots, host bindings, destroy machinery    | Explicit input/output targeting; ordinary effect/listener/output/ref cleanup                            |
-| Registered host bindings | Native binding instructions, styling precedence             | Instance closures, view-lifetime cleanup, SSR/hydration reconstruction                                  |
-| Fragments                | Embedded views, containers, declaration links               | Callable sources/captures, declaration-site DI, identity and injector reconciliation                    |
-| Derivations              | Per-view slots, signal graph                                | Seeded input record, node-less view context, cleanup                                                    |
-| Refs                     | Signals, view insertion/removal bookkeeping                 | Explicit site registry, last-site fallback, collection order                                            |
+| Area                     | Existing reuse                                              | Required extension or unresolved decision                                                         |
+| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Lexical authoring        | Shared template functions, `TView`/`LView`                  | `.ng` parser/checker/lowering; per-instance capture representation                                |
+| Seeded setup             | Signal input nodes, node factories                          | Pre-setup allocation/seeding; initial expression reuse and tracking; subscription timing          |
+| Input-driven providers   | Lazy factories, provider/multi-provider machinery           | Per-instance closures for shared fixed layout; seeded inputs and execution contexts               |
+| Identity and expose      | Definitions, DI lookup, component views                     | Internal/public separation, public injection, debug/API adapters                                  |
+| Hostless roots           | Element-container anchors, PR experiment                    | Full owned-node/renderer/hydration contract and logical handles                                   |
+| Native roots             | Parent-owned hosts, element renderer, directive composition | Compiler-generated host metadata; child-context initialization/tracking; unified styling priority |
+| View-lifetime directives | Static directive slots, host bindings, destroy machinery    | Explicit input/output targeting; ordinary effect/listener/output/ref cleanup                      |
+| Registered host bindings | Native binding instructions, styling precedence             | Instance closures, view-lifetime cleanup, SSR/hydration reconstruction                            |
+| Fragments                | Embedded views, containers, declaration links               | Callable sources/captures, declaration-site DI, identity and injector reconciliation              |
+| Derivations              | Per-view slots, signal graph                                | Seeded input record, node-less view context, cleanup                                              |
+| Refs                     | Signals, view insertion/removal bookkeeping                 | Explicit site registry, last-site fallback, collection order                                      |
 
 Runtime experiments should check the contracts rather than only emitted
 instruction names. Particularly useful cases are two instances with different
 input seeds sharing fixed registrations but independent factories/services;
 callback isolation and ambient-state restoration; side-effectful initial expressions;
 parent signals read only for seeds; same-node peer injection; a native root with different directives
-at different call sites; view destruction/recreation with effects and providers;
+at different call sites; a child-only refresh updating its lifted root; root-local
+input seeds from setup and top-level derivations; initialization cycles and failure
+cleanup; view destruction/recreation with effects and providers;
 class-map changes, styling collisions, and attribute/property semantics;
-declaration-side `Theme` lookup despite a receiver provider; explicit injector
-lookup and declaration fallback with Angular's flags; nullish override identity;
+declaration-side `Theme` lookup when the receiver is outside declaration ancestry;
+explicit injector lookup and declaration fallback with Angular's flags;
+nullish override identity;
+inline/implicit fragment declaration-site ancestry;
 fragment source and injector changes; repeated fragment outlets; ref fallback and
 tracked row reordering; and hydrated view recreation without leaked resources or
 duplicate listeners.
@@ -762,3 +864,11 @@ programmatic creation/attachment, and a testing API intentionally incomplete.
 Logical-host registration uses an explicitly unallocated extension diagnostic;
 D044 remains the checking spec's native-root type mismatch diagnostic. Extension
 sketches are not implemented APIs.
+
+The authoring readme still omits several details that the checking spec or
+host-binding extension states more precisely, including fragment DI and directive
+lifetime explanations. Its decorator-consumption appendix also has incomplete
+native binding/ref and constructor-DI examples. Those are authoring follow-ups,
+not evidence that the runtime bridge already satisfies interoperability. The
+relative paths in those documents reflect another repository layout; links in
+this bridge and its feasibility assessment target this checkout's `mau` files.
