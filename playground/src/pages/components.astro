@@ -325,9 +325,8 @@ const variants = [
   <div class="annotation" role="note">
     <strong>Every component has a <code>rootNode</code>:</strong> omit it and it defaults to <code>RootNode</code> —
     a hostless, <code>ng-container</code>-like root that leaves the template unconstrained and exposes no native element.
-    Declare a native-element root with <code>rootNode: element&lt;HTMLElement&gt;()</code> (or a subtype like
-    <code>element&lt;HTMLButtonElement&gt;()</code>) and the template must have a single root node that is a native element,
-    not wrapped in any control flow (<code>@if</code>/<code>@for</code>/<code>@switch</code>), <code>@defer</code> block, or <code>@boundary</code> block.
+    Declare a native-element root with <code>rootNode: element&lt;HTMLElement&gt;()</code> and the template must have a single root node that is a native element,
+    not wrapped in any control flow, <code>@defer</code> block, or <code>@boundary</code> block.
     That declared root is what call-site directives attach to.
   </div>
 
