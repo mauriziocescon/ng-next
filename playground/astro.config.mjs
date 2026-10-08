@@ -19,7 +19,7 @@ function llmsTxt() {
     { anchor: 'component-structure-and-bindings', desc: '`setup` runs once in injection context; native elements resolve through `IntrinsicElements`; binding syntax (`bind:`, `model:`, `on:`).' },
     { anchor: 'element-directives', desc: 'Directives change DOM appearance/behavior; applied with `use:directive(...)`; `host` property constrains target elements.' },
     { anchor: 'template-scoped-derivations-derive', desc: 'Template-scoped reactive computations with injection context; follows the lifecycle of the enclosing view; must return a `Signal<T>`.' },
-    { anchor: 'binding-syntax-helpers', desc: 'Literal form equivalence for string inputs; `:when` conditionally applies a `use:` binding.' },
+    { anchor: 'binding-syntax-helpers', desc: 'Literal form equivalence for string inputs; `use:` applications have reactive bindings and follow their owning view lifetime.' },
     { anchor: 'one-time-bindings-once', desc: '`once:` freezes an input at creation time — never updated afterwards.' },
     { anchor: 'input-driven-providers', desc: 'Inputs hoisted for provider initialization; `providers` receives only inputs (not models or outputs); factories run in injection context.' },
     { anchor: 'expose-and-template-refs', desc: '`expose` defines a component/directive\'s public API through refs; `ref<T>()` and `refMany<T>()` for element/component/directive access.' },
@@ -27,7 +27,7 @@ function llmsTxt() {
     { anchor: 'dependency-injection-enhancements', desc: '`injectionToken` with four flavours (with factory, auto-provided, without factory, multi); `provide()` shorthand.' },
     { anchor: 'final-considerations', desc: 'Concepts impacted (ng-content, ng-template, structural directives, pipes, queries, etc.); pros and cons of the approach.' },
     { anchor: 'appendix-co-located-templates-in-angular-via-ng-files', desc: 'Rationale for `*.ng` files; co-location benefits; boilerplate tax trade-off analysis.' },
-    { anchor: 'appendix-binding-prefix-and-modifier-reference', desc: 'Canonical list of every prefix/modifier (`bind:`, `model:`, `on:`, `once:`, `class:`, `style:`, `animate:`, `use:`, `:when`, `:ref`, `ref`).' },
+    { anchor: 'appendix-binding-prefix-and-modifier-reference', desc: 'Canonical list of every prefix/modifier (`bind:`, `model:`, `on:`, `once:`, `class:`, `style:`, `animate:`, `use:`, `:ref`, `ref`).' },
     { anchor: 'appendix-relevant-github-issues', desc: 'Well-known community requests related to these proposals.' },
     { anchor: 'appendix-consuming-decorator-based-classes-sketch', desc: 'Consuming existing `@Component`/`@Directive`/`@Pipe` classes in `.ng` files; `:element` suffix for multi-selector components, `use:ClassName(...)` for directives, pipe-to-derivation wrapping.' },
   ];

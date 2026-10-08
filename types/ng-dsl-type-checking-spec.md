@@ -71,7 +71,7 @@ them however it likes.
 | Node | Fields |
 |------|--------|
 | element (native or component) | `name`, `attributes`, `inputs`, `models`, `outputs`, `classes`, `styles`, `animations`, `references`, `directives`, `fragments`, `children` |
-| directive application | `directiveName`, `inputs`, `models`, `outputs`, `fragments`, `when`, `ref` |
+| directive application | `directiveName`, `inputs`, `models`, `outputs`, `fragments`, `ref` |
 | fragment | `name`, `origin` (`inline` \| `implicitChildren`), `parameters`, `children` |
 | derive | `name`, `derivation`, `inputs` |
 | binding entry | `name`, plus `value` or `handler`; input entries also carry `once` |
@@ -391,7 +391,6 @@ identity slots, independent of the element's:
 ∀ name: |{b ∈ dir.inputs ∪ dir.models | b.name = name}| ≤ 1
 ∀ name: |{b ∈ dir.outputs | b.name = name}| ≤ 1
 ∀ name: |{b ∈ dir.fragments | b.name = name}| ≤ 1
-|dir.when| ≤ 1
 |dir.ref| ≤ 1
 Violation → D012
 
@@ -800,7 +799,6 @@ CHECK-REQUIRED(B_D, provided, "directive")
 NO-UNKNOWN-BINDINGS(B_D, dir)
 NO-DUPLICATE-DIRECTIVE-BINDINGS(dir)
 
-if dir.when:  Γ ⊢ dir.when.condition : T    (any type — truthiness)
 if dir.ref:   CHECK-REF(Γ, E_D, dir.ref)
 ─────────────────────────────────────────────────────────────────
 Γ ⊢ use:D(...) ✓
@@ -1074,17 +1072,20 @@ Optional: if options.injector present:
 Γ ⊢ @render(expr, { injector? }) ✓
 ```
 
-When `expr` is `undefined`, nothing is rendered (no-op).
-This supports `@render(optionalFragment()?.())` for an optional receiver signal.
+An `undefined` expression clears the outlet. Optional fragments use
+`@render(optionalFragment()?.())`.
 
 D026 is a template-side code only. It is the invocation half of the fragment
 contract; §3.4 is the declaration half (an inline `@fragment`'s parameter list),
 both comparing a positional list to the same `FragmentArgs<T>`.
 
-**Injector resolution.** `@render` is an inline outlet: providers inside the rendered
-fragment resolve against the **render site's** injector, not the definition site's.
-When `options.injector` is provided it overrides this default; when omitted the
-enclosing component's injector at the `@render` call site is used.
+**Injector resolution.** Fragment views retain declaration-site DI ancestry,
+including native-node providers, wherever rendered. A non-null `options.injector`
+supplies an embedded-view injector: fragment-local nodes, the override, and
+declaration ancestry participate under Angular's lookup rules and injection flags.
+Unresolved tokens may fall back through declaration ancestry. Omitted, `undefined`,
+and `null` mean no override. Rendering inside another component does not
+automatically select its providers.
 
 ---
 

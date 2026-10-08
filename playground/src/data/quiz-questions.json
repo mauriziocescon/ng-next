@@ -50,10 +50,10 @@
   },
   {
     "category": "Directives",
-    "description": "Conditional directive application with :when modifier.",
-    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const SearchBox = component({\n  setup: () => {\n    const text = signal('');\n    const msg = signal('Type to search');\n    const show = signal(true);\n\n    function handler() { /* ... */ }\n\n    return @{\n      <input\n        type=\"text\"\n        model:value={text}\n        use:tooltip(message={msg()}):when={show()}\n        on:input={handler} />\n    };\n  },\n});",
+    "description": "Unconditional directive application with a reactive input.",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\nexport const SearchBox = component({\n  setup: () => {\n    const text = signal('');\n    const msg = signal('Type to search');\n\n    function handler() { /* ... */ }\n\n    return @{\n      <input\n        type=\"text\"\n        model:value={text}\n        use:tooltip(message={msg()})\n        on:input={handler} />\n    };\n  },\n});",
     "valid": true,
-    "explanation": "Correct. :when conditionally applies the directive. It sits outside the directive's parentheses and cannot clash with input names."
+    "explanation": "Correct. The directive is fixed for its owning view lifetime while its message binding remains reactive. View recreation creates a fresh directive; a tracked row move retains it."
   },
   {
     "category": "Directives",

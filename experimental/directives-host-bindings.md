@@ -152,15 +152,15 @@ directives share the owner's lifetime.
 
 A separate composition proposal must specify effective public binding types,
 required-input forwarding, host compatibility, cycles, duplicate applications,
-and injector lifecycle under conditional removal.
+and injector lifecycle under view destruction.
 
 ## 4. Collisions: retain Angular's ordering
 
 The framework MUST retain Angular's existing ordering among the sources present
 in ng-next: native template bindings and directive host bindings. Registration
-time and directive activation time MUST NOT introduce new priority. A
-conditionally applied directive retains its assigned position when it is
-removed and recreated.
+time MUST NOT introduce new priority. Directive applications and their ordering
+are fixed for the owning view instance; recreating the view uses the same static
+ordering with fresh instances.
 
 For styling, native template styling outranks directive host styling. Within a
 source, named bindings outrank whole-map bindings, which outrank static styling.
@@ -191,54 +191,34 @@ separate component host. Styling in that element's own template still has
 template precedence over directive host styling. With the default `RootNode`
 root, there is no native element to receive these bindings.
 
-## 5. Ownership and cleanup
+## 5. View-lifetime resource cleanup
 
-Conditional application (`use:D(...):when={condition}`) introduces removal while
-the element survives. Removal MUST withdraw declarative contributions; this is
-a new lifecycle guarantee beyond today's fixed Angular directive instances.
+A directive application and its registered bindings exist for the owning view's
+lifetime. They are created with the site and destroyed with that view. There is
+no operation to unregister a binding or detach a directive while its view
+survives. Reactive getter results can change without changing this lifetime.
 
-The framework owns the baseline for each element/binding target, shared by all
-declarative writers. The baseline is its unbound state before the first managed
-writer takes ownership, including attribute absence, inline style value and
-priority, class presence, or the native property value. It MUST NOT capture
-another active directive's value as the original baseline. The baseline lasts
-until the last writer releases the target.
+On view destruction, the framework MUST stop binding evaluation, unsubscribe
+native listeners and output subscriptions, dispose view-owned effects and render
+callbacks, clean up emitters and refs, and release instance-local getter/handler
+closures and their captured references. Provider destruction follows the ordinary
+owning injector/view lifetime. New view instances register fresh closures.
+Tracked row moves retain instances and resources rather than registering again.
 
-On directive removal, in the render phase:
+Bindings use normal Angular native binding and styling semantics. A changed
+class map or an `undefined` styling value can reveal a lower-priority styling
+source, as specified in §4. This fallback does not capture or restore a DOM
+snapshot. Attributes and properties retain their own nullish-value semantics,
+update order, and diffing; clearing them does not invoke a styling resolver.
 
-1. Remove its listeners, stop its binding evaluation, release its reactive
-   references, and withdraw its contributions.
-2. Restore baselines for the affected native state before replaying any surviving
-   writers, accounting for coupled targets as described below.
-3. Resolve surviving styling with Angular's precedence and reapply affected
-   property/attribute bindings in Angular's update order, even if their values
-   are unchanged.
-4. Where no writer remains, leave the restored baseline and release its ownership
-   record.
-
-For reflected attributes/properties or otherwise coupled native targets,
-baseline capture and restoration MUST preserve coherent native state. Restore
-released state before replaying surviving writers so restoration cannot overwrite
-their current values. Independent per-directive snapshots are insufficient.
-
-For example, on an initially white background: A supplies green, then a
-higher-priority B supplies blue. Removing A leaves blue; removing B afterward
-restores white, not A's departed green. If A survives B instead, green returns.
-
-Property restoration is a normal native property write. It restores the value,
-not every side effect of the original setter; it cannot resurrect destroyed DOM
-nodes or undo arbitrary imperative work. Only writable native properties with a
-platform-supported baseline/restoration path are supported. Unsupported targets
-MUST be reported rather than silently retaining a departed binding's value.
-
-While a target is managed, its declarative bindings own its state. Imperative
-writes to that same target are outside the merge/cleanup contract. Destroying
-the entire element releases records and listeners without restoring a doomed
-element. A new directive instance registers afresh.
+There is no contract to capture or restore arbitrary pre-binding DOM state.
+Destruction does not reverse arbitrary imperative writes or restore the state
+of an element retained externally after its view is destroyed. Imperative work
+continues to require its own explicit cleanup where appropriate.
 
 ## 6. Native behavior, SSR, and hydration
 
-All writes, including restoration, use Angular's renderer and security rules.
+All binding writes use Angular's renderer and security rules.
 Sanitization depends on the actual native tag and binding target, not just the
 declared host type. Existing restrictions on event-handler attributes and
 unsafe property writes remain in force.
@@ -254,9 +234,9 @@ error handling, teardown, and supported hydration/event-replay integration.
 Getters run during SSR and serializable DOM state is rendered. Arbitrary DOM
 properties and handler functions are not necessarily representable in HTML.
 Hydration MUST recreate instance-local getters/handlers without duplicate
-listeners and preserve or reconstruct cleanup baselines. The already-bound
-server DOM MUST NOT be mistaken for the unbound baseline. A platform unable to
-preserve a required baseline must report that target as unsupported.
+listeners and produce values consistent with the server-rendered DOM, subject
+to Angular's supported mismatch policy. No restoration snapshots need to be
+serialized, preserved, or reconstructed.
 
 ## 7. Checking and runtime integration
 
@@ -268,7 +248,8 @@ Check literal keys and getter results against the native surface of `H`:
   types (D017 for mismatches).
 - Class names and style properties remain open namespaces. Named class values
   use truthiness; whole-class values use the class-map rule above.
-- Registration on a host type admitting `RootNode` is rejected (proposed D044).
+- Registration on a host type admitting `RootNode` is rejected (unallocated
+  extension diagnostic; D044 remains native-root type mismatch).
 - Duplicate keys, unsupported forms, and registration-lifetime violations are
   explicit errors; their diagnostic codes remain to be assigned.
 
@@ -278,9 +259,10 @@ are unchanged.
 
 Literal declaration shapes allow fixed host-binding slots. The compiler stores
 layout in shared metadata; each instance stores its own getter/handler closures.
-Rendering reuses native host-binding instructions and renderer paths. Cleanup
-requires additional ownership, baseline, and forced-replay machinery, including
-SSR/hydration support; this is not a compiler-only change.
+Rendering reuses native host-binding instructions, diffing, styling precedence,
+and renderer paths. Instance closure storage, view-lifetime cleanup, and
+SSR/hydration reconstruction still require runtime integration; this is not a
+compiler-only change.
 
 `host()` remains the escape hatch for focus, measurement, and third-party DOM
 integration. Such work uses render hooks where appropriate and explicit cleanup
@@ -289,16 +271,15 @@ renderer writes or cleanup callback.
 
 ## 8. Required behavioral checks
 
-| Scenario | Required result |
-|:---|:---|
-| Whole-class getter changes `'a'` → `'b'` | Withdraw only this map's `a`; resolve `b` and other sources normally |
-| Native template and directive bind the same class/style | Preserve Angular's template styling precedence |
-| Named styling returns `undefined` versus `false` / `null` | Yield versus explicit class/style removal, as defined above |
-| Two instances read different inputs | Independent values, handlers, and baselines |
-| A is removed beneath B, then B is removed | B remains effective; the original baseline returns after B leaves |
-| A property writer leaves while another survives unchanged | Reapply the surviving writer; no stale snapshot wins |
-| Attribute and reflected property writers overlap | Restore coherent native state, then replay surviving writes |
-| `attr:disabled` returns `false` versus `null` | Present attribute containing `'false'` versus removed attribute |
-| Directive is removed and recreated through `:when` | No leaked listeners; stable ordering; fresh instance callbacks |
-| Server-rendered directive is later removed after hydration | Restore the unbound baseline, not its server-applied value |
-| A baseline cannot be preserved/restored on the target platform | Report the unsupported target rather than promise cleanup |
+| Scenario                                                  | Required result                                                                                                              |
+| :-------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- |
+| Whole-class getter changes `'a'` → `'b'`                  | Withdraw only this map's `a`; resolve `b` and other sources normally                                                         |
+| Native template and directive bind the same class/style   | Preserve Angular's template styling precedence                                                                               |
+| Named styling returns `undefined` versus `false` / `null` | Yield versus explicit class/style removal, as defined above                                                                  |
+| Two instances read different inputs                       | Independent values and handlers                                                                                              |
+| Attribute and reflected property bindings update          | Distinct native writes in Angular's update order and diffing, without a styling resolver                                     |
+| `attr:disabled` returns `false` versus `null`             | Present attribute containing `'false'` versus removed attribute                                                              |
+| `bind:disabled` changes boolean value                     | Native boolean property semantics                                                                                            |
+| An `@if` view is destroyed and recreated                  | No leaked effects, render callbacks, listeners, output subscriptions, emitters, or refs; fresh instance closures and subtree |
+| A tracked `@for` row moves                                | Retain directive instances, resources, and static binding priority                                                           |
+| A hydrated view is destroyed and recreated                | Consistent initial values, fresh client closures, and no duplicate listeners or leaked resources                             |
