@@ -1,166 +1,876 @@
-# Bridging .ng Components to the Ivy Runtime
+# Bridging the `.ng` Proposal to Ivy
 
-> **DISCLAIMER — Highly Speculative & Design Exercise**
-> This document explores how the functional, signal-native `.ng` proposal maps onto the existing Angular Ivy engine. The runtime details and instruction names are approximations used for illustrative purposes and should not be treated as authoritative descriptions of Angular internals.
+> **Highly speculative design exercise.** The `.ng` authoring APIs and runtime
+> extensions discussed here are not implemented in this checkout. Statements
+> about existing Angular behavior are grounded in the linked source files;
+> proposed representations and execution orders remain design choices.
 
-## Proposal Framing
-- **Change Class:** what layer must change (`Compiler-only`, `Runtime-only`, `Compiler + Runtime`).
-- **Delta from Ivy Today:** what is intentionally different from current behavior.
+## 1. Scope and sources
 
----
+This document explores the runtime work needed by the contracts in
+[readme.md](../readme.md), [ng-types.ts](../types/ng-types.ts), its
+[compile-time examples](../types/ng-types.spec.ts), and the
+[template checking specification](../types/ng-dsl-type-checking-spec.md). It also includes
+the additional [directive host-binding proposal](./directives-host-bindings.md).
+The TypeScript helpers are sketches, not working implementations of these APIs.
 
-### 1. Component Instantiation: The "Fake Class" & Reactive Input Wiring
-The `component()` utility returns a constructor-impersonator to satisfy Angular APIs that expect a component type value.
+The source baseline is checkout commit
+`ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2`. References to “existing Ivy” mean
+that checkout, not the latest upstream branch. PR
+`https://github.com/angular/angular/pull/70189` is a separate experiment:
+As of this review (2026-10-07), GitHub reports it as **closed and unmerged**.
+The inspected patch has head commit
+`098aaa9c239317f9e2d734c7537f3671840cd6e1`. Section 4 describes what that patch
+actually changes.
 
-- **Change Class:** Compiler + Runtime + DI metadata changes.
-- **Shape:** The utility returns a JavaScript function object that can carry Angular's static metadata (`ɵcmp`, `ɵfac`) and can be used as a token/type value by DI, Router, TestBed, dynamic component creation, and debugging utilities.
-- **Ivy Metadata:** The compiler can still attach a standard component definition (`ɵcmp`) and factory (`ɵfac`) to this function. However, the factory contract cannot simply be "call `setup()` and return expose" if the rest of Ivy still expects the value in directive slots and `LView[CONTEXT]` to be a component instance.
-- **Current Ivy creation order:** For a component host, Ivy creates the component `LView` before directive instantiation so tokens such as `ChangeDetectorRef` can be injected. It then resolves the component through `getNodeInjectable()`, which invokes the `NodeInjectorFactory`/`ɵfac`. Only after the instance exists does Ivy apply `initialInputs` through `setInputsFromAttrs()`. Dynamic bindings from `ɵɵproperty()` happen later in `refreshView()` update mode. In other words, both static attributes and dynamic property bindings arrive too late for constructor-equivalent logic.
-- **Why `writeToDirectiveInput()` cannot be used before the factory today:** `writeToDirectiveInput()` requires the directive/component instance. For signal inputs it reads the private input field from that instance and extracts the `InputSignalNode`; in dev mode it explicitly rejects writing to a `NodeInjectorFactory` before the directive has been created. Therefore eager seeding cannot literally call today's `writeToDirectiveInput()` before invoking the factory.
-- **Proposed extension — pre-factory binding surface:** The `.ng` component factory must be split into at least two phases:
-  1. Allocate the component's public binding surface first: input signal nodes, model signal nodes, output refs, internal fragment source signals, and the object passed to `setup()`. Expose each fragment signal as read-only; allocate an independent signal even for an omitted optional fragment.
-  2. Apply creation seeds to those preallocated input/model nodes and fragment source signals before any `providers()` factory or `setup()` body can read them. This requires a new seed-writing helper that targets binding nodes directly, not an already-created class instance.
-  3. Resolve per-instance providers that depend on those input nodes.
-  4. Run `setup()` in the established injection context.
-  5. Store the internal component record and public expose result in the appropriate Ivy locations.
-- **Creation/update code shape:** For `.ng` component instantiation sites the compiler may still emit initial values in creation mode and ordinary update bindings for ongoing reactivity:
-  ```
-  // creation pass: seed binding nodes before providers/setup
-  // (ɵɵcomponentAnchor is the hostless boundary from §2; an element-hosted
-  //  component instead lifts its root element into an element-host boundary)
-  ɵɵcomponentAnchor(0, Counter, ɵɵseedInputs([['c', ctx.count()]]));
+The proposal establishes several contracts:
 
-  // update pass: owns ongoing parent -> child synchronization
-  ɵɵproperty('c', ctx.count());
-  ```
-  The creation seed should also initialize the corresponding binding slot, or the compiler must prove that the seeded expression is pure and safe to evaluate again in the first update pass. The proposal examples allow general TypeScript expressions and function calls, so double-evaluation is not automatically safe. Treat "signal-only/pure seed expressions" as a compiler-enforced restriction, or avoid the double evaluation by recording the seeded value into the binding slot that `bindingUpdated()` will later compare.
-- **Provider Lifecycle (with eager seeding):** `providers()` runs after input/model signal nodes are allocated and seeded, but before `setup()`. This is not the same as current static provider metadata. Current Ivy publishes providers into TView/blueprint structures during first create pass (`providersResolver`) and their factories do not receive per-instance input nodes. Input-driven providers require a new per-instance provider-resolution path, likely attached to the component's node-injector factory, so `provide(Store, () => new Store(c))` can close over the current component's seeded input signal.
-- **Consumer one-time bindings (`once:`):** `once:` is mostly a compiler variation: emit the creation seed and omit the update binding. Runtime still needs the same pre-factory seed path. If a `once:` value can contain arbitrary calls, it has the same purity/side-effect considerations as normal seeds, but only during creation.
-- **Delta from Ivy Today:** The broad flow remains Create component boundary -> instantiate component logic -> update bindings. The important delta is that `.ng` needs a pre-instance binding-surface phase and a per-instance provider phase. Inputs are not assigned to class fields; they are created as signal nodes and passed to `setup()`. Prototype lifecycle hooks are removed from the public authoring model; post-binding reactions are signal-based, teardown uses `DestroyRef.onDestroy`, and post-render work uses render hooks/effects.
+- Component and directive `setup` run once per instance in an injection context.
+  Bindings are available immediately; component setup returns one tail-position
+  markup literal, directly or as `{ template, expose? }`. Directive setup returns
+  its public expose value.
+- Inputs, models, outputs, and received fragment signals belong to each instance.
+  Component and directive `providers` callbacks receive **inputs only**, excluding
+  models even though `ModelSignal` extends `InputSignal`.
+- Components default to a logical `RootNode`. An explicit `rootNode: element<T>()`
+  declares a public native-root contract. Call-site directives attach to that
+  root, in one step.
+- Refs and injection of `.ng` component/directive tokens expose only their public
+  API. Template-local fragments retain lexical captures and declaration-site
+  injection ancestry by default; `@render` supports an explicit embedded-view
+  injector. Derivations belong to their enclosing view instance.
+- Explicit `use:` applications are fixed for their owning view instance, with
+  reactive bindings. `host.register` adds declarative native bindings using
+  Angular's normal binding/styling semantics and view-lifetime resource cleanup.
 
----
+These contracts constrain a bridge; they do not select an instruction ABI,
+component identity representation, injector implementation, or CSS mode. Existing
+`ɵɵ` symbols below refer to real source. Pseudocode uses descriptive operations
+instead of inventing Angular instruction names.
 
-### 2. Root Node & Host Modes (`rootNode`)
-Standard Ivy components require a physical DOM host. A `.ng` component instead has **two mutually exclusive host modes**, selected by the `rootNode` config key (`ng-types.ts` §7), and the compiler emits a different boundary for each.
+## 2. Reusable Ivy structures and their limits
 
-- **Change Class:** Compiler + Runtime + Renderer/Hydration integration.
-- **The two modes:**
-  1. **`rootNode` omitted → hostless (comment anchor).** The component's root type is `RootNode` (`ng-types.ts`), a branded, members-less token that is *not* an `HTMLElement`. This is the default. Semantically it is a component whose host is an `ng-container`: the boundary is a comment-node anchor, exactly the "Logical Anchor" this section describes. `RootNode` is only ever the omitted default — writing `rootNode: element<RootNode>()` (or a `RootNode`-containing union) is rejected at declaration time (`ng-types.spec.ts` §11).
-  2. **`rootNode: element<T>()` where `T ⊑ HTMLElement | SVGElement` → element-hosted.** The component's root type becomes the native element type `T` (e.g. `element<HTMLButtonElement>()` or `element<SVGSVGElement>()`). The single, unique renderable root element of the `@{ }` template is "lifted up" to *become* the component's host and takes over all host machinery — `:host` styling, host bindings/attributes/listeners, host directives, providers, and refs — analogous to today's element-hosted Ivy components (`TNodeType.Element`).
+Ivy separates shared template layout from instance state. A `TView` stores template
+metadata, directive definitions, hook tables, host-binding opcodes, and a blueprint.
+Each `LView` stores a particular view's context, native nodes, binding values, and
+directive/provider instances. A `TNode` describes a node's layout and directive
+range. Embedded views are inserted into `LContainer`s. See
+[view interfaces](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/interfaces/view.ts),
+[node interfaces](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/interfaces/node.ts), and
+[view construction](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/view/construction.ts).
 
-  The chosen root type is carried as the 4th type parameter of `ComponentInstance<B, E, M, R>` and read via `ComponentRootOf<C>`; it defaults to `RootNode` when `rootNode` is omitted (`ng-types.ts` §5).
+Shared template functions plus per-instance capture records are a plausible fit
+for `.ng`. The compiler can turn a markup literal into template functions and
+store the setup-local values they need in an internal record. JavaScript closures
+are another option, with different allocation costs. An existing
+`DECLARATION_VIEW` link does not automatically make arbitrary setup locals
+available to a generated function.
 
-- **How the compiler picks the path:** The presence of `rootNode: element<T>()` selects the element-hosted lowering; its absence selects the comment-anchor lowering. For the element-hosted path the compiler must first satisfy the single-native-root constraints from `ng-dsl-type-checking-spec.md` §5.1 (ELEMENT-ROOT) and §6 (Root Resolution):
-  - the template has **exactly one** renderable root node (D041), where renderable roots exclude declaration-only nodes (`@let`/`@derive`/`@fragment`) and whitespace-only text;
-  - that root is **not** a control-flow block `@if/@for/@switch` (D042);
-  - that root is a **native element** (D043), not another component.
-  When these hold, `Root(C) = I(tag(RN(C)))` — the intrinsic host type of the lifted element — and directives applied at `<C .../>` attach to that element.
+Explicit lexical component/directive identifiers require a compiler resolution
+path rather than selector discovery. However,
+[resolveDirectives](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/view/directives.ts) already accepts
+a matching strategy. It can be a reuse point for a statically supplied set of
+definitions. Layout, DI publication, instance creation, and input/output routing
+still need to agree on that set.
 
-- **Element-hosted mechanism (reuses today's contract):** This path is close to current Ivy. `createComponentLView()` in `packages/core/src/render3/view/construction.ts` already requires a `TElementNode` host and passes the host native element to `rendererFactory.createRenderer(native, def)`; the lifted root element supplies exactly that. `:host` styling, host bindings/listeners/attributes, host directives, per-instance providers, and refs all target the real element as they do today. Host-targeted directives supplied at the call site (`H_host = Root(C) ⊑ H_D`, the HOST-COMPAT check D024 in `ng-dsl-type-checking-spec.md` §7) resolve against that element's intrinsic type. Uniqueness (D025) then merges the directives applied on the root inside `T(C)` with those applied at the call site, per §7.1.
+Native interpolation, property writes, control-flow views, and enter/leave
+animations can build on existing rendering primitives. TypeScript expression
+syntax and lexical lookup are compiler work; they do not imply a new DOM renderer.
+Native `model:` still needs an explicit property/event conversion contract for
+the supported input, select, and textarea surfaces. A writable signal alone does
+not specify checkbox, selection, or value-conversion behavior.
 
-- **Hostless mechanism (comment anchor):** This is the delta from Ivy today. `ɵɵelementContainer` already creates a comment-backed `TNodeType.ElementContainer` for `<ng-container>`, and directives can match on it. Components are different: current directive matching asserts a component host is a `TNodeType.Element`, and component view creation assumes it can retrieve an `RElement` host. The hostless path needs:
-  1. **Anchor Instruction:** The parent template calls a new instruction such as `ɵɵcomponentAnchor(index, ComponentDef, seeds?)`. It creates or hydrates a comment node and reserves one slot in the parent `LView`, analogous to a logical container, and attaches the component `LView` to this comment-backed `TNode` rather than to an `RElement`. This mirrors the upstream "hostless components" work (angular/angular#70189), which replaces the physical host element with a comment-node anchor and returns that anchor for `ComponentRef.location.nativeElement`. (Those identifiers — `hostless`, `locateOrCreateCommentNode` — do not exist in this checkout; this section stays speculative.)
-  2. **TNode Shape:** Reusing `TNodeType.ElementContainer` may be possible, but current code distinguishes "component host" from "container" in multiple places. A hostless component likely needs either a new `TNodeType` or an `ElementContainer` subtype/flag that is allowed to carry a component view.
-  3. **Renderer Contract:** Hostless components need a renderer creation path that can apply styles and create child elements without a host `RElement`. Encapsulation is compiler-driven (§7) because host attributes/listeners/classes cannot be applied to a comment node.
-  4. **Host machinery is unavailable, by design:** Host bindings, host listeners, host attributes, `:host`/`:host-context` styles, host directives, and `ViewEncapsulation.ShadowDom` have no element to target on a hostless component and are disallowed for it (matching angular/angular#70189). A directive whose declared host is a DOM element type cannot attach to a `RootNode` root (D024); only a directive declaring host `RootNode` (or `HTMLElement | SVGElement | RootNode`) can, and such a `RootNode` host is *inert* — it attaches, runs setup, and injects, but cannot reach the DOM (`ng-dsl-type-checking-spec.md` §7). Styling intent must instead flow through explicit `input` signals.
-  5. **Hydration/SSR:** The anchor comment must be serialized and matched during hydration similarly to container anchors, as angular/angular#70189 does for its comment anchor. Hydration code that annotates or inspects host elements cannot assume every component boundary has an element.
-  6. **Context Switching:** `enterView()` / `leaveView()` and the selected-index cursor remain conceptually unchanged. The parent advances past one logical slot; the child template runs in its own `LView` with its own cursor. This cursor independence is existing component behavior, not a new runtime capability.
-- **Delta from Ivy Today:** Every Ivy component today is element-hosted (`TNodeType.Element`), and styling, hydration annotations, host bindings, refs, and renderer creation all assume a concrete host node. The `.ng` model keeps that contract for the element-hosted mode (`rootNode: element<T>()`, lifted root) but adds a hostless-by-default mode (`rootNode` omitted, `RootNode`) that keeps the component `LView` boundary while replacing the host element with a comment-anchor contract.
+Keeping an `LView` component boundary preserves view ownership and traversal; it
+does not require a wrapper DOM element. Conversely, a comment alone is insufficient
+to implement a component. DOM insertion, view movement, destruction, renderer
+selection, and hydration must understand all nodes owned by the boundary.
 
----
+## 3. Instance creation, seeded bindings, and DI
 
-### 3. Component Boundaries & Encapsulation
-- **Change Class:** Compiler + Runtime.
-- **Internal Context vs. Public Expose:** Do not assume `lView[CONTEXT]` can simply become the `expose` object. Angular internals, debugging, hydration, `ComponentRef.instance`, and component-def lookup paths often use the context as the component instance or recover metadata from `context.constructor`. A safer design is to store an internal `.ng` component record in `LView[CONTEXT]` (or in a dedicated slot) and store the public `expose` object separately on that record.
-- **Reference Resolution:** Parent refs (e.g., `<Comp ref={child} />`) resolve to the public `expose` object, not to the internal record. Component internals remain private even if Angular keeps an internal identity object for framework bookkeeping.
-- **Lifecycle:** Prototype-based hooks are replaced by DI-native APIs: `DestroyRef.onDestroy` for teardown and render hooks/effects for post-render work. Render callbacks such as `afterNextRender` and `afterRenderEffect` are browser-only and do not run during SSR.
-- **Query Bridging (`ref` and `refMany`):** `ref`/`refMany` should be treated as a new direct-ref mechanism, not as a thin wrapper over current `@ViewChild`/`@ViewChildren`. The compiler can emit creation/destruction hooks at each ref site that register and unregister an element/directive/component expose value with the target ref signal.
-- **Lifecycle-aware refs:** A single ref must reset to `undefined` when the referenced view is destroyed (for example an `@if` branch turns false). A multi ref must preserve DOM/template order, handle duplicate sites, remove destroyed entries, and update on `@for` reordering. Appending once at child creation is insufficient.
-- **Existing query nuance:** Legacy `QueryList` queries use `ɵɵqueryRefresh`, but Angular also has signal-based queries that are already lazy computed signals invalidated by view creation/insertion/deletion. The `.ng` `ref` model is still useful because it is explicit, typed by `expose`, and can avoid query predicate matching, but it should not be described as replacing an unconditional tree-walk on every CD cycle.
-- **Delta from Ivy Today:** Current template refs resolve through `TNode.localNames` and LView directive/native slots. Current queries resolve matches through query metadata and refresh dirty `QueryList`/query-signal state. `.ng` refs resolve only the explicit site's value and write it into framework-owned ref signals with deterministic cleanup.
+### 3.1 Existing creation order
 
----
+For a template component host,
+[instantiateAllDirectives](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/shared.ts)
+creates the component `LView` before obtaining directive instances. This enables
+special injections such as `ChangeDetectorRef`. It then calls
+[getNodeInjectable](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/di.ts), which invokes a
+`NodeInjectorFactory` and caches its result in the directive/provider slot.
+Static input values are applied through `setInputsFromAttrs` **after** that
+instance exists; component view `CONTEXT` is assigned the component instance.
+Dynamic template inputs arrive during update execution in
+[refreshView](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/change_detection.ts).
 
-### 4. Fragments and Lexical Scoping
-Fragments are ng-templates with typed parameters.
+Signal inputs do not change this ordering.
+[writeToDirectiveInput](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/write_to_directive_input.ts)
+reads the input field from an existing instance, obtains its `InputSignalNode`,
+applies a transform if present, and writes the value. Its development assertions
+reject a `NodeInjectorFactory` passed in place of an instance.
 
-- **Change Class:** Compiler + Runtime.
-- **Local fragment declaration:** A `@fragment` declaration can lower to an embedded template function plus a comment-backed `LContainer`, reusing the same primitives as `ɵɵtemplate`. Current embedded views already store the declaration `LView` and create an embedded `TView` with the declaration view's directive/pipe registries.
-- **Runtime representation:** A fragment value should be an explicit runtime object/function that contains:
-  - the template function or `TContainer`/`TNode` identity,
-  - the declaration `LView` where lexical values live,
-  - the typed parameter contract known to the compiler,
-  - optional render options such as an override injector.
-- **Lexical Capture:** Ivy's `declarationLView` gives embedded views access to their declaration tree, but JS lexical closures over `setup()` locals do not automatically appear in generated template functions. The compiler must lower captures either into the fragment runtime object/context or into generated closure functions for `.ng` templates. This is a real runtime/representation choice, not merely a type-checking feature.
-- **Render sites:** If a fragment is declared and rendered in the same template, the render site can be statically allocated. If a fragment is passed as a component binding (for example `children` or `menuItem`), the receiving setup gets a read-only signal of the current opaque source: `Signal<Fragment<T>>` when required and `Signal<Fragment<T> | undefined>` when optional. Its `@render(fragment()(args))` or `@render(fragment()?.(args))` site still needs an `LContainer`, but declaration-view/capture information and template identity belong to the source supplied by the parent. Parent binding updates write source values into the existing internal signal; setup and its destructured signal references are retained.
-- **Typed Parameters:** The primary compiler addition over today's `ng-template` context is a strict parameter contract. Unlike `ngTemplateContextGuard`, the parameter list is part of the fragment declaration and the compiler validates the source invocation in `@render(fragment()(args))` for a required received binding, or the direct `@render(localFragment(args))` for a lexical source.
-- **Memory Impact:** If the implementation uses per-instance closures or capture records, memory increases relative to singleton template functions. If it uses reusable template functions plus explicit capture/context records, template code can remain shared while captures remain per instance.
-- **Outlet lifetime:** Each `@render` outlet owns an embedded view. Preserve it while the source definition and lexical instance stay the same, updating argument/context slots without recreating descendants. A new render-description object alone does not change identity. Replace the view for a different source, destroy it and clear descendant refs/derivations when the result becomes `undefined`, and create a fresh view after absence. Other outlets and the receiving component remain alive. Keep the explicit render-site injector rule and the source's lexical captures. Required sources must be seeded before setup and invalid absent required delivery must fail.
-- **Delta from Ivy Today:** `ɵɵtemplate`, `LContainer`, embedded `TView`, and declaration-view links remain the closest runtime primitives. The delta is the first-class fragment value, typed call contract, explicit lexical capture representation, and direct render-call syntax.
+Programmatic bindings are also not a pre-setup seed facility: the ordinary
+[inputBinding](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/dynamic_bindings.ts) implementation
+writes during its update callback. Creating with bindings therefore does not make
+inputs available in a class constructor.
 
----
+### 3.2 Proposed creation transaction
 
-### 5. Derivations (`@derive`)
-Template-scoped reactive computations with native DI support.
+The seeded-binding requirement applies to components, directives, and input-only
+derivations. A possible logical sequence is:
 
-- **Change Class:** Compiler + Runtime.
-- **Mechanism:**
-  1. **Slot Allocation:** When the compiler encounters `@derive price = simulation(...)` inside a template, it allocates a dedicated slot in the enclosing `LView` for the derivation.
-  2. **Binding Surface:** Derivation inputs are input signal nodes or read-only binding cells created for that derivation instance. They are seeded during creation and updated from parent/template expressions during the update pass.
-  3. **Creation Pass:** During the enclosing view's creation pass, the runtime enters an injection context scoped to the current node/view injector and calls the derivation's `setup()` function. The returned `Signal<T>` is stored in the allocated slot. Any cleanup registered through `DestroyRef` must be associated with the enclosing view.
-  4. **Update Pass:** During change detection, the compiler updates the derivation's input nodes and reads the stored result signal where the template needs the value. The signal graph handles memoization, but Angular still needs a dirty-marking path from signal invalidation to view refresh. In current signal components, template signal reads are tracked by a reactive LView consumer; embedded views currently share their declaration component's consumer rather than always getting one per embedded view.
-  5. **Lifecycle:** The derivation's lifetime matches the enclosing view instance. In an `@for`, each row gets an independent derivation instance; when the row view is destroyed, the derivation's cleanup runs with that view.
-- **Delta from Ivy Today:** The closest legacy analogue is a pipe instance: pipes are allocated per view slot, created in an injection context, support constructor DI, register destroy hooks, and pure pipes memoize based on input identity. Derivations differ because their result is a live `Signal<T>` and their inputs are framework-updated signal/binding nodes. They are signal-native memoization slots, but not magic runtime-only replacements for pipes; the compiler must lower declaration, inputs, reads, cleanup, and type checks.
+```text
+evaluate the consumer's initial binding expressions in consumer scope
+establish the boundary, owning view, and instance lifetime/injection context
+allocate this instance's binding nodes, emitters, and host handle if applicable
+seed supplied values; retain defaults; validate required delivery
+call providers once synchronously with inputs, with injection/tracking suspended
+register its returned providers for this instance
+run setup once, resolving providers lazily as requested
+retain internal state and public expose separately
+render and perform initial template/host-binding updates; publish consistent refs
+```
 
----
+This is a dependency order, not a claim that existing creation instructions can
+execute it unchanged. Boundary allocation can precede expression evaluation if
+needed. For a node carrying several directives, allocation/seeding and provider
+publication must account for cross-directive injection before any setup resolves
+a peer. An early DI lookup must not instantiate a peer with unseeded inputs.
+Reentrant creation and cyclic injection require explicit handling.
 
-### 6. Directive Application (`use:`) & Root Attachment
-A directive written at a component call site — `<C use:tooltip(...) />` — attaches to `Root(C)`, the component's resolved host determined by its `rootNode` mode (§2). There is no directive-forwarding/tunnelling API in the current type model: `ng-types.ts` defines directive application through `directive({ host: ref<H>(), ... })` with `H extends DirectiveHostType` (`HTMLElement | SVGElement | RootNode`), and attachment is resolved by `ng-dsl-type-checking-spec.md` §7 `CHECK-DIRECTIVE-USE`, not by any `forward`/`surface` construct.
+The `bindings` declaration must lower to **allocation metadata or factories**.
+Evaluating `input()`, `model()`, `output()`, or `host: ref<H>()` once at module load
+and reusing those objects would incorrectly share state between instances.
+In particular, existing
+[OutputEmitterRef](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/authoring/output/output_emitter_ref.ts)
+injects `ErrorHandler` and `DestroyRef` during allocation; models allocate an
+emitter too. These cannot simply be constructed outside their owning context.
 
-- **Change Class:** Compiler + Runtime, but for the element-hosted path this is closer to *Compiler-mostly* — it reuses today's Ivy directive machinery essentially unchanged.
-- **Where a `use:` directive lands:** `CHECK-DIRECTIVE-USE(Γ, H_host, R_host, dir)` resolves the directive against the host element `H_host = Root(C)` (§6 Root Resolution) and then enforces `HOST-COMPAT: H_host ⊑ H_D` (D024) and `UNIQUE: D at most once per element in R_host` (D025). The resolved host depends on the mode:
-  1. **Element-hosted component (`rootNode: element<T>()`).** `Root(C) = I(tag(RN(C)))`, the intrinsic type of the lifted native root element (§5.1 ELEMENT-ROOT / §6). A DOM-host directive (`H_D ⊑ HTMLElement`) attaches to that real element and behaves exactly as if it had been written directly on the element inside the component's template.
-  2. **Hostless component (`rootNode` omitted, `RootNode`).** `Root(C) = RootNode`. Only a directive declaring host `RootNode` (or `HTMLElement | SVGElement | RootNode`) satisfies D024; a DOM-host directive is rejected. Such a `RootNode`-host directive is *inert* — it attaches, runs `setup`, and injects, but has no DOM element to touch (§2, `ng-dsl-type-checking-spec.md` §7).
-- **Element-hosted path reuses today's Ivy machinery:** Because the lifted root is a real element (the existing, well-supported host path — `createComponentLView` already takes a `TElementNode` host), a `use:` directive on it needs no new runtime subsystem. It reuses:
-  - directive slots in the TView-indexed LView expando, matched during the first create pass from `tView.directiveRegistry`,
-  - host bindings and host vars,
-  - DI/provider publication and bloom visibility,
-  - outputs (listener setup and teardown),
-  - destroy hooks and `DestroyRef`,
-  - refs.
-  All of these target the real root element exactly as they do when the directive is applied to that element directly. The compiler's job is to emit the directive at the component call site against the lifted root; the runtime treats it like any other element directive.
-- **Attachment is non-transitive (§6):** A directive at `<C .../>` attaches to `C`'s resolved root and no further. It does not propagate to descendants of the component's template.
-- **Uniqueness per resolved host element (D025, §7.1):** Because uniqueness is enforced per *resolved host element*, a call-site `use:D(...)` collides with the same directive `D` written on the root element *inside* `C`'s own template — both resolve to the same final element — and is rejected. This is the same merge described in §2: uniqueness (D025) merges the directives applied on the root inside `T(C)` with those applied at the call site.
-- **Out of scope — forwarding to internal, non-root elements (speculative, beyond the current type model):** The genuinely hard case is landing a consumer-supplied directive on an *internal, non-root* element of a component. The current type model does **not** define any mechanism for this: `forward` and `surface` do not exist in `ng-types.ts`, and neither the readme nor the type-checking spec defines a directive-tunnelling API. Under the real model, the only way a consumer directive reaches a component's root is the `rootNode` mechanism above (declare `rootNode: element<T>()` so the call-site `use:` attaches to that native root). Getting one onto an interior element would require a new API and a new runtime subsystem — for illustration only, that might look like a compile-time "recipe" of directive defs passed across the boundary and executed by an `ɵɵapplyForwardedDirectives`-style instruction, backed by one of: a synthetic per-site directive range, per-`LView` side storage, or a generated adapter view. Each of those would have to re-integrate input/output alias writes, host bindings, provider/DI publication, outputs, queries, destroy hooks, debug APIs, and hydration/SSR. **None of this is part of the current proposal** and it is not required by anything in `ng-types.ts`; it is noted here only to mark the boundary of what the `rootNode` model does and does not cover.
-- **Delta from Ivy Today:** For the element-hosted mode there is essentially no runtime delta — a `use:` directive on a lifted root is an ordinary element directive, matched and instantiated from `tView.directiveRegistry` into LView expando slots as today. The conceptual shift is only that the "host" the directive attaches to is the component's lifted root element rather than an arbitrary element in a template. For the hostless mode the delta is that a `RootNode`-host directive is inert (no DOM target). Forwarding to interior elements is out of scope.
+Setup receives stable binding identities:
 
----
+| Declaration kind  | Per-instance setup value           | Parent synchronization                                                      |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| Input             | `InputSignal<T>`                   | Framework writes the input node                                             |
+| Model             | `ModelSignal<T>`                   | Framework writes the input side; requested two-way wiring handles writeback |
+| Output            | `OutputEmitterRef<T>`              | Consumer subscribes to the selected emitter                                 |
+| Required fragment | `Signal<Fragment<T>>`              | Framework replaces the current source value                                 |
+| Optional fragment | `Signal<Fragment<T> \| undefined>` | Same; omission starts as `undefined`                                        |
 
-### 7. Scoped CSS (mode-dependent)
-CSS encapsulation depends on the host mode chosen in §2. Element-hosted components (`rootNode: element<T>()`) reuse today's `:host`-based encapsulation on the lifted root element; hostless components (`rootNode` omitted) have no `:host` element, so they rely on **compiler-driven scoping** (similar to Svelte/Vue).
+Every optional fragment binding still needs its own read-only signal. A source
+change must not replace that signal or rerun setup. Missing required delivery
+should fail before user initialization; TypeScript checks alone cannot protect
+untyped/programmatic callers. The exact runtime validation remains to be designed.
 
-- **Change Class:** Compiler + Runtime (renderer behavior).
-- **Element-hosted mode:** The lifted root element is a real host, so ordinary emulated encapsulation applies — the compiler emits host and content attributes and `:host`/`:host-context` selectors resolve against that element, exactly as today. `ViewEncapsulation.ShadowDom` is available because there is a concrete element to own a shadow root. This is the mode to use when a component needs `:host` styling or external decoration through host bindings.
-- **Hostless mode — mechanism:** With no host element, the `.ng` compiler generates a unique attribute (e.g., `_ngcontent-c123`) and applies it to **every** DOM element in the component’s template.
-- **Hostless mode — ShadowDom Constraint:** Hostless components are incompatible with `ViewEncapsulation.ShadowDom` because there is no concrete host element to own a shadow root (matching angular/angular#70189, which disallows `ShadowDom` for its comment-anchored components).
-- **Hostless mode — External Styling:** A parent cannot decorate a hostless component automatically; there is no `:host` and no host attributes/classes to receive. Styling intent (`class`, `style`) must be explicitly declared as `input` signals in the `bindings` block.
-- **Hostless mode — Diagnostic Safety:** If a parent applies a `class` to a hostless component that hasn’t opted in via `bindings`, the compiler emits a diagnostic error.
-- **Delta from Ivy Today:** Element-hosted mode preserves current emulated encapsulation with host/content attributes; hostless mode drops the host attribute and needs a hostless scoping contract.
-- **Compatibility Impact:** Medium/High — influences style encapsulation, SSR serialization, and hydration style reconciliation for the hostless path.
+Parent writes to a model must not call its public `.set()`: existing
+[model signals](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/authoring/model/model_signal.ts) emit on public
+writes, whereas framework input-node writes do not. Seeding must preserve that
+distinction. One-way model binding is allowed; writeback is requested by `model:`.
+The keys of the `.ng` binding record are public names; the readme explicitly
+ignores primitive aliases and uses destructuring for local renaming.
 
----
+### 3.3 Initial evaluation and reactive tracking
 
-## Comparison: Legacy vs. Functional Model
+Seeding creates an evaluation problem as well as a write-order problem. With
+today's instruction pattern, `bindingUpdated(lView, index, expression())` evaluates the
+expression **before** comparing the slot. Prepopulating the slot suppresses a
+duplicate write, not a duplicate evaluation. The DSL permits function calls and
+does not establish purity for general binding expressions.
+See [binding comparison](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/bindings.ts) and
+[property binding](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/property.ts).
 
-| Concept | Legacy Class Model | Functional `.ng` Model |
-| :--- | :--- | :--- |
-| **Input Timing** | Inputs uninitialized in the constructor; static attributes are applied after factory instantiation and dynamic bindings are pushed during update mode. | Input/model signal nodes are allocated and seeded before `.ng` providers/setup run. Update bindings still own ongoing synchronization. `once:` emits only the creation seed. Seed expressions must be compiler-proven safe or must initialize the update binding slot to avoid duplicate first-pass evaluation. |
-| **Lifecycle Hooks** | `ngOnChanges`, `ngOnInit`, `ngDoCheck`, `ngAfterContent*`, `ngAfterView*`, `ngOnDestroy` on the class instance. | Removed from the public authoring model. Signal reactivity replaces post-input hooks; `DestroyRef.onDestroy` replaces teardown hooks; render hooks/effects replace post-render work. Angular may still need an internal context/record separate from public `expose`. |
-| **Host Element** | Required physical host element; component renderer, host bindings, styling, hydration, and refs assume it. | Two modes via `rootNode`. Hostless-by-default (`rootNode` omitted, root type `RootNode`, host ≡ `ng-container`): comment anchor plus a component `LView`; renderer, hydration, and host semantics need explicit hostless paths. Element-hosted (`rootNode: element<T>()`): the unique renderable root element is lifted to become the host and reuses today's element-host machinery (`TNodeType.Element`, `createComponentLView` with a real host, `:host`, host bindings, host directives). |
-| **Instruction Cursor** | Sequential `ɵɵadvance` on host. | Parent `ɵɵadvance` treats component as 1 slot; Child has a fresh cursor. |
-| **Public API** | Entire class instance exposed via default template ref and `ComponentRef.instance`. | Refs and intended component interaction expose only the `expose` object. Framework internals may retain a separate component record for metadata/debug/runtime compatibility. |
-| **Projection** | Implicitly handled by `<ng-content>`. | Passed as first-class fragment sources; setup receives read-only source signals in `children`. Explicit `@render(children()?.())` / `@render(children()())` calls mount their views. Sources carry declaration view/capture information; parent updates change signal values without replacing the receiving signals. |
-| **Directives** | Automatically attach to the host element or match normal elements/containers from the compilation scope. | A plain `use:` directive at `<C .../>` attaches to `Root(C)`: the lifted native element `I(tag(RN(C)))` for an element-hosted component (`rootNode: element<T>()`), or the inert `RootNode` for a hostless one (`rootNode` omitted). HOST-COMPAT (`Root(C) ⊑ H_D`, D024) means DOM-host directives fit an element-hosted root but are rejected on a hostless (`RootNode`) root, which only accepts inert `RootNode`-host directives. On the element-hosted path this reuses existing Ivy directive machinery unchanged — directive slots, host bindings, DI/providers, outputs, destroy hooks, and refs all target the real root element as they do for any element directive. Directive forwarding to internal, non-root elements is not part of the current type model (`forward`/`surface` do not exist in `ng-types.ts`). |
-| **CSS Scoping** | Tied to the physical host attribute. | Element-hosted mode reuses ordinary `:host`-based emulated encapsulation (and may use `ShadowDom`). Hostless mode has no `:host`, so scoping is applied to all template elements via compiler-generated attributes and `ShadowDom` is disallowed. |
-| **Template Queries / Refs** | Decorator queries use query metadata and `QueryList`/query-signal refresh machinery; template refs resolve from `TNode.localNames` into native/directive slots. | `ref`/`refMany` are explicit, typed, lifecycle-aware registrations of elements/directives/component expose values. They must update on creation, destruction, and view reordering. A ref to a component still resolves to its `expose`; a ref to a root by host type follows the mode — `Ref<T>` for an element-hosted root, `Ref<RootNode>` for a hostless one (`ng-types.ts` §6). |
-| **Transform / Memoization** | Pipe instances are per-view slots, support DI, register destroy hooks, and pure pipes memoize by input identity. | Derivations are compiler-lowered per-view slots whose inputs are signal/binding nodes and whose result is a live signal. They still need compiler lowering, update writes, dirty marking, and cleanup. |
+A bridge should reuse the evaluated seed during the first binding update, or
+define a different initialization pass in which normal binding evaluation precedes
+setup. Either approach must preserve expression ordering and signal dependency
+tracking. Simply skipping the first update expression can leave the parent
+unsubscribed: existing
+[renderView](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/render.ts) executes creation
+without the template consumer installed by `refreshView` for update execution.
+Any seed cache therefore also needs a way to establish or transfer those reads
+into the correct consumer. Re-evaluating only expressions proven safe is another
+compiler strategy, not a restriction already present in the proposal.
+
+`once:` deliberately freezes **input** values for an instance's lifetime. It is
+valid on component, directive, and derivation inputs, and invalid on native
+properties, fragments, outputs, and `model:` forms. Its lowering omits subsequent
+updates. On owning-view destruction and recreation, a new directive instance
+receives a new seed. Initial seeds referencing `@let`, loop context, or refs require a defined
+evaluation order; unavailable refs cannot be made valid merely by allocating
+binding nodes sooner.
+
+Setup and provider registration callbacks should execute outside the consumer
+evaluating the parent template, so incidental initialization reads do not become parent
+template dependencies and setup can create effects. Live reads in templates,
+host-binding getters, computed signals, and effects retain their normal reactive
+tracking. Immediate setup-time output emissions and model writes introduce a
+further ordering choice: whether consumer subscriptions are installed before
+setup. The authoring sketches do not settle that choice.
+
+### 3.4 Input-driven providers
+
+Existing
+[providersResolver](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/di_setup.ts) publishes tokens,
+factory layout, and injector bloom information during the first create pass.
+Factories are resolved lazily through instance slots, but provider layout belongs
+to shared `TView`/`TNode` metadata.
+
+Provider semantics are defined in [the checking spec, §5.1](../types/ng-dsl-type-checking-spec.md#51-component-declaration-contracts).
+The bridge must save, clear, and restore ambient injection/reactive state around
+`providers(inputs)`, including on failure, then register its array before setup.
+Shared token layout needs instance-specific binding access and factory closures;
+closures must never be cached in a shared `TView` or blueprint for other instances.
+Same-node visibility and collision rules must remain explicit.
+
+### 3.5 Component identity and public injection
+
+`component()` is not specified to return a constructor. `ComponentInstance` is a
+branded declaration type, and the current helper returns its configuration object.
+A generated function carrying `ɵcmp`/`ɵfac` could adapt some existing APIs, but a
+function-shaped token alone does not establish Router, TestBed, dynamic creation,
+or debugging compatibility.
+
+Ivy stores directive instances in slots; it uses the component instance as
+`LView[CONTEXT]`. Existing
+[ComponentRef.instance](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/component_ref.ts) reads that
+context, while
+[discovery utilities](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/util/discovery_utils.ts) recover
+definitions from an instance's constructor. Hook registration also examines the
+definition type's prototype. Returning a bare expose object from `ɵfac` without
+adapting these paths is insufficient.
+
+A plausible representation separates the declaration token/definition, the
+internal binding-and-capture record, and the public expose value. The precise
+slots are open. Crucially, `inject(Component)` and `inject(Directive)` must return
+expose, just as refs do. Today `getNodeInjectable` returns the stored slot value;
+a bridge retaining an internal record needs a public-resolution adapter or a
+separate public token registration. Circular public API dependencies cannot be
+resolved by publishing a record before its expose exists.
+
+The DI token helpers are more incremental. `provide(token, factory)` can map to
+`useFactory`; multi tokens contribute one item per provider, and factory-bearing
+tokens support `provide(token)` shorthand. A factory without `autoProvided: true`
+does not imply root registration. `autoProvided: true` could use Angular's
+root injectable-definition machinery; it does not imply eager factory execution.
+The stronger token-derived typing mainly belongs to the TypeScript layer. See
+[InjectionToken](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/di/injection_token.ts) and
+[R3Injector](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/di/r3_injector.ts). Programmatic creation, testing,
+and full decorator interoperability remain separate design work, as the readme
+states.
+
+## 4. Logical roots, native roots, and the hostless experiment
+
+### 4.1 Root contracts
+
+Omitting `rootNode` gives `Root(C) = RootNode`, a non-DOM brand. It does not infer
+a native root from the template, even if the template contains only `<button>`.
+`element<RootNode>()` and native/`RootNode` unions are rejected as declarations.
+A comment can be the runtime anchor, but the public `RootNode` handle should not
+be identified with a DOM `Comment` or expose DOM methods.
+
+Declaring `rootNode: element<T>()`, with `T` an HTML or SVG element type, requires:
+
+1. Exactly one renderable root, excluding whitespace and `@let`/`@derive`/
+   `@fragment` declarations (D041).
+2. An unconditional root, outside control flow, `@defer` and its companion blocks,
+   or `@boundary` (D042).
+3. A native element rather than a component or other node kind (D043).
+4. `ActualRoot(C)` assignable to the declared `T` (D044).
+
+At a call site, compatibility uses **`Root(C) = DeclaredRoot(C)`**, not the
+potentially narrower actual element type. A component declaring
+`element<HTMLElement>()` and rendering `<button>` still rejects a directive that
+requires `HTMLButtonElement`. A directive written on the internal native button
+is checked against that button's intrinsic type.
+
+Call-site `ref` always targets component expose, including on native-root
+components. The native overloads of `ref<H>()` do not create an alternative
+`<Component ref={...}>` contract for reading its root. Directive setup receives
+its own typed host handle. Binding `class`, `style`, `disabled`, or `on:click` to
+a component also uses its declared binding record; it does not automatically
+write to the native root. `class:`/`style:` (D023) and `animate:` (D034) remain
+invalid on component tags in either mode.
+
+### 4.2 Hostless rendering
+
+In this checkout, normal component matching requires an element host and
+[createComponentLView](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/view/construction.ts) obtains
+an `RElement` and passes it to the renderer factory. Existing
+[element containers](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/element_container.ts)
+provide comment-backed logical nodes and can carry directives, but are not a
+complete component-host path.
+
+A hostless bridge needs to preserve the component view while extending native
+insertion, root-node collection, movement, destruction, and renderer creation for
+a comment-backed boundary. Children become DOM siblings bounded by the anchor's
+placement, not children of the comment. The anchor orientation and owned-node
+range must be defined consistently. Parent and child instruction cursors are
+already independent in Ivy; this is not a new capability.
+
+No element exists for host properties, attributes, listeners, `:host`/
+`:host-context`, or a shadow root. A compatible `RootNode` directive may still
+run setup, emit outputs, inject services, and provide services. “Inert” describes
+its **DOM host surface**, not its logic or DI. There is no attachment tunnelling
+to a descendant component or interior element.
+
+### 4.3 What PR #70189 demonstrates
+
+The `https://github.com/angular/angular/pull/70189/files` adds
+`@Component({ hostless: true })` metadata to decorator-based components. It does
+not implement functional setup, eager input seeding, typed logical roots, or the
+native-root lifting proposed here.
+
+The patch:
+
+- Reuses element creation instructions, changes a matched hostless node to
+  `TNodeType.ElementContainer`, and calls the element-container comment creation/
+  hydration path. It does not introduce a `ɵɵcomponentAnchor` instruction.
+- Extends rendering, native-node collection/manipulation, and component creation
+  to account for comment-backed component hosts. For dynamic creation without
+  an explicit root selector/node, the location is a comment; the patch retains
+  the explicit-root path rather than making every creation API uniformly hostless.
+- Rejects a hostless component's own host bindings, shadow encapsulation modes,
+  decorator animation configuration, and host CSS selectors. Consumer checks
+  reject unclaimed DOM bindings, while allowing declared inputs/outputs and
+  directive-claimed attributes.
+- Keeps emulated content scoping and skips host-attribute application on comments
+  in `EmulatedEncapsulationDomRenderer2.applyToHost`.
+- Adds comment hydration annotations, root-node counts in `ELEMENT_CONTAINERS`,
+  hydration lookup and skip-hydration handling, with runtime and SSR test cases.
+
+The patch is evidence of the scope of hostless work, not proof that all edge cases
+are solved. In particular, it does not establish a blanket ban on host directives
+or transitive validation of every applied directive's DOM behavior. The `.ng`
+host-type checks and `host.register` restriction are separate proposal contracts.
+
+### 4.4 Native-root lifting through compiler-generated host metadata
+
+The single unconditional native-root restriction makes a compile-time lowering
+plausible. The compiler can lift the authored root into host metadata, let the
+parent create that native element as the component host, and compile the root's
+children as the component render body. This retains Ivy's parent-owned host and
+child component view. It requires neither moving a DOM node after creation nor
+rendering a wrapper around a second copy of the root.
+
+For example, this proposed source:
+
+```ts
+const Counter = component({
+  rootNode: element<HTMLButtonElement>(),
+  setup: () => {
+    const count = signal(0);
+    return @{
+      <button disabled={count() > 10}>
+        {count()}
+      </button>
+    };
+  },
+});
+```
+
+could lower conceptually to:
+
+```text
+host metadata: native button tag, namespace, and static root attributes
+setup: create count once and retain it in the component's internal context
+root bindings: write disabled on the host using the component's count
+child template: render count as text inside the host
+```
+
+The parent can create or hydrate the host before setup. Dynamic root bindings
+execute once their child context is initialized. Existing `createComponentLView`
+then has a real native host to use. The compiler and creation APIs must consume
+the generated host description, but native-root lifting does not inherently
+require a new runtime ownership architecture.
+
+The source proposal defines
+`AppliedDirs(C, S) = LocalDirs(RN(C)) ∪ CallSiteDirs(S)` per instantiation. D025
+rejects a directive appearing in both sets. Call-site directives can remain in
+the parent's host-node layout, as ordinary Angular directives do today. Root-local
+directives could be incorporated through compiler metadata using a mechanism
+similar to static host-directive composition; existing
+[resolveDirectives](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/view/directives.ts) already merges
+host directives with matched definitions before initializing the node's layout.
+This is an internal lowering option, not a new component authoring API or a claim
+that current host-directive semantics cover every root-local application.
+
+Different callers can therefore have different directive sets without mutating
+the shared child `TView`. The remaining integration requirements are:
+
+- **Child lexical scope:** root bindings must still access setup locals and
+  template declarations, even though the parent creates the host. Root-local
+  directive inputs depending on those values need a defined initialization order.
+- **Styling precedence:** root-authored styling must retain native template
+  precedence. Translating it into ordinary component host bindings could change
+  which source wins; the lowering must preserve its source priority explicitly.
+- **Directive semantics:** root-local and call-site directives need compatible
+  input routing, injection contexts, ordering, duplicate checks, and cleanup.
+  A composition-like layout alone does not establish these guarantees.
+- **Refs and declarations:** refs to the authored root and declarations beside
+  it need correct scope and registration after the root is removed from the child
+  template's native-node creation sequence.
+- **Renderer and hydration:** tag, namespace, attributes, scoping, and hydration
+  identity must describe one host element that is created or claimed exactly once.
+
+Keeping root creation in the child and bridging native-node access is another
+possible design, with more ownership questions. It is not necessary to assume
+that design when assessing the simpler compiler-generated host approach.
+
+## 5. Directive applications and declarative host bindings
+
+### 5.1 Explicit, view-lifetime `use:`
+
+For a fixed application on an ordinary native element, much of Ivy's machinery is
+reusable: definition layout, node injection, input nodes, output subscriptions,
+host-binding execution, and teardown. Explicit syntax still changes routing:
+`use:tooltip(message={...})` targets **that directive's** input, independently of
+same-named element or peer inputs. Existing `ɵɵproperty` can fan out to several
+matching inputs. Direct targeting needs the equivalent of
+`setDirectiveInput` and
+[listenToDirectiveOutput](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/view/directive_outputs.ts),
+rather than blindly emitting that fan-out path.
+
+Applications are fixed for the owning view instance. Sites inside `@if`, `@for`,
+or other view-producing constructs create and destroy their directives with the
+view. A tracked row move retains those instances. Removing a site through `@if`
+recreates its subtree on re-entry; element identity, focus, and component-local
+state are not preserved across removal and recreation. There is no directive-only
+detachment while the element or component boundary survives.
+
+Existing
+[NodeInjectorDestroyRef](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/linker/destroy_ref.ts) registers
+callbacks on an `LView`, matching this owning-view lifetime. Teardown must dispose
+view-owned effects, render callbacks, emitters, listeners, output subscriptions,
+providers where applicable, and refs. The bridge needs integration with these
+ordinary cleanup paths rather than shorter directive-specific lifetimes.
+
+### 5.2 `host.register`
+
+The [host-binding extension](./directives-host-bindings.md) requires at most one
+unconditional synchronous registration with a statically known object shape.
+It snapshots getter/handler references without evaluating getters. A host type
+admitting `RootNode` cannot register DOM bindings, even when setup later narrows
+a host read. This API and its precise TypeScript declarations are not yet present
+in `ng-types.ts`.
+
+Static keys allow shared binding layout; getter/handler closures remain instance
+state. Generated host-binding functions could read those closures and reuse
+Ivy's native property, attribute, class-map, and named styling instructions.
+Listeners install during creation; getters first evaluate after seeding in the
+host-binding update phase. Native host properties and events must target the
+element directly, without component/directive input or output fallback.
+The checkout already has
+[`ɵɵdomProperty`](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/dom_property.ts) and
+[`ɵɵdomListener`](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/listener.ts) paths for
+that distinction. The general listener path can also subscribe to same-named
+outputs and is not an interchangeable lowering for a native-only host event.
+Getters must be side-effect-free. The registration shape excludes spreads,
+computed keys, and conditional key sets; class/style aliases that bypass the
+styling pipeline are rejected by the extension.
+
+Existing
+[host-binding execution](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/change_detection.ts)
+runs under a view's reactive consumer. This provides a useful scheduling model:
+signal getter reads participate in view tracking and zoneless updates. It does not
+provide an effect per getter or independently scheduled binding. New view
+instances must execute their getters to establish dependencies before expecting
+subsequent signal invalidation to refresh the view.
+
+Collision rules must retain Angular's styling semantics:
+
+- Native template styling outranks directive host styling; named bindings outrank
+  map bindings, which outrank static styling within a source. Directive priority
+  is fixed for the owning view instance and follows the same static ordering
+  on view recreation.
+- Named class `false`/`null` suppresses a class; `undefined` yields. Named style
+  `null` removes a style; `undefined` yields. Withdrawing a class map releases that
+  source's entries rather than erasing all other classes.
+- Property and attribute writes use Angular's update order and diffing; they do
+  not acquire the styling precedence resolver. Reflected native properties and
+  attributes remain distinct, potentially coupled targets.
+
+See the existing
+[styling instructions](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/instructions/styling.ts) and
+[styling binding list](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/styling/style_binding_list.ts).
+The proposal supplies no separate component host styling source: bindings authored
+on a native root retain native **template** precedence, including against call-site
+directives attached there.
+
+### 5.3 View-lifetime resource cleanup
+
+Registered bindings follow their directive's owning view lifetime. Destruction
+stops evaluation, unsubscribes native listeners and outputs, disposes view-owned
+effects and render callbacks, cleans up emitters and refs, and releases captured
+getter/handler closures. A recreated view gets fresh instances and closures;
+tracked row moves retain them. There is no general operation to unregister a
+binding while the view survives.
+
+Reactive class-map changes and `undefined` styling values use Angular's ordinary
+precedence fallback. This does not restore captured pre-binding DOM state.
+Attributes and properties keep their normal update order, diffing, and nullish
+semantics, without a styling resolver or forced replay of unchanged writers.
+The proposal neither reverses arbitrary imperative DOM writes on destruction
+nor restores an externally retained element. Renderer and sanitization rules
+still depend on the actual native tag and target.
+
+Static binding layout and instance-local closure storage need runtime integration
+with view cleanup and hydration, but no shared snapshot/ownership subsystem is
+required for restoration.
+
+The extension also sketches declaration-level `hostDirectives` with static
+input/output forwarding. That remains an additional API absent from `ng-types.ts`,
+with required-input forwarding, host compatibility, cycles, duplicates, and
+provider lifetime under view destruction unresolved. `host.register` itself accepts no
+`use:` entries or directive composition recipes.
+
+## 6. Fragments, lexical capture, and outlet lifetime
+
+### 6.1 Sources, bindings, and render descriptions
+
+The proposal distinguishes three things:
+
+- `fragment<T>()` / `fragment.required<T>()`: non-callable binding declaration
+  metadata. Requiredness belongs to the receiving binding.
+- `Fragment<T>`: a branded callable lexical source. Calling it returns opaque
+  `TemplateMarkup`; a plausible representation describes rendering without
+  immediately mounting DOM or executing child setup.
+- The received read-only signal: reading it obtains the current source, so local
+  calls use `row(item)` while received calls use `row()(item)` or `row()?.(item)`.
+
+Component delivery can be by source-valued prop, inline named `@fragment`, or
+implicit `children`. `children` must be `FragmentBinding<void>`. Directive bindings
+can receive sources by value, but cannot declare inline fragments inside `use:`.
+The argument convention is positional: `void` means zero arguments, a tuple means
+that tuple's arguments, and an open array type means one array payload.
+
+A runtime source needs reusable template identity, the particular lexical
+instance/capture environment, and declaration-view/container links (or equivalent
+metadata) preserving default injection ancestry. A call can create a lightweight
+description carrying that source identity and argument values. Phantom brands, `TemplateAST`, and TypeScript
+parameter types do not themselves need runtime storage. A declaration can reuse
+the `ɵɵtemplate`/`TContainer`/`LContainer` model, or use another representation that
+retains equivalent ownership, lexical captures, and declaration-linked DI.
+
+Fragments are visible to all siblings in their child list, unlike forward-scoped
+`@let` and `@derive`. A direct left-to-right allocation scheme must therefore
+predeclare fragment handles or otherwise support a use before its declaration.
+Captures of values initialized later still need a sound initialization order.
+
+### 6.2 Declaration-site lexical scope and default DI
+
+Existing [TemplateRef](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/linker/template_ref.ts)
+inherits both binding and injection context from its declaration site, even when
+inserted elsewhere. The proposed fragment default follows this model: lexical
+captures and default injection ancestry remain declaration-linked. Rendering a
+fragment inside another component does not automatically select that receiver's
+providers. If `Parent` declares content rendered by `Menu` and both provide
+`Theme`, a descendant within the fragment resolves the declaration-side value
+by default, absent a nearer provider or restrictive injection flags.
+
+An explicit non-null `options.injector` supplies an embedded-view injector.
+[createAndRenderEmbeddedLView](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/view_manipulation.ts)
+preserves declaration links and accepts that injector. Existing
+[embedded injector lookup](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/di.ts)
+interleaves fragment-local node lookup and the embedded-view injector; unresolved
+tokens can fall back through declaration ancestry. The override does not erase
+all ancestors. Omitted, `undefined`, and `null` mean no override. Preserve
+Angular's injection-flag behavior instead of introducing a new lookup algorithm.
+
+This restriction improves reuse of declaration-linked embedded views. The
+composition trade-off is that consumer-authored fragments do not automatically
+inject the receiving menu/list/controller's services. Typed parameters and
+explicit injector overrides can supply that context. `inject()` still requires
+a supported injection context, such as descendant setup.
+
+### 6.3 Proposed outlet reconciliation
+
+Each `@render` site owns its container and embedded view. The proposed runtime
+policy retains the view while source definition, lexical instance, and effective
+injector stay the same, updating argument/context slots in place. Allocating a
+fresh render description does not alone imply a fresh subtree. A different source
+or effective injector replaces the view; `undefined` destroys existing content
+and renders nothing; a later source mounts a fresh instance. Other outlets and
+the receiver stay alive.
+
+The effective injector is the explicit non-null override, or the source's
+declaration-linked default when there is no override. Omitted, `null`, and
+`undefined` overrides share the same no-override identity. Switching injectors
+must not retain instances with their old dependencies.
+
+This identity/lifetime policy is proposed runtime behavior, not proved by the
+type contracts. Source lifetime after its declaration view is destroyed, capture
+retention, and transplanted-view refresh still need validation.
+
+Fragments generalize deferred view creation rather than merely renaming
+`ng-content` projection. Each outlet can own separate component/directive instances
+and cleanup. Mounting the same source twice must not move one pre-existing DOM
+subtree between the outlets.
+
+## 7. Derivations, reactivity, and cleanup
+
+`@derive price = simulation(item={item} qty={1});` introduces a `Signal<T>` for
+later siblings and descendants in that template scope. It accepts only input
+bindings, including `once:`. It has no host, models, outputs, fragments, or
+providers configuration.
+
+A lowering can allocate a derivation record in the enclosing `LView`, allocate
+and seed its input nodes, then call setup once in that view's injection context.
+Later updates write inputs before uses of the returned signal. Each `@for` row
+owns a distinct instance; a tracked row move retains it, and row destruction
+disposes its resources. Signal results can depend on injected reactive services
+as well as inputs; they are not just pure input-tuple caches.
+
+Existing [pipe allocation](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/pipe.ts) offers an analogue
+for per-view slots, DI, and destroy hooks, but has different contracts. Pure pipe
+bindings cache on argument identity; a derivation returns a live signal. Copying
+pipe creation or a generic `runInInjectionContext` call does not automatically
+establish the desired derivation injector and lifetime at a declaration that has
+no native node. Those require a deliberate view-level context or logical site.
+Likewise, `new SomePipe(...)` does not synthesize constructor arguments from DI;
+the readme's `DatePipe` wrapper explicitly calls `inject(LOCALE_ID)` and passes it.
+
+Existing
+[reactive view consumers](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/reactive_lview_consumer.ts)
+track template signal reads and mark ancestor traversal on invalidation. Embedded
+views normally share the active containing component's consumer; temporary
+consumers cover some direct embedded-view refresh paths. They do not normally
+receive an independent consumer per row. A bridge can retain this granularity;
+finer derivation or fragment scheduling would be a separate change.
+
+Lifecycle is owned by framework contexts rather than user prototypes:
+`DestroyRef.onDestroy` handles teardown, effects handle live reactions, and render
+hooks handle post-render work. Setup is not rerun on signal updates. Existing
+[effect creation](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/reactivity/effect.ts) uses
+`ViewContext` and `DestroyRef` to distinguish view effects from root effects;
+an environment-injector-only adapter could accidentally change both timing and
+cleanup. The bridge must preserve view-aware contexts for setup, directives,
+and derivations, with ordinary owning-view cleanup as described in section 5.
+`afterNextRender` and `afterRenderEffect` do not execute during SSR. Removing lifecycle hooks from
+`.ng` authoring does not remove their runtime support for decorator-based classes.
+
+## 8. Explicit refs and public values
+
+`ref` and `refMany` are read-only signals populated by the framework. They target
+native values at native sites and expose values at component/directive sites;
+`:ref` captures a particular directive. Without expose, the declared types are
+`Ref<undefined>` and `Ref<[]>`. They do not permit arbitrary provider reads.
+
+The compiler can register values directly at explicit sites, avoiding query
+predicate matching. Registration still needs lifecycle/order bookkeeping:
+
+- A single ref used at several sites follows the spec's “last rendered wins” rule
+  in template order. Removing the winning site should reveal a surviving earlier
+  site, or `undefined` when none remains. This fallback is a proposed runtime
+  interpretation; unconditionally clearing on any site's destruction would lose
+  an active match.
+- `refMany` should reflect active sites in rendered template order, including
+  tracked `@for` moves and view creation/destruction. A one-time append is
+  insufficient; internal site identity must distinguish repeated instances.
+- Publication must be consistent with completed rendering. The proposal tells
+  users to read refs after render hooks; initial setup cannot assume child refs
+  already exist. Render hooks do not make refs a browser-only storage mechanism.
+
+Existing refs use `TNode.localNames` and native/directive slots. Existing
+[signal queries](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/render3/queries/query_reactive.ts) are lazy
+computed signals invalidated through query dirtiness, with a guard against partial
+creation results. Explicit refs are a different selection contract; they should
+not be justified by claiming current queries always walk the entire tree on every
+change-detection pass.
+
+## 9. CSS, SSR, hydration, and native security
+
+The current `.ng` config declares `style` and `styleUrl`, not an `encapsulation`
+option or component host-binding object. CSS policy beyond those fields remains
+open. In particular, a native root does not by itself grant a Shadow DOM API;
+shadow-root-compatible hosts are more restrictive than `HTMLElement | SVGElement`.
+
+For hostless components, retaining emulated **content** scoping is plausible.
+Angular already splits CSS rewriting in
+[ShadowCss](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/compiler/src/shadow_css.ts) from attribute application in
+[the DOM renderer](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/platform-browser/src/dom/dom_renderer.ts).
+Content attributes can remain while host selectors and host attributes are
+unavailable, as PR #70189 demonstrates. Hostless operation does not inherently
+require a separate Svelte/Vue-style scoping engine or compiler-emitted attribute
+write for every element.
+
+For native-root components, renderer selection and scoping must account for the
+element being both the declared root and an element authored in its own template.
+It may need both that component's content scope and a host scope if host-selector
+support is chosen, as well as its parent's applicable scope. Normal host creation
+does not settle this automatically. Fragment-rendered content should retain its
+source's lexical style ownership and declaration-linked default DI ancestry.
+An explicit embedded-view injector changes dependency lookup, not the fragment's
+source/style ownership or lexical captures.
+
+SSR and hydration must preserve the same ownership and ordering:
+
+- Logical boundaries need serialized anchors, root ranges/counts, template/source
+  identity, and compatible client lookup. Existing hydration host-attribute
+  assumptions require extensions; PR #70189 illustrates changes in
+  [annotation](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/hydration/annotate.ts) and
+  [lookup](https://github.com/angular/angular/blob/ff0dbf1cd47bb2a252ae87719dd193a8fbb064e2/packages/core/src/hydration/node_lookup_utils.ts).
+- Native roots must hydrate one element with the merged directive set, not claim
+  it independently as both parent host and child root. Namespace and valid HTML
+  placement matter, especially for table, select, and SVG content.
+- Functional captures, binding nodes, and host getter/handler closures are
+  reconstructed on the client. Server setup having run once does not mean client
+  setup is skipped. Initial values/conditions must yield matching DOM or follow
+  an explicit mismatch/skip policy.
+- `host.register` getters run on the server and render serializable DOM state.
+  Client instance closures must be reconstructed with values consistent with the
+  server DOM or an explicit mismatch policy. Native properties and handler
+  functions are not all HTML-serializable; no restoration snapshots are required.
+- Host listeners retain Angular's scheduling, error handling, teardown, and
+  applicable event-replay integration. Hydration and view recreation must avoid
+  duplicate listeners. DOM-only defer triggers need actual native targets; a logical root
+  does not provide one automatically.
+
+All DOM binding writes must use renderer/security semantics.
+Typing expressions as TypeScript does not replace sanitization based on the real
+tag and binding target. `attr:disabled` returning `false` writes a present
+attribute containing `'false'`; `null` removes it. Boolean native properties use
+property semantics. Hostless logical handles must not accidentally bypass the
+no-DOM-host contract through legacy element APIs.
+
+## 10. Work required and decisions still open
+
+| Area                     | Existing reuse                                              | Required extension or unresolved decision                                                               |
+| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Lexical authoring        | Shared template functions, `TView`/`LView`                  | `.ng` parser/checker/lowering; per-instance capture representation                                      |
+| Seeded setup             | Signal input nodes, node factories                          | Pre-setup allocation/seeding; initial expression reuse and tracking; subscription timing                |
+| Input-driven providers   | Lazy factories, provider/multi-provider machinery           | Per-instance closures for shared fixed layout; seeded inputs and execution contexts                     |
+| Identity and expose      | Definitions, DI lookup, component views                     | Internal/public separation, public injection, debug/API adapters                                        |
+| Hostless roots           | Element-container anchors, PR experiment                    | Full owned-node/renderer/hydration contract and logical handles                                         |
+| Native roots             | Parent-owned hosts, element renderer, directive composition | Compiler-generated host metadata; child-context root bindings and preserved directive/styling semantics |
+| View-lifetime directives | Static directive slots, host bindings, destroy machinery    | Explicit input/output targeting; ordinary effect/listener/output/ref cleanup                            |
+| Registered host bindings | Native binding instructions, styling precedence             | Instance closures, view-lifetime cleanup, SSR/hydration reconstruction                                  |
+| Fragments                | Embedded views, containers, declaration links               | Callable sources/captures, declaration-site DI, identity and injector reconciliation                    |
+| Derivations              | Per-view slots, signal graph                                | Seeded input record, node-less view context, cleanup                                                    |
+| Refs                     | Signals, view insertion/removal bookkeeping                 | Explicit site registry, last-site fallback, collection order                                            |
+
+Runtime experiments should check the contracts rather than only emitted
+instruction names. Particularly useful cases are two instances with different
+input seeds sharing fixed registrations but independent factories/services;
+callback isolation and ambient-state restoration; side-effectful initial expressions;
+parent signals read only for seeds; same-node peer injection; a native root with different directives
+at different call sites; view destruction/recreation with effects and providers;
+class-map changes, styling collisions, and attribute/property semantics;
+declaration-side `Theme` lookup despite a receiver provider; explicit injector
+lookup and declaration fallback with Angular's flags; nullish override identity;
+fragment source and injector changes; repeated fragment outlets; ref fallback and
+tracked row reordering; and hydrated view recreation without leaked resources or
+duplicate listeners.
+
+The source proposal's compile-time examples establish type relationships, not
+these runtime properties. It also leaves full decorator interoperability,
+programmatic creation/attachment, and a testing API intentionally incomplete.
+Logical-host registration uses an explicitly unallocated extension diagnostic;
+D044 remains the checking spec's native-root type mismatch diagnostic. Extension
+sketches are not implemented APIs.
+
+## 11. Runtime feasibility assessment
+
+With directive applications fixed to view lifetimes and no DOM baseline
+restoration contract, the runtime proposal, including the host-binding extension,
+scores approximately **8/10 for practical feasibility within Ivy**. Fixed provider
+registrations allow shared injector layout; view-lifetime directives, ordinary
+host-binding cleanup, and declaration-site fragment DI improve reuse of Ivy's
+existing machinery. Per-instance factories, initialization, and hydration still
+require prototypes.
+
+These scores are qualitative engineering judgments based on the source analysis
+above. A score of 10 means a strong architectural fit with manageable extensions;
+5 means feasible but requiring substantial architectural changes; 1 means severe
+incompatibility with the existing runtime. They are not measured performance
+results, delivery estimates, or probabilities of upstream acceptance. The overall
+score reflects interactions between features, not an arithmetic average.
+
+There is no obvious fundamental blocker in the contracts examined here. Ivy
+already supplies views, containers, signals, rendering, and scheduling. The
+hardest changes concern early initialization, per-instance provider factories,
+fragment outlet reconciliation, and hydration. Native-root lifting has a plausible
+compiler-generated host path that preserves ordinary Ivy ownership; its remaining
+integration work does not, by itself, justify treating it as a major ownership
+redesign.
+
+### 11.1 Feasibility by runtime area
+
+| Runtime area                                     | Score  | Main difficulty                                                                                             |
+| ------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------- |
+| Functional setup and lexical captures            | 8/10   | Separate internal records from public expose; preserve view-aware injection                                 |
+| Derivations and explicit refs                    | 8/10   | Initialization, ordered registration, and cleanup                                                           |
+| Hostless components                              | 7/10   | Node ranges, movement, rendering, and hydration; PR #70189 supplies useful experimental evidence            |
+| Inputs available before setup                    | 6/10   | Change creation order while preserving expression evaluation and reactive tracking                          |
+| Fragments with declaration-site DI               | 8/10   | Preserve declaration links; reconcile sources, arguments, and optional embedded-view injectors              |
+| Input-driven providers                           | 7/10   | Per-instance factories for fixed shared layout; initialization and execution contexts                       |
+| Native-root lifting and directive merging        | 6–7/10 | Generate a native host; preserve child scope, template styling priority, and root-local directive semantics |
+| View-lifetime directives and registered bindings | 8/10   | Explicit targeting, instance closures, native binding semantics, and ordinary cleanup                       |
+
+The lower scores identify greater architectural distance and unresolved semantics,
+not evidence that those features are impossible. View-lifetime `host.register`
+bindings reuse normal evaluation, diffing, styling precedence, and cleanup,
+without directive-only detachment or DOM snapshot restoration.
+The native-root score assumes the compiler-generated host approach in §4.4 and
+the existing single unconditional root restriction. The overall assessment remains
+contingent on initialization, provider/injector, root-binding, and hydration
+prototypes. Declaration-site fragment DI removes
+the need to suppress declaration fallback or select receiver ancestry by default.
+
+### 11.2 The most difficult points
+
+**Native-root lifting needs semantic preservation, not necessarily new ownership
+(§4.4).** A compiler can lift the authored element into host metadata, keep the
+host and call-site directives in the parent view, and render only its children in
+the component view. Different callers then do not require mutation of the child's
+shared `TView`. The remaining work is preserving child lexical scope, root-local
+directive initialization and injection, refs, renderer scoping, and template
+styling priority. These are meaningful integration requirements, but are more
+tractable than an approach that shares one element across independent logical
+owners. A prototype should validate those semantics using the compiler-generated
+host approach first.
+
+**Registered bindings need instance and hydration integration (§5 and §9).**
+Static layout can reuse native host-binding instructions, but getter/handler
+closures belong to instances and must be released with their views. Initial
+signal reads must establish tracking; hydration must reconstruct matching values
+without duplicate listeners. Styling fallback uses the existing pipeline rather
+than captured native state. These integrations require prototypes even though
+ordinary view cleanup now matches directive lifetimes.
+
+**Early inputs require a coherent initialization model (§3.2–§3.3).** Allocating
+and seeding signals is comparatively straightforward. Evaluating initial
+expressions exactly once, tracking their signal dependencies, supporting
+template-local values, and preventing DI from constructing an unseeded peer are
+harder. Caching initial values solves duplicate evaluation only if dependency
+tracking is also handled. A prototype should establish the complete initialization
+order rather than add isolated pre-factory writes.
+
+**Providers need per-instance closures within shared layout (§3.4).** Fixed
+registrations fit Ivy; initialization and compiler analysis still need prototypes.
+
+These difficulties compound. A directive attached to a lifted root, contributing
+input-driven providers and registered bindings in a hydrated view, exercises
+several integrations simultaneously. Solving each feature independently would
+not establish that their combination works. Allocation, retained captures,
+injector lookup, and binding evaluation have unmeasured memory and performance
+costs.
+
+### 11.3 Suggested prototype sequence
+
+1. **Establish the core instance model:** internal records and expose, per-instance
+   binding allocation, seeded setup, reactive tracking, and fixed providers with
+   per-instance closures and callback isolation.
+2. **Validate view-lifetime directives and registered bindings:** explicit targeting,
+   instance getters/handlers, binding diffing, styling collisions, and ordinary
+   effect/listener/output/ref cleanup. Check view recreation and tracked row moves.
+3. **Validate view-based features:** derivations, ordered refs, and fragment
+   outlets with lexical captures and declaration-site DI. Check explicit embedded-view
+   injectors, declaration fallback and injection flags, nullish override identity,
+   source/injector replacement, repeated outlets, and cleanup.
+4. **Validate root lowering:** hostless node ranges and compiler-generated native
+   hosts, including child-context root bindings, template styling priority,
+   root-local and call-site directive combinations, and renderer scoping.
+5. **Combine SSR/hydration and lifecycle validation:** reconstruct instance closures,
+   hydrate one native host element, preserve matching initial values, and destroy
+   and recreate views without duplicated listeners or leaked resources.
+
+This sequence is a recommendation for gathering evidence, not a change to the
+authoring contracts. The core deserves an implementation experiment; the full
+proposal needs concrete evidence for initialization, provider/injector behavior,
+root-binding semantics, and combined hydration/lifecycle cleanup before it can
+be treated as a production-ready runtime design.
