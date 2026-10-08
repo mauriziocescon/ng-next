@@ -284,8 +284,8 @@ const variants = [
 ];
 ---
 
-<Base title="Element Directives" description="Element directives applied with use:directive(), typed against host elements, and fixed for their owning view lifetime — no magic selectors.">
-  <h2>Element Directives</h2>
+<Base title="Directives" description="Element directives applied with use:directive(), typed against host elements, and fixed for their owning view lifetime — no magic selectors.">
+  <h2>Directives</h2>
   <p class="subtitle">Directives are always explicit — no selector matching, just <code>use:</code>.</p>
 
   <p>
@@ -304,18 +304,6 @@ const variants = [
   <div class="annotation" role="note">
     <strong>No magic selectors:</strong> directives are applied where you see them (<code>use:</code>),
     type-checked against the host element, and fixed for the owning view's lifetime.
-    Their bindings remain reactive, e.g. <code>use:tooltip(message=&#123;tip()&#125;)</code>.
-    Sites inside <code>@if</code> or <code>@for</code> are destroyed and recreated
-    with their views; a tracked row move retains its directive instances.
-    Removing a site with <code>@if</code> recreates its subtree on re-entry, so
-    element identity, focus, and component-local state are not preserved across it.
-  </div>
-
-  <div class="annotation" role="note">
-    <strong>Host is <code>HTMLElement | SVGElement | RootNode</code>:</strong> a directive's <code>host</code> type is
-    the <code>DirectiveHostType</code> union — a native HTML element (the common case, e.g. <code>host: ref&lt;HTMLElement&gt;()</code>),
-    a native SVG element (e.g. <code>host: ref&lt;SVGSVGElement&gt;()</code>),
-    or a component's default <code>RootNode</code>.
   </div>
 
 </Base>

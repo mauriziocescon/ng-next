@@ -189,7 +189,7 @@
     "explanation": "Correct. With autoProvided: true, the token is registered at root scope automatically — no need for provide() in the component's providers array."
   },
   {
-    "category": "DI: Providers",
+    "category": "DI: Input-Driven Providers",
     "description": "Input-driven provider factory with hoisted input access.",
     "code": "class CounterStore {\n  private readonly counter: WritableSignal<number>;\n  readonly value = this.counter.asReadonly();\n\n  constructor(start: InputSignal<number>) {\n    this.counter = linkedSignal(() => start());\n  }\n\n  decrease() { this.counter.update(v => v - 1); }\n  increase() { this.counter.update(v => v + 1); }\n}\n\nexport const Counter = component({\n  bindings: { start: input<number>(0) },\n  providers: ({ start }) => [\n    provide(CounterStore, () => new CounterStore(start)),\n  ],\n  setup: () => {\n    const store = inject(CounterStore);\n    return @{ <span>{store.value()}</span> };\n  },\n});",
     "valid": true,
