@@ -8,7 +8,7 @@ description: "Input-driven providers — hoist inputs to the component level so 
 
 <p class="subtitle">Inputs are hoisted — <code>providers</code> can depend on them before <code>setup</code> runs.</p>
 
-Provider factories receive inputs as signals and run in an injection context — enabling reactive, input-driven service instances.
+With seeded inputs, `providers` runs once before `setup`, without injection context or reactive tracking. Its registered factories resolve lazily in an injection context.
 
 ```typescript
 import { component, linkedSignal, input, WritableSignal, provide, inject } from '@angular/core';

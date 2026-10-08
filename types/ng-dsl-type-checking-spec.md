@@ -743,6 +743,21 @@ Root(C) is what a directive applied at a `<C .../>` call site attaches to; see
 ─────────────────────────────────────────────────────────────────
 ```
 
+**Proposed provider semantics (components and directives):** call `providers(inputs)`
+synchronously once per instance after input seeding, outside an injection context
+and without reactive tracking. Input reads are allowed; `inject()` is unavailable.
+Register the returned array before `setup`; resolve value factories lazily in an
+injection context using Angular's normal provider semantics. Input changes do not
+rerun the callback, rebuild registrations, or automatically recreate services;
+retained input signals remain readable.
+
+Token identities, registration count/order, and provider kinds must be fixed across
+instances, preserving repeated multi-token order. Closures and values may depend
+on inputs, including conditional logic inside factories; input-dependent token/list
+selection is unsupported. Neither once-per-instance execution nor `Provider[]`
+enforces this invariant. Compiler analysis and any syntax restrictions remain
+undecided; these sketches do not implement that check.
+
 ---
 
 ## 6. Root Resolution
@@ -861,6 +876,7 @@ Without a bindings record:
 InputsOnly uses PROVIDERS-INPUTS-ONLY (§5.1); excluded binding access → D007.
 The callback must return Angular Provider[]; other type mismatches → D017.
 Host context and setup's expose result are not callback arguments.
+Provider semantics follow §5.1.
 ─────────────────────────────────────────────────────────────────
 ```
 

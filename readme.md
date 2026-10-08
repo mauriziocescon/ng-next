@@ -300,7 +300,7 @@ export const Consumer = component({
 
 ## Input-driven providers
 
-Inputs hoisted to the component level for use in provider initialization (`providers` receives only inputs — not models or outputs). Provider factories run in an injection context — `inject()` works inside them:
+Inputs hoisted to the component level for use in provider initialization. `providers(inputs)` runs synchronously once per instance after input seeding, before `setup`, with inputs only and no injection context or reactive tracking. Registered factories resolve lazily in an injection context.
 
 ```ts
 import { component, linkedSignal, input, WritableSignal, Signal, provide, inject } from '@angular/core';
