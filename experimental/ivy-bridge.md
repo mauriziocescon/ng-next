@@ -829,7 +829,7 @@ no-DOM-host contract through legacy element APIs.
 
 | Area                     | Existing reuse                                              | Required extension or unresolved decision                                                         |
 | ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Lexical authoring        | Shared template functions, `TView`/`LView`                  | `.ng` parser/checker/lowering; per-instance capture representation                                |
+| Lexical authoring        | Shared template functions, `TView`/`LView`                  | `.ng` parser/lowering; checking via a TS 7.1 content mapper; per-instance capture representation  |
 | Seeded setup             | Signal input nodes, node factories                          | Pre-setup allocation/seeding; initial expression reuse and tracking; subscription timing          |
 | Input-driven providers   | Lazy factories, provider/multi-provider machinery           | Per-instance closures for shared fixed layout; seeded inputs and execution contexts               |
 | Identity and expose      | Definitions, DI lookup, component views                     | Internal/public separation, public injection, debug/API adapters                                  |
