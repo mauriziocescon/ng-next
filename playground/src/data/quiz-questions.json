@@ -32,10 +32,10 @@
     "description": "Conditional class:, style:, and native element bindings.",
     "code": "export const Alert = component({\n  bindings: {\n    message: input.required<string>(),\n    severity: input<'info' | 'warn' | 'error'>('info'),\n  },\n  setup: ({ message, severity }) => {\n    const visible = signal(true);\n\n    return @{\n      <div\n        class:alert-visible={visible()}\n        class:alert-error={severity() === 'error'}\n        style:padding={'1rem'}\n        style:opacity={visible() ? '1' : '0'}>\n        <p>{message()}</p>\n        <button on:click={() => visible.set(false)}>Dismiss</button>\n      </div>\n    };\n  },\n  style: `\n    .alert-visible { display: block; }\n    .alert-error { border: 1px solid red; }\n  `,\n});",
     "valid": true,
-    "explanation": "Correct. Multiple class: and style: bindings on the same element are allowed and independently reactive. Native element properties (like on:click) follow the same bind:/on: rules."
+    "explanation": "Correct. Multiple class: and style: bindings on the same element are allowed and independently reactive. Native element events (like on:click) follow the same on: rules."
   },
   {
-    "category": "Lexical Scoping",
+    "category": "DI: Input-Driven Providers",
     "description": "Providers accessing an output binding alongside an input.",
     "code": "class Logger {\n  constructor(readonly count: Signal<number>) {}\n}\n\nexport const Info = component({\n  bindings: {\n    count: input.required<number>(),\n    reset: output<void>(),\n  },\n  setup: ({ count, reset }) => @{\n    <p>Count: {count()}</p>\n    <button on:click={() => reset.emit()}>Reset</button>\n  },\n  providers: ({ count, reset }) => [\n    provide(Logger, () => new Logger(count)),\n  ],\n});",
     "valid": false,
@@ -149,9 +149,9 @@
   {
     "category": "Component Root",
     "description": "Applying a use: directive to a component that omits rootNode (default RootNode).",
-    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button omits rootNode, so its root defaults to RootNode\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children()())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'}) on:click={doStuff}>\n      Click\n    </Button>\n  },\n});",
+    "code": "const tooltip = directive({\n  host: ref<HTMLElement>(),\n  bindings: {\n    message: input.required<string>(),\n  },\n  setup: ({ message }, { host }) => {\n    afterRenderEffect(() => { /* ... */ });\n  },\n});\n\n// Button omits rootNode, so its root defaults to RootNode\nconst Button = component({\n  bindings: {\n    children: fragment.required<void>(),\n  },\n  setup: ({ children }) => @{\n    <button>@render(children()())</button>\n  },\n});\n\nexport const App = component({\n  setup: () => @{\n    <Button use:tooltip(message={'hi'})>\n      Click\n    </Button>\n  },\n});",
     "valid": false,
-    "explanation": "Invalid. Button omits rootNode, so its root defaults to RootNode — it exposes no native element for a tag-specific directive to land on. To accept use:tooltip at the call site, Button must declare a native-element root with rootNode: element<HTMLButtonElement>()."
+    "explanation": "Invalid. Button omits rootNode, so its root defaults to RootNode — it exposes no native element for a host: ref<HTMLElement>() directive to land on. To accept use:tooltip at the call site, Button must declare a native-element root with rootNode: element<HTMLButtonElement>()."
   },
   {
     "category": "Component Root",
@@ -191,8 +191,8 @@
   {
     "category": "DI: Input-Driven Providers",
     "description": "Input-driven provider factory with hoisted input access.",
-    "code": "class CounterStore {\n  private readonly counter: WritableSignal<number>;\n  readonly value = this.counter.asReadonly();\n\n  constructor(start: InputSignal<number>) {\n    this.counter = linkedSignal(() => start());\n  }\n\n  decrease() { this.counter.update(v => v - 1); }\n  increase() { this.counter.update(v => v + 1); }\n}\n\nexport const Counter = component({\n  bindings: { start: input<number>(0) },\n  providers: ({ start }) => [\n    provide(CounterStore, () => new CounterStore(start)),\n  ],\n  setup: () => {\n    const store = inject(CounterStore);\n    return @{ <span>{store.value()}</span> };\n  },\n});",
+    "code": "class CounterStore {\n  private readonly counter: WritableSignal<number>;\n  readonly value: Signal<number>;\n\n  constructor(start: InputSignal<number>) {\n    this.counter = linkedSignal(() => start());\n    this.value = this.counter.asReadonly();\n  }\n\n  decrease() { this.counter.update(v => v - 1); }\n  increase() { this.counter.update(v => v + 1); }\n}\n\nexport const Counter = component({\n  bindings: { start: input<number>(0) },\n  providers: ({ start }) => [\n    provide(CounterStore, () => new CounterStore(start)),\n  ],\n  setup: () => {\n    const store = inject(CounterStore);\n    return @{ <span>{store.value()}</span> };\n  },\n});",
     "valid": true,
-    "explanation": "Correct. Inputs are hoisted and available in providers before setup runs. The factory has injection context."
+    "explanation": "Correct. Inputs are hoisted and available in providers before setup runs. providers itself has no injection context; the registered factory resolves lazily in one."
   }
 ]
