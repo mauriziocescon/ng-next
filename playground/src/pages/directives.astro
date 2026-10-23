@@ -51,7 +51,7 @@ const annotations = [
   },
   {
     token: 'directive({',
-    explanation: 'Factory function. Config shape: host → bindings → setup. No template, no providers.',
+    explanation: 'Factory function. Config shape: host → bindings → setup → providers. No template.',
     category: 'keyword',
   },
   {
@@ -61,7 +61,7 @@ const annotations = [
   },
   {
     token: 'bindings:',
-    explanation: 'Public API — inputs, models, outputs, fragments. Same shape as component bindings.',
+    explanation: 'Public API — inputs, models, outputs, fragments. Same shape as component bindings, without reserved names.',
     category: 'keyword',
   },
   {
