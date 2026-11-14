@@ -83,7 +83,7 @@ function llmsTxt() {
           '8. Dependency Injection Enhancements,',
           '9. Final considerations + types.',
           '',
-          '**Template syntax note**: markup lives inside a `@{ }` literal (the `@` marks the TypeScript→DSL boundary), supporting Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.',
+          '**Syntax note**: markup lives inside a `@{ }` literal (the `@` marks the TypeScript→DSL boundary), supporting Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.',
           '',
           '## Topics',
           '',

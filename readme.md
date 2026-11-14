@@ -19,7 +19,7 @@ Highlights:
 8. Dependency Injection Enhancements,
 9. Final considerations + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
-**Template syntax note**: markup lives inside a `@{ }` literal (the `@` marks the TypeScript→DSL boundary), supporting Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
+**Syntax note**: markup lives inside a `@{ }` literal (the `@` marks the TypeScript→DSL boundary), supporting Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
 
 <details>
   <summary><strong>Table of contents</strong></summary>
