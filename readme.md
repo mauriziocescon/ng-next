@@ -1,25 +1,25 @@
 # Exploring Angular Templates for an Agentic Future
 
-**⚠️ Note ⚠️: personal thoughts on Angular's future template layer: explicit contracts, typed template surfaces, and structures that are easier for humans, tooling, and AI agents to reason about.**
+**⚠️ Note ⚠️: personal thoughts on Angular's future template layer — explicit contracts and typed template surfaces that aim to be easier for humans, tooling, and AI agents to reason about.**
 
 Highlights:
 
 1. Building blocks as functions:
   - `*.ng` files with template DSL (see [appendix](#appendix-co-located-templates-in-angular-via-ng-files)),
-  - `component`: a `setup` with scoped logic that returns a `template` or `{ template, expose }`,
-  - `directive`: a `setup` that can change the appearance or behavior of DOM elements,
-  - `derivation`: a factory for template-scoped computed values that requires DI,
-  - `fragment`: a way to capture some markup in the form of a function,
+  - `component`: a `setup` returning a `template` or `{ template, expose }`,
+  - `directive`: a `setup` that changes the appearance or behavior of DOM elements,
+  - `derivation`: a DI-backed factory for template-scoped computed values,
+  - `fragment`: markup captured as a function,
 2. TS expressions with `{}`: bindings + text interpolation
-3. Extra bindings for DOM elements: `bind:`, `on:`, `model:`, `class:`, `style:`, `animate:`, `use:`,
+3. Extra DOM bindings: `bind:`, `on:`, `model:`, `class:`, `style:`, `animate:`, `use:`,
 4. Hostless components + TS lexical scoping for templates,
-5. Component inputs: lifted up + immediately available in setup and providers,
+5. Component inputs: lifted up, available in setup and providers,
 6. Expose and Template Refs,
 7. Composition with Fragments and Directives,
 8. Dependency Injection Enhancements,
 9. Final considerations + [`types`](https://github.com/mauriziocescon/ng-next/blob/main/types/ng-types.ts).
 
-**Template syntax note**: template markup is written inside a `@{ }` markup literal (the `@` marks the TypeScript→DSL boundary). It supports Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
+**Template syntax note**: markup lives inside a `@{ }` literal (the `@` marks the TypeScript→DSL boundary), supporting Angular control flow, directives, custom bindings, and an Angular-owned `IntrinsicElements` map for native tag typing.
 
 <details>
   <summary><strong>Table of contents</strong></summary>
@@ -43,9 +43,7 @@ Highlights:
 
 ## Component structure and bindings
 
-`setup` runs once in an injection context. Bindings are immediately available; destructuring is optional.
-
-Native elements resolve through `IntrinsicElements` — the compiler knows valid attributes, properties, and events. Binding syntax:
+`setup` runs once in an injection context. Bindings are immediately available; destructuring is optional. Native elements resolve through `IntrinsicElements`. Binding syntax:
 
 - 1-way: `bind:property={var}` (`bind:` can be omitted)
 - 2-way: `model:property={var}` (input / select / textarea)
